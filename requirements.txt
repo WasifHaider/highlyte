@@ -1,0 +1,10 @@
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+yt-dlp>=2026.8.19
+youtube-transcript-api==0.6.3
+faster-whisper==1.1.0
+pydantic==2.10.3
+python-multipart==0.0.20
+supabase==2.10.0
+python-dotenv==1.0.1
+openai==1.57.4

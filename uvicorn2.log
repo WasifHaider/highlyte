@@ -1,0 +1,19 @@
+INFO:     Started server process [29164]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:5822 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5824 - "POST /api/generate HTTP/1.1" 200 OK
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+INFO:     127.0.0.1:30218 - "GET /api/status/f860795cfef3 HTTP/1.1" 200 OK
+[download]   0.3% of  302.04KiB at   54.58KiB/s ETA 00:05[download]   1.0% of  302.04KiB at  123.17KiB/s ETA 00:02[download]   2.3% of  302.04KiB at  260.22KiB/s ETA 00:01[download]   5.0% of  302.04KiB at  518.22KiB/s ETA 00:00[download]  10.3% of  302.04KiB at  531.64KiB/s ETA 00:00[download]  20.9% of  302.04KiB at  549.19KiB/s ETA 00:00[download]  42.0% of  302.04KiB at  207.83KiB/s ETA 00:00[download]  84.4% of  302.04KiB at  286.58KiB/s ETA 00:00[download] 100.0% of  302.04KiB at  299.96KiB/s ETA 00:00[download] 100% of  302.04KiB in 00:00:01 at 232.05KiB/s                                                         Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+D:\Personal\HighLyte\.venv\Lib\site-packages\huggingface_hub\file_download.py:150: UserWarning: `huggingface_hub` cache-system uses symlinks by default to efficiently store duplicated files but your machine does not support them in C:\Users\whaid\.cache\huggingface\hub. Caching files will still work but in a degraded version that might require more space on your disk. This warning can be disabled by setting the `HF_HUB_DISABLE_SYMLINKS_WARNING` environment variable. For more details, see https://huggingface.co/docs/huggingface_hub/how-to-cache#limitations.
+To support symlinks on Windows, you either need to activate Developer Mode or to run Python as an administrator. In order to activate developer mode, see this article: https://docs.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development
+  warnings.warn(message)
+D:\Personal\HighLyte\.venv\Lib\site-packages\huggingface_hub\file_download.py:150: UserWarning: `huggingface_hub` cache-system uses symlinks by default to efficiently store duplicated files but your machine does not support them in C:\Users\whaid\.cache\huggingface\hub\models--Systran--faster-whisper-small. Caching files will still work but in a degraded version that might require more space on your disk. This warning can be disabled by setting the `HF_HUB_DISABLE_SYMLINKS_WARNING` environment variable. For more details, see https://huggingface.co/docs/huggingface_hub/how-to-cache#limitations.
+To support symlinks on Windows, you either need to activate Developer Mode or to run Python as an administrator. In order to activate developer mode, see this article: https://docs.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development
+  warnings.warn(message)
+INFO:     127.0.0.1:46502 - "GET /api/status/f860795cfef3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52638 - "GET /api/status/f860795cfef3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:18039 - "GET /api/status/f860795cfef3 HTTP/1.1" 200 OK

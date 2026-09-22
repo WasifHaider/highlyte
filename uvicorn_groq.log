@@ -1,0 +1,220 @@
+INFO:     Started server process [17556]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:7000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:14647 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51462 - "POST /api/generate HTTP/1.1" 200 OK
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+INFO:     127.0.0.1:46747 - "GET /api/status/d317037fbeb3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/status/d317037fbeb3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34189 - "GET /api/status/d317037fbeb3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52041 - "GET /api/status/d317037fbeb3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60354 - "GET /api/status/d317037fbeb3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13165 - "GET /api/status/d317037fbeb3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:31651 - "GET /api/status/d317037fbeb3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9825 - "GET /api/status/d317037fbeb3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47139 - "GET /api/status/d317037fbeb3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34555 - "GET /api/status/d317037fbeb3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63830 - "GET /api/status/79a84e5e3fbb HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52044 - "OPTIONS /api/generate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "POST /api/generate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+[download]   0.0% of    4.05MiB at  Unknown B/s ETA UnknownINFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+[download]   0.1% of    4.05MiB at    9.88KiB/s ETA 06:59  [download]   0.2% of    4.05MiB at   22.75KiB/s ETA 03:01[download]   0.4% of    4.05MiB at   48.25KiB/s ETA 01:25[download]   0.7% of    4.05MiB at   98.62KiB/s ETA 00:41[download]   1.5% of    4.05MiB at  198.20KiB/s ETA 00:20[download]   3.1% of    4.05MiB at  391.94KiB/s ETA 00:10[download]   6.2% of    4.05MiB at  763.28KiB/s ETA 00:05[download]  12.3% of    4.05MiB at    1.40MiB/s ETA 00:02[download]  24.7% of    4.05MiB at    2.49MiB/s ETA 00:01[download]  49.4% of    4.05MiB at    4.02MiB/s ETA 00:00[download]  98.8% of    4.05MiB at    5.90MiB/s ETA 00:00[download] 100.0% of    4.05MiB at    5.92MiB/s ETA 00:00[download] 100% of    4.05MiB in 00:00:01 at 3.97MiB/s                                                         INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52044 - "GET /api/status/ed0d1b94aa45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11036 - "GET /api/clips/ed0d1b94aa45/clip_0.m4a HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:43194 - "GET /api/clips/ed0d1b94aa45/clip_0.m4a HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:31190 - "GET /api/clips/ed0d1b94aa45/clip_0.m4a HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:61826 - "GET /api/clips/ed0d1b94aa45/clip_1.m4a HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:46478 - "GET /api/clips/ed0d1b94aa45/clip_1.m4a HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:46478 - "GET /api/clips/ed0d1b94aa45/clip_1.m4a HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:32443 - "GET /api/clips/ed0d1b94aa45/clip_0.m4a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "POST /api/generate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5335 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3820 - "GET /api/clips/72c0baad3a0b/clip_0.m4a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2077 - "GET /api/status/72c0baad3a0b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44119 - "GET /api/clips/72c0baad3a0b/clip_0.m4a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "OPTIONS /api/generate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "POST /api/generate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+[download]   0.0% of   10.00MiB at  435.73KiB/s ETA 00:23[download]   0.0% of   10.00MiB at    6.84KiB/s ETA 24:56[download]   0.1% of   10.00MiB at   15.83KiB/s ETA 10:46[download]   0.1% of   10.00MiB at   33.64KiB/s ETA 05:03[download]   0.3% of   10.00MiB at   69.05KiB/s ETA 02:28[download]   0.6% of   10.00MiB at  139.04KiB/s ETA 01:13[download]   1.2% of   10.00MiB at  277.10KiB/s ETA 00:36[download]   2.5% of   10.00MiB at  546.09KiB/s ETA 00:18[download]   5.0% of   10.00MiB at    1.03MiB/s ETA 00:09[download]  10.0% of   10.00MiB at    1.89MiB/s ETA 00:04[download]  20.0% of   10.00MiB at    3.24MiB/s ETA 00:02[download]  40.0% of   10.00MiB at    4.85MiB/s ETA 00:01INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+[download]  80.0% of   10.00MiB at    6.38MiB/s ETA 00:00[download]  97.2% of   10.00MiB at    6.94MiB/s ETA 00:00[download]  97.3% of   10.00MiB at  Unknown B/s ETA Unknown[download]  97.3% of   10.00MiB at    1.48MiB/s ETA 00:00  [download]  97.3% of   10.00MiB at  726.45KiB/s ETA 00:00[download]  97.4% of   10.00MiB at    1.11MiB/s ETA 00:00[download]  97.6% of   10.00MiB at    1.92MiB/s ETA 00:00[download]  97.9% of   10.00MiB at    3.26MiB/s ETA 00:00[download]  98.5% of   10.00MiB at    4.60MiB/s ETA 00:00[download]  99.7% of   10.00MiB at    8.24MiB/s ETA 00:00[download] 100.0% of   10.00MiB at    8.39MiB/s ETA 00:00[download] 100% of   10.00MiB in 00:00:01 at 5.50MiB/s                                                         INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17414 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3627 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52914 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52914 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52914 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52914 - "GET /api/status/421124bbba6e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14067 - "GET /api/clips/421124bbba6e/clip_0.m4a HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:30734 - "GET /api/clips/421124bbba6e/clip_0.m4a HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:30734 - "GET /api/clips/421124bbba6e/clip_0.m4a HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:3226 - "GET /api/clips/421124bbba6e/clip_0.m4a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "POST /api/generate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3975 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61917 - "GET /api/clips/620fce705680/clip_0.m4a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:15507 - "GET /api/status/620fce705680 HTTP/1.1" 200 OK

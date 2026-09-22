@@ -1,0 +1,8 @@
+INFO:     Started server process [35712]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:33822 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34606 - "POST /api/generate HTTP/1.1" 200 OK
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+INFO:     127.0.0.1:41069 - "GET /api/jobs HTTP/1.1" 200 OK

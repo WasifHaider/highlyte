@@ -1,0 +1,4 @@
+threads=auto beam=1: 34.6s for 60s audio -> 1.73x realtime
+threads=auto beam=5: 56.1s for 60s audio -> 1.07x realtime
+threads=8 beam=1: 28.4s for 60s audio -> 2.11x realtime
+threads=8 beam=5: 65.6s for 60s audio -> 0.91x realtime

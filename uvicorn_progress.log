@@ -1,0 +1,24 @@
+INFO:     Started server process [41504]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:7000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:28882 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7302 - "POST /api/generate HTTP/1.1" 200 OK
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+INFO:     127.0.0.1:32539 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:17886 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64171 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51356 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:25392 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:16695 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48082 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37805 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2957 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:20489 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:27302 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43468 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44548 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:20474 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41533 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:18907 - "GET /api/status/59715b3e2c2f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39936 - "GET /api/jobs HTTP/1.1" 200 OK
