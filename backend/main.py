@@ -5,7 +5,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from . import db, storage
 from .pipeline import cut, highlight, ingest, transcript
+from .validation import check_clip_filename, check_id
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(BASE_DIR, "data", "cache")
@@ -40,7 +41,9 @@ app.add_middleware(
 
 class GenerateRequest(BaseModel):
     url: str
-    whisper_model: str = "small"
+    # Allowlisted: this is passed straight to faster-whisper, which would
+    # otherwise download whatever model name a client sends.
+    whisper_model: Literal["tiny", "base", "small", "medium"] = "small"
 
 
 @dataclass
@@ -279,6 +282,8 @@ def get_clip(job_id: str, filename: str):
     # stays stable regardless of where the bytes actually live — R2 or
     # local disk — and regardless of a presigned URL's expiry, since a
     # fresh one is generated per request here rather than stored.
+    check_id(job_id, "job id")
+    check_clip_filename(filename)
     path = os.path.join(CLIPS_DIR, job_id, filename)
     if storage.is_enabled():
         key = storage.clip_key(job_id, filename)
