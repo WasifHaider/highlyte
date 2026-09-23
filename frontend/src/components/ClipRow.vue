@@ -67,7 +67,7 @@ const waveform = computed(() => {
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px;
   transition: border-color .15s ease, background .15s ease;
 }
-.clip-row.playing { background: #F5EFE3; border-color: var(--accent); }
+.clip-row.playing { background: var(--accent-soft); border-color: var(--accent); }
 
 .checkbox {
   width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; margin-top: 2px;

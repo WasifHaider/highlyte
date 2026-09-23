@@ -46,8 +46,11 @@ PAUSE_GAP_S = 0.5
 # single "sentence" can never swallow the whole transcript.
 MAX_SENTENCE_S = 20.0
 # Snapping tolerance when pulling a candidate clip edge onto the nearest
-# sentence boundary.
-SNAP_TOLERANCE_S = 1.5
+# sentence boundary. Sentences are now built from word-level timestamps
+# (see transcript.py), so real sentence boundaries can sit close together
+# (e.g. back-to-back short questions) — kept tight so a clip edge snaps to
+# its own boundary rather than jumping onto a neighboring sentence.
+SNAP_TOLERANCE_S = 0.4
 
 STRONG_MARKERS = [
     "honestly", "actually", "the truth is", "i think", "i believe",
@@ -202,9 +205,14 @@ GROQ_MODEL = "openai/gpt-oss-20b"
 
 # Character budget per LLM call (formatted transcript window). Keeps each
 # call comfortably inside context even for multi-hour podcasts; long
-# transcripts are split into consecutive non-overlapping windows and results
-# from every window are merged before final selection.
+# transcripts are split into windows and results from every window are
+# merged before final selection.
 LLM_WINDOW_CHARS = 9000
+# Sentences repeated at the start of each window from the tail of the
+# previous one, so a highlight whose setup/payoff straddles a window
+# boundary is still fully visible (and pickable) in at least one window.
+# Overlap suppression in `_select_clips` dedupes any span picked twice.
+LLM_WINDOW_OVERLAP_SENTENCES = 8
 # Highlight spans requested per window; final MAX_CLIPS truncation and
 # overlap suppression happen globally across all windows in `_select_clips`.
 LLM_SPANS_PER_WINDOW = 4
@@ -212,7 +220,9 @@ LLM_SPANS_PER_WINDOW = 4
 _JSON_ARRAY_RE = re.compile(r"\[.*\]", re.DOTALL)
 
 
-def _llm_windows(sentences: list[Sentence], max_chars: int) -> list[list[Sentence]]:
+def _llm_windows(
+    sentences: list[Sentence], max_chars: int, overlap_sentences: int = LLM_WINDOW_OVERLAP_SENTENCES
+) -> list[list[Sentence]]:
     windows: list[list[Sentence]] = []
     current: list[Sentence] = []
     current_chars = 0
@@ -220,8 +230,12 @@ def _llm_windows(sentences: list[Sentence], max_chars: int) -> list[list[Sentenc
         line_chars = len(sent.text) + 40  # rough allowance for "[idx] (s-e) "
         if current and current_chars + line_chars > max_chars:
             windows.append(current)
-            current = []
-            current_chars = 0
+            # Carry the tail of this window into the next one, so spans
+            # that straddle the boundary are still fully contained in a
+            # single window somewhere.
+            carry = current[-overlap_sentences:] if overlap_sentences else []
+            current = list(carry)
+            current_chars = sum(len(s.text) + 40 for s in current)
         current.append(sent)
         current_chars += line_chars
     if current:
@@ -245,9 +259,10 @@ def _llm_score_window(client, window: list[Sentence], sentences_by_idx: dict[int
         "above. Each span must be a self-contained idea (setup and payoff, or "
         "question and answer) that makes sense with NO outside context, must "
         "start and end exactly on a listed index (never split a sentence), and "
-        "should be roughly 15-90 seconds long. Rate each span's hook_score "
-        "0-10: how much the first 2-3 seconds of the span would grab a "
-        "scrolling viewer with zero context.\n\n"
+        "should be roughly 15-90 seconds long. end_idx must be the payoff/"
+        "answer/punchline sentence, not a filler line before it. Rate each "
+        "span's hook_score 0-10: how much the first 2-3 seconds of the span "
+        "would grab a scrolling viewer with zero context.\n\n"
         "Reply with ONLY a JSON array, no prose, in this exact shape:\n"
         '[{"start_idx": <int>, "end_idx": <int>, "hook_score": <0-10 number>, '
         '"reason": "<short phrase>", "tag": "<one of: Strong opinion, Key '
@@ -258,8 +273,13 @@ def _llm_score_window(client, window: list[Sentence], sentences_by_idx: dict[int
     resp = client.chat.completions.create(
         model=GROQ_MODEL,
         messages=[{"role": "user", "content": prompt}],
-        max_tokens=1500,  # gpt-oss-20b is a reasoning model — needs headroom
-                          # for hidden reasoning tokens before the JSON answer
+        # gpt-oss-20b is a reasoning model — needs headroom for hidden
+        # reasoning tokens before the JSON answer. Word-level sentence
+        # boundaries mean windows now hold many more (shorter) candidate
+        # lines than before, so the model reasons over more of them;
+        # measured ~850 completion tokens on a 70-line window, so 2200
+        # leaves real margin without letting a stuck response run away.
+        max_tokens=2200,
     )
     content = resp.choices[0].message.content or ""
     match = _JSON_ARRAY_RE.search(content)

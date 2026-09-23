@@ -14,15 +14,29 @@ Fallback path (in order of preference):
 
 Because this app targets podcasts that mix English with Roman-script
 Hindi/Urdu (Hindi/Urdu spoken but written in Latin letters, not Devanagari
-or the Urdu/Nastaliq script), both paths force `language="en"` and seed a
-prompt with a short Roman-Urdu/Hindi sentence. Whisper treats the prompt as
-"text so far" and keeps decoding in the same script family (Latin), instead
-of switching to Devanagari/Urdu script or silently translating the
-Urdu/Hindi portions into English. This is a well-known community technique
-for coaxing Whisper into Roman-Urdu output — see
+or the Urdu/Nastaliq script), both paths force `language="en"` and, when the
+audio actually contains Urdu/Hindi (see `_detect_needs_roman_urdu_hint`),
+seed a prompt with a short Roman-Urdu/Hindi sentence. Whisper treats the
+prompt as "text so far" and keeps decoding in the same script family
+(Latin), instead of switching to Devanagari/Urdu script or silently
+translating the Urdu/Hindi portions into English. This is a well-known
+community technique for coaxing Whisper into Roman-Urdu output — see
 DeveloperSarim/roman-urdu-speech-to-text on GitHub. Do NOT set
 language="ur" or "hi" (that produces native-script output) and do not strip
-the prompt (without it Whisper tends to translate instead of transcribe).
+the prompt on mixed-language audio (without it Whisper tends to translate
+instead of transcribe). The prompt is a strong conditioning signal though —
+sending it on audio that's actually all-English makes Whisper occasionally
+hallucinate a few Urdu-looking words that were never said, so it's only
+sent once a quick probe confirms the audio isn't pure English.
+
+Both paths also request word-level timestamps instead of Whisper's own
+~15-30s segment timestamps. Whisper's segments are decoding windows, not
+sentences — they routinely end mid-sentence, and downstream highlight
+selection (`pipeline.highlight`) can only place a clip boundary where a
+transcript timestamp exists. Word-level timestamps let it rebuild real
+sentence boundaries (punctuation + inter-word pauses) instead of being
+stuck with Whisper's coarse window edges, which is what was causing clips
+to start/end mid-sentence.
 """
 from __future__ import annotations
 
@@ -169,53 +183,127 @@ def _split_audio(audio_path: str, chunk_s: float, out_dir: str) -> list[tuple[fl
     return chunks
 
 
-def _transcribe_chunk_local(chunk_path: str, model_size: str) -> list[tuple[float, float, str]]:
+def _words_from_segments(segments) -> list[tuple[float, float, str]]:
+    """Flatten faster-whisper segments (with word_timestamps=True) into
+    word-level (start, end, text) tuples. Falls back to whole-segment
+    tuples for any segment that has no word list (shouldn't normally
+    happen with word_timestamps=True, but keeps this robust)."""
+    out: list[tuple[float, float, str]] = []
+    for s in segments:
+        words = getattr(s, "words", None)
+        if words:
+            for w in words:
+                text = w.word.strip()
+                if text:
+                    out.append((w.start, w.end, text))
+        elif s.text.strip():
+            out.append((s.start, s.end, s.text.strip()))
+    return out
+
+
+def _transcribe_chunk_local(
+    chunk_path: str, model_size: str, prompt: str | None
+) -> list[tuple[float, float, str]]:
     """Transcribe one chunk with local faster-whisper. beam_size=1 (not 5)
     — measured ~2x throughput on this machine's CPU with a small accuracy
     tradeoff, since this is a fast highlight-scoring pass, not a
-    transcript-of-record."""
+    transcript-of-record. Returns word-level (start, end, text) tuples —
+    see module docstring for why."""
     model = _get_whisper_model(model_size)
     segments, _info = model.transcribe(
         chunk_path,
         language="en",  # forced: keeps output in Latin script (see module docstring)
-        initial_prompt=ROMAN_URDU_HINDI_SEED,
+        initial_prompt=prompt,
         beam_size=1,
         vad_filter=True,
+        word_timestamps=True,
     )
-    return [(s.start, s.end, s.text.strip()) for s in segments if s.text.strip()]
+    return _words_from_segments(segments)
 
 
-def _transcribe_chunk_groq(chunk_path: str, api_key: str) -> list[tuple[float, float, str]]:
+def _transcribe_chunk_groq(
+    chunk_path: str, api_key: str, prompt: str | None
+) -> list[tuple[float, float, str]]:
     """Transcribe one chunk via Groq's hosted Whisper API. Raises on
     failure (including rate limits) — caller decides whether to retry or
-    fall back to local."""
+    fall back to local. Returns word-level (start, end, text) tuples — see
+    module docstring for why."""
     from openai import OpenAI
 
     client = OpenAI(api_key=api_key, base_url=GROQ_BASE_URL)
+    kwargs: dict = dict(
+        model=GROQ_WHISPER_MODEL,
+        language="en",  # forced: keeps output in Latin script (see module docstring)
+        response_format="verbose_json",
+        timestamp_granularities=["word"],
+    )
+    if prompt:
+        kwargs["prompt"] = prompt
     with open(chunk_path, "rb") as f:
-        resp = client.audio.transcriptions.create(
-            model=GROQ_WHISPER_MODEL,
-            file=f,
-            language="en",  # forced: keeps output in Latin script (see module docstring)
-            prompt=ROMAN_URDU_HINDI_SEED,
-            response_format="verbose_json",
-        )
-    segments = getattr(resp, "segments", None) or []
+        resp = client.audio.transcriptions.create(file=f, **kwargs)
+
+    words = getattr(resp, "words", None) or []
     out = []
-    for s in segments:
-        # Groq's response mimics OpenAI's verbose_json shape: dict-like
-        # segments with start/end/text.
-        start = s["start"] if isinstance(s, dict) else s.start
-        end = s["end"] if isinstance(s, dict) else s.end
-        text = (s["text"] if isinstance(s, dict) else s.text).strip()
+    for w in words:
+        start = w["start"] if isinstance(w, dict) else w.start
+        end = w["end"] if isinstance(w, dict) else w.end
+        text = (w["word"] if isinstance(w, dict) else w.word).strip()
         if text:
             out.append((start, end, text))
     if not out:
-        # Fallback: some responses may only carry top-level `.text`.
+        # Fallback: no word timestamps returned (e.g. silent chunk) — use
+        # whatever coarser segment/text info is available so the chunk
+        # isn't silently dropped.
+        segments = getattr(resp, "segments", None) or []
+        for s in segments:
+            start = s["start"] if isinstance(s, dict) else s.start
+            end = s["end"] if isinstance(s, dict) else s.end
+            text = (s["text"] if isinstance(s, dict) else s.text).strip()
+            if text:
+                out.append((start, end, text))
+    if not out:
         text = (getattr(resp, "text", "") or "").strip()
         if text:
             out.append((0.0, _probe_duration(chunk_path), text))
     return out
+
+
+def _detect_needs_roman_urdu_hint(audio_path: str, api_key: str) -> bool:
+    """Probe a short sample of the audio (first 30s) with a plain,
+    unprompted, language-undetected Groq call, and check what language
+    Whisper decides on its own. If it's already confident English, the
+    Roman-Urdu seed prompt is skipped for the whole file — sending it on
+    English-only audio makes Whisper occasionally hallucinate a few
+    Urdu-looking words that were never said (it's a strong conditioning
+    signal, not just a spelling hint). Returns True (use the hint, the
+    prior always-on behavior) if the probe itself fails for any reason, so
+    a Groq hiccup here never breaks mixed-language transcription."""
+    from openai import OpenAI
+
+    tmp_dir = tempfile.mkdtemp(prefix="highlyte_langprobe_")
+    try:
+        sample_path = os.path.join(tmp_dir, "sample.m4a")
+        cmd = [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-i", audio_path, "-t", "30",
+            "-c", "copy", sample_path,
+        ]
+        proc = subprocess.run(cmd, capture_output=True)
+        if proc.returncode != 0 or not os.path.exists(sample_path) or os.path.getsize(sample_path) == 0:
+            return True
+        client = OpenAI(api_key=api_key, base_url=GROQ_BASE_URL)
+        with open(sample_path, "rb") as f:
+            resp = client.audio.transcriptions.create(
+                model=GROQ_WHISPER_MODEL,
+                file=f,
+                response_format="verbose_json",
+            )
+        lang = (getattr(resp, "language", "") or "").strip().lower()
+        return lang not in ("en", "english")
+    except Exception:
+        return True
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 _RETRY_AFTER_RE = re.compile(r"retry.{0,10}?(\d+(?:\.\d+)?)\s*s", re.IGNORECASE)
@@ -255,13 +343,20 @@ def transcribe_whisper(
         used_groq = False
         used_local = False
 
+        # Decide once, up front, whether this file needs the Roman-Urdu
+        # hint at all (see `_detect_needs_roman_urdu_hint`). Defaults to
+        # on (prior behavior) when there's no Groq key to probe with.
+        prompt: str | None = ROMAN_URDU_HINDI_SEED
+        if groq_key and not _detect_needs_roman_urdu_hint(audio_path, groq_key):
+            prompt = None
+
         for i, (offset, chunk_path) in enumerate(chunk_list):
-            raw_segments: list[tuple[float, float, str]] | None = None
+            raw_words: list[tuple[float, float, str]] | None = None
 
             if groq_key:
                 for attempt in range(GROQ_MAX_RETRIES + 1):
                     try:
-                        raw_segments = _transcribe_chunk_groq(chunk_path, groq_key)
+                        raw_words = _transcribe_chunk_groq(chunk_path, groq_key, prompt)
                         used_groq = True
                         break
                     except Exception as e:  # noqa: BLE001
@@ -271,18 +366,19 @@ def transcribe_whisper(
                             continue
                         break  # give up on Groq for this chunk, fall back to local
 
-            if raw_segments is None:
-                raw_segments = _transcribe_chunk_local(chunk_path, model_size)
+            if raw_words is None:
+                raw_words = _transcribe_chunk_local(chunk_path, model_size, prompt)
                 used_local = True
 
-            last_text = ""
-            for start, end, text in raw_segments:
+            preview_words: list[str] = []
+            for start, end, text in raw_words:
                 all_segments.append(TranscriptSegment(
                     start=start + offset,
                     end=end + offset,
                     text=text,
                 ))
-                last_text = text
+                preview_words.append(text)
+            last_text = " ".join(preview_words[-25:])  # word-level now, so preview last ~25 words
             if on_progress is not None:
                 try:
                     on_progress(i + 1, total_chunks, last_text)

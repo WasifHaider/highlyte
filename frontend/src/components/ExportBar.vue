@@ -52,7 +52,7 @@ function onExport() {
 .export-btn {
   border: none; border-radius: 8px; padding: 10px 20px; font-size: 13.5px; font-weight: 600;
   font-family: var(--font-sans); cursor: default; color: #fff;
-  background: rgba(43,38,32,0.25);
+  background: rgba(0,71,65,0.25);
 }
 .export-btn.active { background: var(--accent); cursor: pointer; }
 .toast {

@@ -32,7 +32,7 @@ defineProps({
   height: 101px;
   flex-shrink: 0;
   border-radius: 10px;
-  background: repeating-linear-gradient(45deg,#F5EFE3,#F5EFE3 8px,#EFE6D4 8px,#EFE6D4 16px);
+  background: repeating-linear-gradient(45deg,#F0EDE4,#F0EDE4 8px,#E3DFD3 8px,#E3DFD3 16px);
   border: 1px solid var(--border);
   display: flex;
   align-items: center;

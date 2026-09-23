@@ -1,14 +1,14 @@
-/* Highlyte design tokens — cream/serif/orange theme */
+/* Highlyte design tokens — Cyprus (deep teal) / Sand theme */
 :root {
-  --bg: #FAF6EF;
+  --bg: #F0EDE4;
   --surface: #FFFFFF;
-  --border: #E8E0D2;
-  --ink: #2B2620;
-  --ink-soft: rgba(43,38,32,0.6);
-  --ink-faint: rgba(43,38,32,0.4);
-  --accent: #D4703A;
-  --accent-soft: rgba(212,112,58,0.12);
-  --accent-text: #B85F2E;
+  --border: #D8DCD4;
+  --ink: #004741;
+  --ink-soft: rgba(0,71,65,0.62);
+  --ink-faint: rgba(0,71,65,0.4);
+  --accent: #004741;
+  --accent-soft: rgba(0,71,65,0.1);
+  --accent-text: #004741;
   --font-serif: 'Newsreader', serif;
   --font-sans: 'Public Sans', sans-serif;
 }

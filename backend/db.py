@@ -68,3 +68,26 @@ def list_jobs(limit: int = 20) -> list[dict[str, Any]]:
     except Exception as e:  # noqa: BLE001
         print(f"[supabase] list_jobs failed: {e}")
         return []
+
+
+def list_clips(limit: int = 100) -> list[dict[str, Any]]:
+    """All clips across every job, newest first, each with its parent
+    job's video info embedded (PostgREST foreign-key embed via the
+    clips.job_id -> jobs.id relationship) — this is what backs the
+    Library tab, so a clip is never shown without knowing which video and
+    which job it came from."""
+    client = get_client()
+    if client is None:
+        return []
+    try:
+        res = (
+            client.table("clips")
+            .select("*, jobs(url, video_title, video_channel, video_duration)")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+    except Exception as e:  # noqa: BLE001
+        print(f"[supabase] list_clips failed: {e}")
+        return []

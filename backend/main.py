@@ -9,10 +9,10 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 
-from . import db
+from . import db, storage
 from .pipeline import cut, highlight, ingest, transcript
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -139,6 +139,23 @@ def _run_pipeline(job: Job, whisper_model: str) -> None:
             out_name = f"clip_{i}.mp4"
             out_path = os.path.join(job_clip_dir, out_name)
             cut.cut_clip(meta.video_path, c.start, c.end, out_path)
+
+            # Upload to R2 when configured, then drop the local copy — the
+            # clip is served back out of the bucket, not local disk (see
+            # get_clip below). If the upload fails, keep the local file so
+            # the clip is still servable rather than losing it.
+            storage_provider = "local"
+            storage_key = None
+            if storage.is_enabled():
+                try:
+                    storage_key = storage.clip_key(job.id, out_name)
+                    storage.upload_clip(out_path, storage_key)
+                    os.remove(out_path)
+                    storage_provider = "r2"
+                except Exception as e:  # noqa: BLE001
+                    storage_key = None
+                    print(f"[r2] upload failed for {job.id}/{out_name}, keeping local copy: {e}")
+
             results.append({
                 "id": _clip_id(job.id, i),
                 "start": c.start,
@@ -150,6 +167,8 @@ def _run_pipeline(job: Job, whisper_model: str) -> None:
                 "tag": c.tag,
                 "score": c.score,
                 "downloadUrl": f"/api/clips/{job.id}/{out_name}",
+                "storageProvider": storage_provider,
+                "storageKey": storage_key,
             })
             job.progress = {
                 "stage": "cutting",
@@ -172,6 +191,8 @@ def _run_pipeline(job: Job, whisper_model: str) -> None:
                 "tag": r["tag"],
                 "score": r["score"],
                 "download_path": r["downloadUrl"],
+                "storage_provider": r["storageProvider"],
+                "storage_key": r["storageKey"],
             }
             for i, r in enumerate(results)
         ])
@@ -218,9 +239,58 @@ def jobs() -> list[dict[str, Any]]:
     return db.list_jobs()
 
 
+@app.get("/api/clips")
+def list_all_clips(limit: int = 100) -> list[dict[str, Any]]:
+    """Every clip the user has generated, newest first, with its parent
+    video's title/channel attached — backs the Library tab. Requires
+    Supabase (db.py); returns [] if it isn't configured, same as the
+    other list endpoints, since there's nowhere else this history is
+    durably tracked (the in-memory JOBS dict is lost on restart)."""
+    rows = db.list_clips(limit)
+    out = []
+    for r in rows:
+        job_info = r.get("jobs") or {}
+        start_s = r.get("start_s") or 0.0
+        end_s = r.get("end_s") or 0.0
+        out.append({
+            "id": r["id"],
+            "jobId": r["job_id"],
+            "start": start_s,
+            "end": end_s,
+            "startLabel": ingest.duration_label(start_s),
+            "endLabel": ingest.duration_label(end_s),
+            "durationLabel": ingest.duration_label(end_s - start_s),
+            "text": r.get("text"),
+            "tag": r.get("tag"),
+            "score": r.get("score"),
+            "downloadUrl": r.get("download_path") or f"/api/clips/{r['job_id']}/clip_{r.get('idx', 0)}.mp4",
+            "storageProvider": r.get("storage_provider", "local"),
+            "createdAt": r.get("created_at"),
+            "videoTitle": job_info.get("video_title"),
+            "videoChannel": job_info.get("video_channel"),
+            "videoUrl": job_info.get("url"),
+        })
+    return out
+
+
 @app.get("/api/clips/{job_id}/{filename}")
 def get_clip(job_id: str, filename: str):
+    # This path is what's persisted as each clip's downloadUrl, so it
+    # stays stable regardless of where the bytes actually live — R2 or
+    # local disk — and regardless of a presigned URL's expiry, since a
+    # fresh one is generated per request here rather than stored.
     path = os.path.join(CLIPS_DIR, job_id, filename)
+    if storage.is_enabled():
+        key = storage.clip_key(job_id, filename)
+        # clip_url() doesn't verify the object exists (a presigned URL is
+        # just a signed request, not a lookup), so check first — otherwise
+        # an upload that failed and fell back to the local copy would
+        # still redirect to a 404 in the bucket instead of falling
+        # through to that local copy below.
+        if storage.clip_exists(key):
+            url = storage.clip_url(key)
+            if url is not None:
+                return RedirectResponse(url)
     if not os.path.exists(path):
         raise HTTPException(404, "clip not found")
     return FileResponse(path, media_type="video/mp4", filename=filename)
