@@ -1,7 +1,10 @@
 .venv/
 __pycache__/
 *.pyc
-backend/data/
+data/clips/*
+!data/clips/.gitkeep
+data/cache/*
+!data/cache/.gitkeep
 pip_install.log
 .env
 .hermes/
