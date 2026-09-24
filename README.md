@@ -56,6 +56,55 @@ npm run build           # production build -> frontend/dist
 Without these set, the backend still works — job/clip metadata just isn't
 persisted (everything runs in-memory for the life of the process).
 
+## Vertical clips and rendering
+
+Each highlight becomes a 9:16 short: the crop follows faces (or the
+current speaker, or shows both people split-screen, or fits the whole
+frame on a blurred background), with animated word-by-word captions and
+an optional hook title. The clip page previews every change live in the
+browser; the final mp4 is rendered on AWS Lambda with
+[Remotion](https://www.remotion.dev) only when you export.
+
+- `renderer/` — the Remotion composition (layouts, caption presets, hook
+  title). The same code runs in the browser preview and on Lambda.
+  `npm run studio` opens Remotion Studio for designing presets;
+  `npm run fixture:video && npm run stills` renders a still for every
+  layout × preset.
+- Remotion's free license covers teams of 3 or fewer people.
+
+### One-time AWS setup
+
+1. `cd renderer && npm install`
+2. In the AWS console create an IAM user for HighLyte. Attach the policy
+   printed by `npx remotion lambda policies user` to the user, and create
+   the role described by `npx remotion lambda policies role` (role name
+   `remotion-lambda-role`). Create an access key for the user.
+3. Put the key, secret and region in `.env` (`REMOTION_AWS_*`), and also
+   export them as `REMOTION_AWS_ACCESS_KEY_ID` / `REMOTION_AWS_SECRET_ACCESS_KEY`
+   in the shell for the next two commands.
+4. `npm run deploy:functions` — copy the function name into `REMOTION_FUNCTION_NAME`.
+5. `npm run deploy:site` — copy the Serve URL into `REMOTION_SERVE_URL`.
+   Re-run this whenever anything in `renderer/src` changes.
+6. Create an AWS Budget alert at $5/month (Billing → Budgets).
+7. Backstop cleanup: add a lifecycle rule on the `remotionlambda-*` S3
+   bucket deleting objects under `renders/` after 1 day (HighLyte deletes
+   each output after copying it to R2; this catches anything missed).
+8. If renders fail with throttling errors, request a Lambda concurrency
+   increase (Service Quotas → Lambda → Concurrent executions).
+
+Remotion npm packages and the Python `remotion-lambda` client must be
+the exact same version (currently 4.0.527). When upgrading, change both,
+then redeploy the functions and the site; the backend logs a VERSION
+MISMATCH line at startup if they differ.
+
+### Tests
+```
+./.venv/Scripts/pip install -r requirements-dev.txt
+./.venv/Scripts/python -m pytest              # fast suite
+./.venv/Scripts/python -m pytest -m slow      # downloads the face model, runs MediaPipe
+cd renderer && npm test
+```
+
 ## How it works
 
 1. **Ingest** — pull the audio via `yt-dlp`, cached by video ID.
@@ -63,13 +112,13 @@ persisted (everything runs in-memory for the life of the process).
    with Roman Urdu/Hindi decoding (see above).
 3. **Highlight detection** — chunk the transcript into ~45s windows, score
    each for "meaningful" content (heuristic scorer by default; optional
-   LLM scorer if `OPENAI_API_KEY` is set), keep the top ones.
+   LLM scorer if `GROQ_KEY` is set), keep the top ones.
 4. **Cutting** — `ffmpeg -c copy` (fast path) or re-encode fallback.
 5. **Frontend** — poll job status, render clip list with play/select/export.
 
 ## Open questions (carried over from original scope)
 
-- [ ] Output format: long-form highlight reel vs. vertical short-form clips
+- [x] Output format: vertical 9:16 shorts (Phase 1)
 - [ ] Caption quality check before trusting auto-captions over Whisper
 - [ ] LLM highlight scoring model choice, if/when the heuristic scorer isn't
       good enough
