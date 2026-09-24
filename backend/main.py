@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import copy
 import os
 import tempfile
@@ -452,8 +453,7 @@ def renders_zip(ids: str = Query(...)) -> StreamingResponse:
     buf = tempfile.SpooledTemporaryFile(max_size=64 * 1024 * 1024)
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:
         for r in renders:
-            with zf.open(f"highlyte-{r.clip_id}.mp4", "w") as dest:
-                src = storage.open_object(r.storage_key)
+            with zf.open(f"highlyte-{r.clip_id}.mp4", "w") as dest, contextlib.closing(storage.open_object(r.storage_key)) as src:
                 for chunk in iter(lambda: src.read(1024 * 1024), b""):
                     dest.write(chunk)
     buf.seek(0)
