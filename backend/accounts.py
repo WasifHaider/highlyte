@@ -126,7 +126,7 @@ def _forget_member(user_id: str) -> None:
         _member_cache.pop(user_id, None)
 
 
-def current_member(request: Request, response: Response) -> Member:
+def current_member(request: Request) -> Member:
     _require_supabase()
     access = request.cookies.get(ACCESS_COOKIE)
     refresh_token = request.cookies.get(REFRESH_COOKIE)
@@ -138,10 +138,15 @@ def current_member(request: Request, response: Response) -> Member:
             except auth.InvalidCredentials:
                 session = None
             if session is not None:
-                # The access token expired: hand the browser fresh cookies on
-                # this same response so the user never sees a logout.
-                set_session_cookies(response, session)
+                # The access token expired: session_middleware hands the
+                # browser fresh cookies on this same response, whatever
+                # kind it turns out to be, so the user never sees a logout.
+                request.state.refreshed_session = session
                 user = session.user
+            else:
+                # The refresh token is spent or revoked; drop the dead
+                # cookies so the browser stops sending them.
+                request.state.clear_session = True
     except auth.AuthUnavailable:
         raise HTTPException(503, UNAVAILABLE)
     if user is None:
@@ -158,17 +163,32 @@ def admin_member(member: Member = Depends(current_member)) -> Member:
     return member
 
 
-async def csrf_middleware(request: Request, call_next):
-    """Cookie sessions would let another site's form submit changes as the
+async def session_middleware(request: Request, call_next):
+    """Checks the CSRF header, then applies any session change that
+    `current_member` recorded.
+
+    Cookie sessions would let another site's form submit changes as the
     logged-in user. Browsers won't let other sites add this custom header,
-    and our own frontend sends it on every request."""
+    and our own frontend sends it on every request.
+
+    Refreshed cookies are set here rather than on the dependency's injected
+    Response, because FastAPI drops those headers when an endpoint returns
+    its own Response (files, redirects, 204s) or raises HTTPException.
+    Supabase rotates refresh tokens, so losing them would log the user out
+    at the next expiry."""
     if (
         request.method not in SAFE_METHODS
         and request.url.path.startswith("/api/")
         and request.headers.get(CSRF_HEADER) != CSRF_VALUE
     ):
         return JSONResponse({"detail": f"Missing {CSRF_HEADER} header"}, status_code=403)
-    return await call_next(request)
+    response = await call_next(request)
+    session = getattr(request.state, "refreshed_session", None)
+    if session is not None:
+        set_session_cookies(response, session)
+    elif getattr(request.state, "clear_session", False):
+        clear_session_cookies(response)
+    return response
 
 
 def _member_api(row: dict[str, Any]) -> dict[str, Any]:

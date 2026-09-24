@@ -46,7 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.middleware("http")(accounts.csrf_middleware)
+app.middleware("http")(accounts.session_middleware)
 app.include_router(accounts.router)
 
 RENDERER_PACKAGE_JSON = os.path.join(BASE_DIR, "renderer", "package.json")

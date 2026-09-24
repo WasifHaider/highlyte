@@ -192,3 +192,55 @@ def test_without_supabase(monkeypatch):
     assert c.get("/api/auth/me").json()["detail"] == "Accounts need Supabase"
     assert c.get("/api/jobs").status_code == 503
     assert c.get("/api/health").json()["auth"] is False
+
+
+def _set_cookie_names(response) -> list[str]:
+    return [h.split("=", 1)[0] for h in response.headers.get_list("set-cookie")]
+
+
+def test_refresh_cookies_survive_a_file_response(env):
+    # Endpoints that return their own Response (files, redirects, 204s)
+    # must still hand the browser the rotated tokens, or it keeps a spent
+    # refresh token and is logged out when the access token next expires.
+    import os
+    from backend import main
+
+    c = api_client()
+    team_id = _signup(c).json()["team"]["id"]
+    job_id = "ffff00000001"
+    clip_dir = os.path.join(main.CLIPS_DIR, job_id)
+    os.makedirs(clip_dir, exist_ok=True)
+    with open(os.path.join(clip_dir, "clip_0.mp4"), "wb") as f:
+        f.write(b"mp4")
+    main.JOBS[job_id] = main.Job(id=job_id, url="u", status="done", team_id=team_id)
+    try:
+        c.cookies.delete("hl_access")
+        r = c.get(f"/api/clips/{job_id}/clip_0.mp4")
+        assert r.status_code == 200 and r.content == b"mp4"
+        assert {"hl_access", "hl_refresh"} <= set(_set_cookie_names(r))
+    finally:
+        main.JOBS.pop(job_id, None)
+        os.remove(os.path.join(clip_dir, "clip_0.mp4"))
+        os.rmdir(clip_dir)
+
+
+def test_refresh_cookies_survive_a_204(env):
+    admin = api_client()
+    _signup(admin)
+    added = admin.post("/api/team/users", json={"email": "ali@x.com"}).json()
+    admin.cookies.delete("hl_access")
+    r = admin.delete(f"/api/team/users/{added['user']['id']}")
+    assert r.status_code == 204
+    assert {"hl_access", "hl_refresh"} <= set(_set_cookie_names(r))
+    # The old refresh token was spent by that refresh, so this only works
+    # if the browser received the new one.
+    assert admin.get("/api/auth/me").status_code == 200
+
+
+def test_invalid_refresh_clears_cookies(env):
+    c = api_client()
+    c.cookies.set("hl_refresh", "bogus")
+    r = c.get("/api/auth/me")
+    assert r.status_code == 401
+    cleared = [h.lower() for h in r.headers.get_list("set-cookie") if h.startswith("hl_refresh=")]
+    assert cleared and ("max-age=0" in cleared[0] or "expires=thu, 01 jan 1970" in cleared[0])
