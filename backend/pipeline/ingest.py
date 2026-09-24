@@ -16,6 +16,8 @@ class VideoMeta:
     duration: float  # seconds
     audio_path: str
     video_path: str | None
+    # yt-dlp's best thumbnail URL for the video, when it reports one.
+    thumbnail_url: str | None = None
 
 
 def _fmt_duration(seconds: float) -> str:
@@ -105,6 +107,7 @@ def ingest(url: str, cache_dir: str, on_progress: "callable | None" = None) -> V
         duration=float(info.get("duration") or 0),
         audio_path=target_audio,
         video_path=target_video,
+        thumbnail_url=info.get("thumbnail"),
     )
 
 

@@ -163,6 +163,25 @@ def get_render(render_id: str) -> dict[str, Any] | None:
         return None
 
 
+def count_clips_by_job(job_ids: list[str]) -> dict[str, int]:
+    """Clip count per job for the project list, in one query. PostgREST caps
+    a response at its max-rows setting (1000 by default), so with more clips
+    than that across the listed jobs some counts come back low; the project
+    list asks for at most 200 jobs of about 8 clips each, so this is rare."""
+    client = get_client()
+    if client is None or not job_ids:
+        return {}
+    try:
+        res = client.table("clips").select("job_id").in_("job_id", job_ids).execute()
+    except Exception as e:  # noqa: BLE001
+        print(f"[supabase] count_clips_by_job failed: {e}")
+        return {}
+    counts: dict[str, int] = {}
+    for r in res.data or []:
+        counts[r["job_id"]] = counts.get(r["job_id"], 0) + 1
+    return counts
+
+
 def find_render(clip_id: str, style_hash: str) -> dict[str, Any] | None:
     """Newest live (queued/rendering/done) render of this clip in exactly
     this style, if any — failed renders are never reused."""

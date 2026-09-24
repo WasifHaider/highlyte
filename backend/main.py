@@ -9,6 +9,7 @@ import time
 import uuid
 import zipfile
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 from fastapi import Body, FastAPI, HTTPException, Query
@@ -16,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
-from . import db, render, storage
+from . import db, projects, render, storage
 from .pipeline import clipprep, cut, highlight, ingest, transcript
 from .spec import ClipStyle, default_style
 from .validation import check_clip_filename, check_id
@@ -67,6 +68,7 @@ class Job:
     # Live progress within the current status, e.g. download %, whisper
     # chunk N/M. Always in-memory/fresh; only sampled into Supabase.
     progress: dict[str, Any] = field(default_factory=dict)
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     _last_persist: float = field(default=0.0, repr=False)
 
 
@@ -90,6 +92,8 @@ def _persist_job(job: Job, whisper_model: str, *, throttle: bool = False) -> Non
         row["video_title"] = job.video_meta.get("title")
         row["video_channel"] = job.video_meta.get("channel")
         row["video_duration"] = job.video_meta.get("duration")
+        row["video_id"] = job.video_meta.get("videoId")
+        row["thumbnail_url"] = job.video_meta.get("thumbnailUrl")
     db.upsert_job(row)
 
 
@@ -236,6 +240,8 @@ def _run_pipeline(job: Job, whisper_model: str) -> None:
             "channel": meta.channel,
             "duration": meta.duration,
             "durationLabel": ingest.duration_label(meta.duration),
+            "videoId": meta.video_id,
+            "thumbnailUrl": projects.thumbnail_url(meta.video_id, meta.thumbnail_url),
         }
         job.progress = {"stage": "downloading", "percent": 100, "note": "download complete"}
         _persist_job(job, whisper_model)
@@ -346,14 +352,17 @@ def status(job_id: str) -> dict[str, Any]:
     status_value, error = row["status"], row.get("error")
     if status_value not in ("done", "error"):
         # Its worker thread died with the old process; it will never finish.
-        status_value, error = "error", "Processing was interrupted by a server restart. Please submit the video again."
+        status_value, error = "error", projects.INTERRUPTED_ERROR
     video_meta = None
     if row.get("video_title"):
+        video_id = row.get("video_id") or projects.youtube_id(row.get("url"))
         video_meta = {
             "title": row.get("video_title"),
             "channel": row.get("video_channel"),
             "duration": row.get("video_duration"),
             "durationLabel": ingest.duration_label(float(row.get("video_duration") or 0)),
+            "videoId": video_id,
+            "thumbnailUrl": projects.thumbnail_url(video_id, row.get("thumbnail_url")),
         }
     return {
         "id": row["id"],
@@ -367,8 +376,16 @@ def status(job_id: str) -> dict[str, Any]:
 
 
 @app.get("/api/jobs")
-def jobs() -> list[dict[str, Any]]:
-    return db.list_jobs()
+def list_projects(
+    limit: int = Query(100, ge=1, le=200),
+    q: str | None = None,
+    status: Literal["processing", "done", "error"] | None = None,
+) -> list[dict[str, Any]]:
+    """Every submitted video for the Home and Projects pages, newest first."""
+    rows = db.list_jobs(limit=200)
+    counts = db.count_clips_by_job([r["id"] for r in rows])
+    memory = [projects.from_job(job) for job in list(JOBS.values())]
+    return projects.build_projects(memory, rows, counts, q=q, status=status, limit=limit)
 
 
 @app.get("/api/clips")

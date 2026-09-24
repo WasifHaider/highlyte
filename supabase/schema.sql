@@ -99,3 +99,8 @@ drop trigger if exists renders_set_updated_at on renders;
 create trigger renders_set_updated_at
   before update on renders
   for each row execute function set_updated_at();
+
+-- Projects page: YouTube id and thumbnail for each job, so the Home and
+-- Projects lists can show the video's thumbnail.
+alter table jobs add column if not exists video_id text;
+alter table jobs add column if not exists thumbnail_url text;
