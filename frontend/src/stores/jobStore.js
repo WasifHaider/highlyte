@@ -49,8 +49,13 @@ export const useJobStore = defineStore('job', {
     },
     async refresh() {
       if (!this.currentJobId) return
+      // Captured before the await: if the project changes while this
+      // request is in flight, a late response for the old id must not
+      // overwrite the job the user has since switched to.
+      const id = this.currentJobId
       try {
-        const data = await getJobStatus(this.currentJobId)
+        const data = await getJobStatus(id)
+        if (this.currentJobId !== id) return
         // The Player needs an absolute URL; the API returns its own path.
         for (const c of data.clips || []) {
           if (c.spec?.source?.url?.startsWith('/')) c.spec.source.url = clipDownloadUrl(c.spec.source.url)

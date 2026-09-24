@@ -45,6 +45,11 @@ const statusNote = computed(() => {
 function startForId(id) {
   jobStore.currentJobId = id
   jobStore.job = null
+  // Matches submitUrl's reset so switching projects doesn't carry over the
+  // previous project's error banner, clip selection, or render state.
+  jobStore.error = null
+  jobStore.selected = {}
+  jobStore.renders = {}
   jobStore.startPolling()
 }
 
