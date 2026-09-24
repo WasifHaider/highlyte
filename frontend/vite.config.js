@@ -32,5 +32,10 @@ export default defineConfig({
   preview: {
     port: 6100,
     strictPort: true,
+    // Same proxy as the dev server, so a production build served by
+    // `vite preview` can log in too.
+    proxy: {
+      '/api': 'http://127.0.0.1:8000',
+    },
   },
 })
