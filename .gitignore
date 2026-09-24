@@ -10,3 +10,4 @@ pip_install.log
 .hermes/
 frontend/node_modules/
 frontend/dist/
+data/models/
