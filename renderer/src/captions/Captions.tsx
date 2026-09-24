@@ -7,7 +7,7 @@ import { pageAt, paginate, type Page } from './paginate'
 
 const PRESETS = {
   karaoke: { maxWords: 4, maxChars: 28 },
-  pop: { maxWords: 2, maxChars: 18 },
+  pop: { maxWords: 2, maxChars: 12 },
   clean: { maxWords: 14, maxChars: 84 },
 } as const
 
