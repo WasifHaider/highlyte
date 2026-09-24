@@ -23,3 +23,23 @@ export function listAllClips(limit = 100) {
 export function clipDownloadUrl(path) {
   return `${baseURL}${path}`
 }
+
+export function getHealth() {
+  return api.get('/api/health').then(r => r.data)
+}
+
+export function saveClipStyle(clipId, style) {
+  return api.patch(`/api/clips/${clipId}/style`, style).then(r => r.data)
+}
+
+export function startRender(clipId, style) {
+  return api.post(`/api/clips/${clipId}/render`, style).then(r => r.data)
+}
+
+export function getRender(renderId) {
+  return api.get(`/api/renders/${renderId}`).then(r => r.data)
+}
+
+export function rendersZipUrl(renderIds) {
+  return `${baseURL}/api/renders/zip?ids=${renderIds.join(',')}`
+}

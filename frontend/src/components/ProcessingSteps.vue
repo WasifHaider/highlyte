@@ -18,7 +18,7 @@
         </div>
       </div>
     </div>
-    <div class="processing-hint">This usually takes a minute or two on CPU. Long podcasts are chunked, so progress updates continuously.</div>
+    <div class="processing-hint">This takes a few minutes on CPU: every clip gets word-timed captions and face tracking.</div>
   </div>
 </template>
 
@@ -26,15 +26,15 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  status: { type: String, required: true }, // queued|transcribing|analyzing|cutting|done|error
+  status: { type: String, required: true }, // queued|transcribing|analyzing|preparing|done|error
   progress: { type: Object, default: () => ({}) },
 })
 
-const ORDER = ['transcribing', 'analyzing', 'cutting']
+const ORDER = ['transcribing', 'analyzing', 'preparing']
 const LABELS = {
   transcribing: 'Transcribing audio',
   analyzing: 'Analyzing for highlights',
-  cutting: 'Cutting clips',
+  preparing: 'Preparing clips (captions and framing)',
 }
 
 const steps = computed(() => {

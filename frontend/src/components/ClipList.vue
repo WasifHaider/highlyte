@@ -11,14 +11,12 @@
     </div>
 
     <div class="clip-list">
-      <ClipRow
+      <ClipCard
         v-for="clip in jobStore.clips"
         :key="clip.id"
         :clip="clip"
         :is-selected="!!jobStore.selected[clip.id]"
-        :is-playing="jobStore.playingClipId === clip.id"
         @toggle="jobStore.toggleClip(clip.id)"
-        @play="jobStore.setPlaying(clip.id)"
       />
     </div>
   </div>
@@ -26,7 +24,7 @@
 
 <script setup>
 import { useJobStore } from '../stores/jobStore'
-import ClipRow from './ClipRow.vue'
+import ClipCard from './ClipCard.vue'
 
 const jobStore = useJobStore()
 </script>

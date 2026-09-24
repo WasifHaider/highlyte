@@ -31,7 +31,7 @@ const STATUS_NOTES = {
   queued: 'Queued…',
   transcribing: 'Transcribing episode…',
   analyzing: 'Analyzing for highlights…',
-  cutting: 'Cutting clips…',
+  preparing: 'Preparing clips…',
   done: null,
   error: 'Something went wrong',
 }
@@ -48,7 +48,10 @@ function startForId(id) {
   jobStore.startPolling()
 }
 
-onMounted(() => startForId(props.id))
+onMounted(() => {
+  jobStore.loadHealth()
+  startForId(props.id)
+})
 onUnmounted(() => jobStore.stopPolling())
 watch(() => props.id, (newId) => startForId(newId))
 </script>
