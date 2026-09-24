@@ -39,6 +39,29 @@ def test_second_team_does_not_claim(env):
     assert len(teams.claimed) == 1
 
 
+def test_signup_rolls_back_team_and_user_on_failure(env, monkeypatch):
+    gotrue, teams = env
+    monkeypatch.setattr(db, "add_member", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    with pytest.raises(RuntimeError):
+        _signup(api_client())
+    # The failed signup must leave no trace: no dangling auth user and no
+    # team row that would corrupt which team is "oldest" for later signups.
+    assert "admin@x.com" not in gotrue.users
+    assert teams.teams == {}
+
+
+def test_claim_still_works_after_an_earlier_failed_signup(env, monkeypatch):
+    gotrue, teams = env
+    real_add_member = db.add_member
+    monkeypatch.setattr(db, "add_member", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    with pytest.raises(RuntimeError):
+        _signup(api_client())
+    monkeypatch.setattr(db, "add_member", real_add_member)
+    r = _signup(api_client(), email="second@x.com")
+    assert r.status_code == 200
+    assert teams.claimed == [r.json()["team"]["id"]]
+
+
 @pytest.mark.parametrize("payload", [
     {"teamName": "  ", "email": "a@x.com", "password": "password1"},
     {"teamName": "T", "email": "not-an-email", "password": "password1"},
@@ -127,12 +150,13 @@ def test_admin_adds_user_who_can_log_in(env):
 
 def test_member_cannot_manage_team(env):
     admin = api_client()
-    _signup(admin)
+    admin_body = _signup(admin).json()
     password = admin.post("/api/team/users", json={"email": "ali@x.com"}).json()["password"]
     member = api_client()
     member.post("/api/auth/login", json={"email": "ali@x.com", "password": password})
     assert member.get("/api/team/users").status_code == 403
     assert member.post("/api/team/users", json={"email": "b@x.com"}).status_code == 403
+    assert member.delete(f"/api/team/users/{admin_body['user']['id']}").status_code == 403
 
 
 def test_remove_user(env):

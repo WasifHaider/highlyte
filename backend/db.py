@@ -215,6 +215,10 @@ def create_team(name: str) -> dict[str, Any]:
     return _require_client().table("teams").insert({"name": name}).execute().data[0]
 
 
+def delete_team(team_id: str) -> None:
+    _require_client().table("teams").delete().eq("id", team_id).execute()
+
+
 def add_member(user_id: str, team_id: str, role: str, email: str) -> dict[str, Any]:
     row = {"user_id": user_id, "team_id": team_id, "role": role, "email": email}
     return _require_client().table("team_members").insert(row).execute().data[0]
@@ -229,8 +233,16 @@ def list_members(team_id: str) -> list[dict[str, Any]]:
     return _require_client().table("team_members").select("*").eq("team_id", team_id).execute().data or []
 
 
-def count_teams() -> int:
-    return _require_client().table("teams").select("id", count="exact").limit(1).execute().count or 0
+def oldest_team_id() -> str | None:
+    # Which team gets the pre-login jobs. Ordered by created_at then id so
+    # ties (teams created in the same instant) still resolve consistently
+    # instead of depending on whatever order Postgres happens to return.
+    res = (
+        _require_client().table("teams").select("id")
+        .order("created_at", desc=False).order("id", desc=False).limit(1).execute()
+    )
+    row = _first(res)
+    return row["id"] if row else None
 
 
 def claim_unowned_jobs(team_id: str) -> None:

@@ -187,15 +187,32 @@ def signup(body: SignupRequest, response: Response) -> dict[str, Any]:
         raise HTTPException(409, EMAIL_TAKEN)
     except auth.AuthUnavailable:
         raise HTTPException(503, UNAVAILABLE)
+    team: dict[str, Any] | None = None
     try:
         team = db.create_team(body.teamName)
         db.add_member(user.id, team["id"], "admin", user.email)
-        if db.count_teams() == 1:
-            # The first team is whoever used HighLyte before logins existed,
-            # so it inherits the projects made back then.
+        if db.oldest_team_id() == team["id"]:
+            # The oldest team is whoever used HighLyte before logins existed
+            # (or the first team standing after other signups here failed
+            # and were rolled back), so it inherits the projects made back
+            # then.
             db.claim_unowned_jobs(team["id"])
     except Exception:
-        auth.delete_user(user.id)  # don't leave a login that belongs to no team
+        # Neither compensating call may swallow the original exception —
+        # that's the one the caller (and our caller's caller) needs to see —
+        # so each gets its own try/except that only logs. A half-created
+        # team with no matching auth user, or a login with no team, would
+        # otherwise linger and either break every later signup's "oldest
+        # team" claim or leave an unreachable account.
+        if team is not None:
+            try:
+                db.delete_team(team["id"])
+            except Exception as cleanup_error:  # noqa: BLE001
+                print(f"[accounts] failed to roll back team {team['id']}: {cleanup_error}")
+        try:
+            auth.delete_user(user.id)
+        except Exception as cleanup_error:  # noqa: BLE001
+            print(f"[accounts] failed to roll back user {user.id}: {cleanup_error}")
         raise
     try:
         session = auth.password_login(body.email, body.password)
@@ -254,7 +271,12 @@ def add_team_user(body: AddUserRequest, admin: Member = Depends(admin_member)) -
     try:
         row = db.add_member(user.id, admin.team_id, "member", user.email)
     except Exception:
-        auth.delete_user(user.id)
+        # Same rule as signup's rollback: the cleanup call must not hide the
+        # original failure behind one of its own.
+        try:
+            auth.delete_user(user.id)
+        except Exception as cleanup_error:  # noqa: BLE001
+            print(f"[accounts] failed to roll back user {user.id}: {cleanup_error}")
         raise
     # The only time the password leaves the server; it is never stored.
     return {"user": _member_api(row), "password": password}

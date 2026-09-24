@@ -96,11 +96,19 @@ class FakeTeamDb:
         self.teams: dict[str, dict] = {}
         self.members: dict[str, dict] = {}
         self.claimed: list[str] = []
+        # Monotonic, never reused even across a delete_team, so
+        # oldest_team_id() stays meaningful for a team created after an
+        # earlier one was rolled back.
+        self._team_seq = 0
 
     def create_team(self, name: str) -> dict:
-        team_id = f"team-{len(self.teams) + 1}"
-        self.teams[team_id] = {"id": team_id, "name": name}
+        self._team_seq += 1
+        team_id = f"team-{self._team_seq}"
+        self.teams[team_id] = {"id": team_id, "name": name, "created_at": self._team_seq}
         return self.teams[team_id]
+
+    def delete_team(self, team_id: str) -> None:
+        self.teams.pop(team_id, None)
 
     def add_member(self, user_id: str, team_id: str, role: str, email: str) -> dict:
         row = {"user_id": user_id, "team_id": team_id, "role": role, "email": email,
@@ -115,8 +123,10 @@ class FakeTeamDb:
     def list_members(self, team_id: str) -> list[dict]:
         return [r for r in self.members.values() if r["team_id"] == team_id]
 
-    def count_teams(self) -> int:
-        return len(self.teams)
+    def oldest_team_id(self) -> str | None:
+        if not self.teams:
+            return None
+        return min(self.teams.values(), key=lambda t: (t["created_at"], t["id"]))["id"]
 
     def claim_unowned_jobs(self, team_id: str) -> None:
         self.claimed.append(team_id)
@@ -124,7 +134,7 @@ class FakeTeamDb:
 
 def install_team_db(monkeypatch) -> FakeTeamDb:
     fake = FakeTeamDb()
-    for name in ("create_team", "add_member", "get_member", "list_members", "count_teams", "claim_unowned_jobs"):
+    for name in ("create_team", "delete_team", "add_member", "get_member", "list_members", "oldest_team_id", "claim_unowned_jobs"):
         monkeypatch.setattr(db, name, getattr(fake, name))
     monkeypatch.setattr(db, "is_enabled", lambda: True)
     return fake
