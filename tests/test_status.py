@@ -51,3 +51,13 @@ def test_status_reports_interrupted_jobs(monkeypatch):
 def test_status_unknown_job(monkeypatch):
     monkeypatch.setattr(main.db, "get_job", lambda job_id: None)
     assert client.get("/api/status/feed00000002").status_code == 404
+
+
+def test_list_all_clips_normalizes_source_url(monkeypatch):
+    row = dict(_clip_row())
+    row["jobs"] = {"url": "u", "video_title": "Ep 1", "video_channel": "Pod"}
+    monkeypatch.setattr(main.db, "list_clips", lambda limit: [row])
+    body = client.get("/api/clips").json()
+    clip = body[0]
+    assert clip["spec"]["source"]["url"] == "/api/clips/feed00000001/clip_0.mp4"
+    assert clip["videoTitle"] == "Ep 1"

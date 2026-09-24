@@ -67,10 +67,6 @@ class Job:
 JOBS: dict[str, Job] = {}
 
 
-def _clip_id(job_id: str, idx: int) -> str:
-    return f"{job_id}-{idx}"
-
-
 def _persist_job(job: Job, whisper_model: str, *, throttle: bool = False) -> None:
     now = time.monotonic()
     if throttle and (now - job._last_persist) < PROGRESS_PERSIST_INTERVAL_S:
@@ -343,7 +339,7 @@ def list_all_clips(limit: int = 100) -> list[dict[str, Any]]:
     out = []
     for r in db.list_clips(limit):
         job_info = r.get("jobs") or {}
-        record = _clip_row_to_api(r)
+        record = _with_source_url(_clip_row_to_api(r))
         record.update({
             "videoTitle": job_info.get("video_title"),
             "videoChannel": job_info.get("video_channel"),
