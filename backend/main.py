@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
-from . import db, projects, render, storage
+from . import accounts, db, projects, render, storage
 from .pipeline import clipprep, cut, highlight, ingest, transcript
 from .spec import ClipStyle, default_style
 from .validation import check_clip_filename, check_id
@@ -44,6 +44,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.middleware("http")(accounts.csrf_middleware)
+app.include_router(accounts.router)
 
 RENDERER_PACKAGE_JSON = os.path.join(BASE_DIR, "renderer", "package.json")
 MAX_ZIP_RENDERS = 20
@@ -317,7 +320,12 @@ def _run_pipeline(job: Job, whisper_model: str) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "supabase": db.is_enabled(), "rendering": RENDER_SERVICE is not None}
+    return {
+        "status": "ok",
+        "supabase": db.is_enabled(),
+        "auth": db.is_enabled(),
+        "rendering": RENDER_SERVICE is not None,
+    }
 
 
 @app.post("/api/generate")

@@ -86,3 +86,51 @@ def install_gotrue(monkeypatch) -> FakeGoTrue:
     monkeypatch.setattr(auth, "_client", httpx.Client(transport=httpx.MockTransport(fake)))
     auth._cache.clear()
     return fake
+
+
+from fastapi.testclient import TestClient
+
+
+class FakeTeamDb:
+    def __init__(self) -> None:
+        self.teams: dict[str, dict] = {}
+        self.members: dict[str, dict] = {}
+        self.claimed: list[str] = []
+
+    def create_team(self, name: str) -> dict:
+        team_id = f"team-{len(self.teams) + 1}"
+        self.teams[team_id] = {"id": team_id, "name": name}
+        return self.teams[team_id]
+
+    def add_member(self, user_id: str, team_id: str, role: str, email: str) -> dict:
+        row = {"user_id": user_id, "team_id": team_id, "role": role, "email": email,
+               "created_at": f"2026-09-24T00:00:{len(self.members):02d}+00:00"}
+        self.members[user_id] = row
+        return row
+
+    def get_member(self, user_id: str) -> dict | None:
+        row = self.members.get(user_id)
+        return None if row is None else {**row, "teams": {"name": self.teams[row["team_id"]]["name"]}}
+
+    def list_members(self, team_id: str) -> list[dict]:
+        return [r for r in self.members.values() if r["team_id"] == team_id]
+
+    def count_teams(self) -> int:
+        return len(self.teams)
+
+    def claim_unowned_jobs(self, team_id: str) -> None:
+        self.claimed.append(team_id)
+
+
+def install_team_db(monkeypatch) -> FakeTeamDb:
+    fake = FakeTeamDb()
+    for name in ("create_team", "add_member", "get_member", "list_members", "count_teams", "claim_unowned_jobs"):
+        monkeypatch.setattr(db, name, getattr(fake, name))
+    monkeypatch.setattr(db, "is_enabled", lambda: True)
+    return fake
+
+
+def api_client() -> TestClient:
+    from backend.main import app
+
+    return TestClient(app, headers={"X-Requested-With": "highlyte"})

@@ -199,3 +199,39 @@ def find_render(clip_id: str, style_hash: str) -> dict[str, Any] | None:
     except Exception as e:  # noqa: BLE001
         print(f"[supabase] find_render failed: {e}")
         return None
+
+
+# Account and team writes raise instead of logging and carrying on like the
+# helpers above: a half-created account is worse than an error the caller
+# can clean up after.
+def _require_client():
+    client = get_client()
+    if client is None:
+        raise RuntimeError("Supabase is not configured")
+    return client
+
+
+def create_team(name: str) -> dict[str, Any]:
+    return _require_client().table("teams").insert({"name": name}).execute().data[0]
+
+
+def add_member(user_id: str, team_id: str, role: str, email: str) -> dict[str, Any]:
+    row = {"user_id": user_id, "team_id": team_id, "role": role, "email": email}
+    return _require_client().table("team_members").insert(row).execute().data[0]
+
+
+def get_member(user_id: str) -> dict[str, Any] | None:
+    res = _require_client().table("team_members").select("*, teams(name)").eq("user_id", user_id).limit(1).execute()
+    return _first(res)
+
+
+def list_members(team_id: str) -> list[dict[str, Any]]:
+    return _require_client().table("team_members").select("*").eq("team_id", team_id).execute().data or []
+
+
+def count_teams() -> int:
+    return _require_client().table("teams").select("id", count="exact").limit(1).execute().count or 0
+
+
+def claim_unowned_jobs(team_id: str) -> None:
+    _require_client().table("jobs").update({"team_id": team_id}).is_("team_id", "null").execute()
