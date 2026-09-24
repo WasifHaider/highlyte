@@ -7,9 +7,9 @@ Handles episodes that mix English with Roman-script Hindi/Urdu.
 
 - `backend/` — FastAPI app. Pipeline: yt-dlp ingest -> transcript (YouTube
   captions, else local faster-whisper) -> heuristic/LLM highlight scoring ->
-  ffmpeg cuts. Job/clip metadata persisted to Supabase Postgres (optional —
-  app runs fully offline without it, see below). Clip audio files stay on
-  local disk under `backend/data/clips/`.
+  ffmpeg cuts. Job/clip metadata persisted to Supabase Postgres, and logins
+  go through Supabase Auth (required, see below). Clip files stay on local
+  disk under `data/clips/` unless R2 is configured.
 - `frontend/` — Vue 3 + Vite SPA (Pinia store, Vue Router, axios). Polls job
   status and renders the highlight list.
 - `supabase/schema.sql` — jobs/clips tables + indexes. Run in the Supabase
@@ -36,8 +36,8 @@ cd HighLyte
 python -m venv .venv
 ./.venv/Scripts/pip install -r requirements.txt   # Windows
 # source .venv/bin/activate && pip install -r requirements.txt   # WSL/Linux
-cp .env.example .env   # fill in SUPABASE_URL / SUPABASE_KEY (optional)
-./.venv/Scripts/python -m uvicorn backend.main:app --reload --port 7000
+cp .env.example .env   # fill in SUPABASE_URL / SUPABASE_KEY
+./.venv/Scripts/python -m uvicorn backend.main:app --reload --port 8000
 ```
 `ffmpeg` must be on PATH (already present on this machine via winget).
 
@@ -45,16 +45,35 @@ cp .env.example .env   # fill in SUPABASE_URL / SUPABASE_KEY (optional)
 ```
 cd frontend
 npm install
-npm run dev            # http://localhost:6100 (talks to backend via VITE_API_BASE_URL)
+npm run dev            # http://localhost:6100 (Vite proxies /api to the backend on :8000)
 npm run build           # production build -> frontend/dist
 ```
 
-### Supabase (optional but recommended for scaling)
+The frontend calls the API on its own origin (`/api`), and Vite's dev and
+preview servers proxy that to the backend. Keeping one origin is what lets
+the backend's httpOnly login cookies travel with every request.
+
+### Supabase (required)
 1. Create a project at supabase.com.
 2. Run `supabase/schema.sql` in the SQL editor.
-3. Put `SUPABASE_URL` and `SUPABASE_KEY` in `.env` at the repo root.
-Without these set, the backend still works — job/clip metadata just isn't
-persisted (everything runs in-memory for the life of the process).
+3. Put `SUPABASE_URL` and `SUPABASE_KEY` (the service-role key) in `.env` at
+   the repo root.
+Accounts live in Supabase Auth, so without these set login, signup and every
+project endpoint answer 503 "Accounts need Supabase".
+
+## Team accounts
+
+Everyone logs in, and each project belongs to a team.
+
+- **Sign up first after deploying.** The oldest team claims every project
+  made before logins existed, and signup is open to anyone who can reach
+  the app, so create your own team before sharing the URL.
+- **Add teammates on the Team page** (admins only). HighLyte generates a
+  password and shows it once; copy it and send it to the teammate yourself.
+  It is never stored or shown again.
+- **Behind https, set `COOKIE_SECURE=true`** in `.env` so the login cookies
+  are only ever sent over https. Leave it unset for local http development,
+  where secure cookies would not be sent at all.
 
 ## Vertical clips and rendering
 
