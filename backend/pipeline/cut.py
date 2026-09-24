@@ -10,6 +10,7 @@ CPU cost is small and worth the correctness.
 """
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 
@@ -29,3 +30,15 @@ def cut_clip(source_path: str, start: float, end: float, out_path: str) -> str:
     if proc.returncode != 0 or not os.path.exists(out_path) or os.path.getsize(out_path) == 0:
         raise RuntimeError(f"ffmpeg failed: {proc.stderr.decode(errors='ignore')}")
     return out_path
+
+
+def probe_video(path: str) -> tuple[int, int, float]:
+    """(width, height, fps) of the first video stream."""
+    cmd = [
+        "ffprobe", "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "stream=width,height,r_frame_rate", "-of", "json", path,
+    ]
+    proc = subprocess.run(cmd, capture_output=True, check=True)
+    stream = json.loads(proc.stdout)["streams"][0]
+    num, den = stream["r_frame_rate"].split("/")
+    return int(stream["width"]), int(stream["height"]), float(num) / float(den or 1)

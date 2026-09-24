@@ -31,7 +31,7 @@ const STATUS_NOTES = {
   queued: 'Queued…',
   transcribing: 'Transcribing episode…',
   analyzing: 'Analyzing for highlights…',
-  cutting: 'Cutting clips…',
+  preparing: 'Preparing clips…',
   done: null,
   error: 'Something went wrong',
 }
@@ -45,10 +45,18 @@ const statusNote = computed(() => {
 function startForId(id) {
   jobStore.currentJobId = id
   jobStore.job = null
+  // Matches submitUrl's reset so switching projects doesn't carry over the
+  // previous project's error banner, clip selection, or render state.
+  jobStore.error = null
+  jobStore.selected = {}
+  jobStore.renders = {}
   jobStore.startPolling()
 }
 
-onMounted(() => startForId(props.id))
+onMounted(() => {
+  jobStore.loadHealth()
+  startForId(props.id)
+})
 onUnmounted(() => jobStore.stopPolling())
 watch(() => props.id, (newId) => startForId(newId))
 </script>

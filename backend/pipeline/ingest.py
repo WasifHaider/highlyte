@@ -16,6 +16,8 @@ class VideoMeta:
     duration: float  # seconds
     audio_path: str
     video_path: str | None
+    # yt-dlp's best thumbnail URL for the video, when it reports one.
+    thumbnail_url: str | None = None
 
 
 def _fmt_duration(seconds: float) -> str:
@@ -70,7 +72,14 @@ def ingest(url: str, cache_dir: str, on_progress: "callable | None" = None) -> V
         ydl_opts = {
             "quiet": True,
             "noplaylist": True,
-            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+            # Prefer H.264 at 1080p or lower: every browser can decode it for
+            # the live preview, and face analysis/cutting stay fast. Falls
+            # back to anything available rather than failing the download.
+            "format": (
+                "bestvideo[vcodec^=avc1][height<=1080][ext=mp4]+bestaudio[ext=m4a]"
+                "/best[vcodec^=avc1][height<=1080][ext=mp4]"
+                "/bestvideo[height<=1080]+bestaudio/best"
+            ),
             "merge_output_format": "mp4",
             "outtmpl": out_template,
             "progress_hooks": [_hook],
@@ -98,6 +107,7 @@ def ingest(url: str, cache_dir: str, on_progress: "callable | None" = None) -> V
         duration=float(info.get("duration") or 0),
         audio_path=target_audio,
         video_path=target_video,
+        thumbnail_url=info.get("thumbnail"),
     )
 
 

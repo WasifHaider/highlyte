@@ -2,41 +2,47 @@
   <div class="bottombar">
     <div class="bottombar-inner">
       <span class="selection-label">{{ label }}</span>
-      <button class="export-btn" :class="{ active: jobStore.selectedCount > 0 }" @click="onExport">
-        Export selected
-      </button>
+      <div class="actions">
+        <a v-if="zipUrl" class="zip-link" :href="zipUrl">Download all (zip)</a>
+        <button
+          class="export-btn"
+          :class="{ active: canExport }"
+          :disabled="!canExport"
+          :title="jobStore.renderingEnabled ? '' : 'Rendering not configured'"
+          @click="jobStore.exportSelected()"
+        >
+          {{ jobStore.renderingEnabled ? 'Render & export selected' : 'Rendering not configured' }}
+        </button>
+      </div>
     </div>
-    <div v-if="toastMsg" class="toast">{{ toastMsg }}</div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useJobStore } from '../stores/jobStore'
-import { clipDownloadUrl } from '../services/highlyteApi'
+import { rendersZipUrl } from '../services/highlyteApi'
 
 const jobStore = useJobStore()
-const toastMsg = ref('')
 
 const label = computed(() => {
   const n = jobStore.selectedCount
-  return n === 0 ? 'Select clips to export' : `${n} of ${jobStore.clips.length} clips selected`
+  if (n === 0) return 'Select clips to export'
+  const renders = jobStore.selectedRenders
+  const done = renders.filter(r => r.status === 'done').length
+  const busy = renders.filter(r => ['queued', 'rendering'].includes(r.status)).length
+  if (busy) return `Rendering ${busy} of ${n} clips… (${done} done)`
+  return `${n} of ${jobStore.clips.length} clips selected`
 })
 
-function onExport() {
-  const selectedClips = jobStore.clips.filter(c => jobStore.selected[c.id])
-  if (selectedClips.length === 0) return
-  for (const c of selectedClips) {
-    const a = document.createElement('a')
-    a.href = clipDownloadUrl(c.downloadUrl)
-    a.download = ''
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-  }
-  toastMsg.value = `Exporting ${selectedClips.length} clip${selectedClips.length === 1 ? '' : 's'}…`
-  setTimeout(() => { toastMsg.value = '' }, 2400)
-}
+const canExport = computed(() => jobStore.renderingEnabled && jobStore.selectedCount > 0)
+
+const zipUrl = computed(() => {
+  const renders = jobStore.selectedRenders
+  if (renders.length === 0 || renders.length !== jobStore.selectedCount) return null
+  if (!renders.every(r => r.status === 'done')) return null
+  return rendersZipUrl(renders.map(r => r.id))
+})
 </script>
 
 <style scoped>
@@ -49,15 +55,12 @@ function onExport() {
   display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
 }
 .selection-label { font-size: 13.5px; color: var(--ink-soft); }
+.actions { display: flex; align-items: center; gap: 14px; }
+.zip-link { font-size: 13.5px; font-weight: 600; color: var(--accent); }
 .export-btn {
   border: none; border-radius: 8px; padding: 10px 20px; font-size: 13.5px; font-weight: 600;
   font-family: var(--font-sans); cursor: default; color: #fff;
   background: rgba(0,71,65,0.25);
 }
 .export-btn.active { background: var(--accent); cursor: pointer; }
-.toast {
-  position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
-  background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 999px;
-  font-size: 13px; z-index: 40; animation: toastIn .2s ease;
-}
 </style>

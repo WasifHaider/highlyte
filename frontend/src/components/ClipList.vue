@@ -1,5 +1,6 @@
 <template>
   <div>
+    <StyleAllBar v-if="hasVerticalClips" />
     <div class="results-header">
       <div class="results-title">Highlights</div>
       <div class="select-all" @click="jobStore.toggleSelectAll()">
@@ -11,24 +12,25 @@
     </div>
 
     <div class="clip-list">
-      <ClipRow
+      <ClipCard
         v-for="clip in jobStore.clips"
         :key="clip.id"
         :clip="clip"
         :is-selected="!!jobStore.selected[clip.id]"
-        :is-playing="jobStore.playingClipId === clip.id"
         @toggle="jobStore.toggleClip(clip.id)"
-        @play="jobStore.setPlaying(clip.id)"
       />
     </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useJobStore } from '../stores/jobStore'
-import ClipRow from './ClipRow.vue'
+import ClipCard from './ClipCard.vue'
+import StyleAllBar from './StyleAllBar.vue'
 
 const jobStore = useJobStore()
+const hasVerticalClips = computed(() => jobStore.clips.some(c => c.spec))
 </script>
 
 <style scoped>

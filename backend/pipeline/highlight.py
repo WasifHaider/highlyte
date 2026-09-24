@@ -13,9 +13,10 @@ Two boundary/selection strategies are supported:
     API, OpenAI-compatible, model openai/gpt-oss-20b) reads the full
     sentence-indexed transcript and directly picks highlight spans by
     sentence index range — i.e. it chooses the boundaries itself (setup ->
-    payoff, question -> answer), it isn't just scoring pre-cut slabs. Long
-    transcripts are split into non-overlapping windows to fit the model's
-    context; results from all windows are merged before final selection.
+    payoff, question -> answer), it isn't just scoring pre-cut slabs. It also
+    returns a hook title, a 0-10 virality score and caption emphasis words per
+    span. Long transcripts are split into non-overlapping windows to fit the
+    model's context; results from all windows are merged before final selection.
     Purely additive — the app runs fully offline/free without it.
 
 Both paths funnel through a shared final stage: boundary snapping (clip
@@ -28,7 +29,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 
 from .transcript import TranscriptSegment
 
@@ -37,6 +38,9 @@ MIN_CLIP_S = 12.0
 MAX_CLIP_S = 240.0
 MAX_CLIPS = 8
 MIN_CLIP_GAP_S = 4.0  # minimum gap enforced between picked clips
+
+HOOK_TITLE_MAX_WORDS = 8
+MAX_EMPHASIS_WORDS = 5
 
 # Inter-segment gap above which we treat it as a spoken pause / sentence
 # boundary signal, even without terminal punctuation in the transcript text.
@@ -77,6 +81,10 @@ class Clip:
     text: str
     score: float
     tag: str
+    # LLM path only: a short hook overlay for the first seconds of the
+    # short, and words from the span to highlight in captions.
+    hook_title: str | None = None
+    emphasis: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -261,10 +269,16 @@ def _llm_score_window(client, window: list[Sentence], sentences_by_idx: dict[int
         "start and end exactly on a listed index (never split a sentence), and "
         "should be roughly 15-90 seconds long. end_idx must be the payoff/"
         "answer/punchline sentence, not a filler line before it. Rate each "
-        "span's hook_score 0-10: how much the first 2-3 seconds of the span "
-        "would grab a scrolling viewer with zero context.\n\n"
+        "span's virality_score 0-10: how likely it is to perform as a "
+        "standalone short, weighing most heavily how hard its first 2-3 "
+        "seconds would grab a scrolling viewer with zero context. Write a "
+        "hook_title of at most 8 words, punchy, in the same language mix the "
+        "speakers use, that makes someone want to watch. List up to 5 "
+        "emphasis words: single words copied from the span's own text that "
+        "carry its meaning (they get highlighted in captions).\n\n"
         "Reply with ONLY a JSON array, no prose, in this exact shape:\n"
-        '[{"start_idx": <int>, "end_idx": <int>, "hook_score": <0-10 number>, '
+        '[{"start_idx": <int>, "end_idx": <int>, "virality_score": <0-10 number>, '
+        '"hook_title": "<at most 8 words>", "emphasis": ["<word>", ...], '
         '"reason": "<short phrase>", "tag": "<one of: Strong opinion, Key '
         'insight, Funny moment, Actionable advice, Contrarian take, Wild '
         'claim>"}]\n'
@@ -295,7 +309,8 @@ def _llm_score_window(client, window: list[Sentence], sentences_by_idx: dict[int
         try:
             start_idx = int(span["start_idx"])
             end_idx = int(span["end_idx"])
-            hook_score = float(span.get("hook_score", 0))
+            # hook_score was the field name before virality_score existed.
+            virality = float(span.get("virality_score", span.get("hook_score", 0)))
         except (KeyError, TypeError, ValueError):
             continue
         if end_idx < start_idx:
@@ -312,12 +327,20 @@ def _llm_score_window(client, window: list[Sentence], sentences_by_idx: dict[int
         tag = span.get("tag") if isinstance(span.get("tag"), str) else None
         if tag not in TAGS:
             tag = _pick_tag(text, i)
+        raw_title = span.get("hook_title")
+        hook_title = None
+        if isinstance(raw_title, str) and raw_title.strip():
+            hook_title = " ".join(raw_title.split()[:HOOK_TITLE_MAX_WORDS])
+        raw_emphasis = span.get("emphasis") if isinstance(span.get("emphasis"), list) else []
+        emphasis = [w for w in raw_emphasis if isinstance(w, str) and w.strip()][:MAX_EMPHASIS_WORDS]
         clips.append(Clip(
             start=start_sent.start,
             end=end_sent.end,
             text=text,
-            score=hook_score,
+            score=virality,
             tag=tag,
+            hook_title=hook_title,
+            emphasis=emphasis,
         ))
     return clips
 
@@ -430,7 +453,7 @@ def _select_clips(candidates: list[Clip], sentences: list[Sentence]) -> list[Cli
             if end - new_start >= MIN_CLIP_S:
                 start, text = new_start, new_text
 
-        picked.append(Clip(start=start, end=end, text=text, score=c.score, tag=c.tag))
+        picked.append(replace(c, start=start, end=end, text=text))
         if len(picked) >= MAX_CLIPS:
             break
 

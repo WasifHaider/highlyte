@@ -68,3 +68,66 @@ drop trigger if exists jobs_set_updated_at on jobs;
 create trigger jobs_set_updated_at
   before update on jobs
   for each row execute function set_updated_at();
+
+-- Phase 1: vertical reframe + Remotion captions. The clip's padded 16:9
+-- segment is still the file at storage_key / download_path; these columns
+-- hold what the renderer needs to draw the 9:16 version of it.
+alter table clips add column if not exists spec jsonb;           -- ClipSpec (backend/spec.py); source.url left empty
+alter table clips add column if not exists style jsonb;          -- ClipStyle chosen by the team; null = defaults
+alter table clips add column if not exists hook_title text;
+alter table clips add column if not exists virality_score numeric;
+
+create table if not exists renders (
+  id text primary key,
+  clip_id text not null references clips(id) on delete cascade,
+  style jsonb not null,
+  style_hash text not null,
+  status text not null default 'queued',  -- queued|rendering|done|error
+  progress numeric not null default 0,
+  lambda_render_id text,
+  lambda_bucket text,
+  storage_key text,
+  error text,
+  started_epoch double precision,         -- unix seconds; used for the 30-minute stuck check
+  attempts integer not null default 0,    -- Lambda throttling retries
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists renders_clip_style_idx on renders(clip_id, style_hash);
+
+drop trigger if exists renders_set_updated_at on renders;
+create trigger renders_set_updated_at
+  before update on renders
+  for each row execute function set_updated_at();
+
+-- Projects page: YouTube id and thumbnail for each job, so the Home and
+-- Projects lists can show the video's thumbnail.
+alter table jobs add column if not exists video_id text;
+alter table jobs add column if not exists thumbnail_url text;
+
+-- Team accounts: a team admin signs up and adds users; everyone in a team
+-- shares its projects. Only the backend (service-role key) reads these.
+create table if not exists teams (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists team_members (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  team_id uuid not null references teams(id) on delete cascade,
+  role text not null check (role in ('admin', 'member')),
+  email text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists team_members_team_idx on team_members(team_id);
+
+alter table jobs add column if not exists team_id uuid references teams(id) on delete cascade;
+alter table jobs add column if not exists created_by uuid references auth.users(id) on delete set null;
+create index if not exists jobs_team_created_idx on jobs(team_id, created_at desc);
+
+alter table teams enable row level security;
+alter table team_members enable row level security;
+alter table jobs enable row level security;
+alter table clips enable row level security;
+alter table renders enable row level security;

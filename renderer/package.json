@@ -1,0 +1,30 @@
+{
+  "name": "highlyte-renderer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "fixture:video": "node scripts/make-fixture-video.mjs",
+    "stills": "node scripts/stills.mjs",
+    "deploy:functions": "remotion lambda functions deploy --memory=2048 --disk=2048 --timeout=240",
+    "deploy:site": "remotion lambda sites create src/index.ts --site-name=highlyte"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.527",
+    "@remotion/google-fonts": "4.0.527",
+    "@remotion/lambda": "4.0.527",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.527",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.1"
+  }
+}

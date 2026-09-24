@@ -1,0 +1,22 @@
+/* Shared by the login and signup pages. */
+.auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.auth-card {
+  width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 32px 28px; display: flex; flex-direction: column; gap: 14px;
+}
+.auth-card .logo { align-self: center; }
+.auth-card h1 { font-family: var(--font-serif); font-size: 24px; font-weight: 500; text-align: center; margin: 0 0 6px; }
+.auth-card .field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--ink-soft); }
+.auth-card .field input {
+  font-family: var(--font-sans); font-size: 14px; color: var(--ink);
+  border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: #fff;
+}
+.auth-card button[type="submit"] {
+  border: none; border-radius: 8px; padding: 11px 16px; font-size: 14px; font-weight: 600;
+  font-family: var(--font-sans); color: #fff; background: var(--accent); cursor: pointer; margin-top: 4px;
+}
+.auth-card button[disabled] { opacity: .6; cursor: default; }
+.auth-card .error { background: #FBEAE3; border: 1px solid #E8B79E; color: #9C3B14; border-radius: 8px; padding: 9px 12px; font-size: 13px; }
+.auth-card .note { font-size: 12.5px; color: var(--ink-faint); text-align: center; margin: 0; }
+.auth-card .switch { font-size: 13px; color: var(--ink-soft); text-align: center; margin: 0; }
+.auth-card .switch a { color: var(--accent); font-weight: 600; }

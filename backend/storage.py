@@ -123,3 +123,32 @@ def delete_clip(key: str) -> None:
         client.delete_object(Bucket=R2_BUCKET, Key=key)
     except Exception as e:  # noqa: BLE001
         print(f"[r2] delete_object failed for {key}: {e}")
+
+
+def render_key(render_id: str) -> str:
+    return f"renders/{render_id}.mp4"
+
+
+def upload_fileobj(fileobj, key: str, download_name: str) -> None:
+    """Stream a file-like object (e.g. an S3 GetObject body from a
+    finished Lambda render) into the bucket without writing it to local
+    disk first. Same attachment disposition as upload_clip, for the same
+    cross-origin-redirect reason."""
+    client = get_client()
+    if client is None:
+        raise RuntimeError("R2 is not configured")
+    client.upload_fileobj(
+        fileobj, R2_BUCKET, key,
+        ExtraArgs={
+            "ContentType": "video/mp4",
+            "ContentDisposition": f'attachment; filename="{download_name}"',
+        },
+    )
+
+
+def open_object(key: str):
+    """Readable stream of an object's bytes (used to build zip downloads)."""
+    client = get_client()
+    if client is None:
+        raise RuntimeError("R2 is not configured")
+    return client.get_object(Bucket=R2_BUCKET, Key=key)["Body"]
