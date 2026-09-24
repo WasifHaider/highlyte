@@ -140,3 +140,43 @@ def list_clips(limit: int = 100) -> list[dict[str, Any]]:
     except Exception as e:  # noqa: BLE001
         print(f"[supabase] list_clips failed: {e}")
         return []
+
+
+def upsert_render(row: dict[str, Any]) -> None:
+    client = get_client()
+    if client is None:
+        return
+    try:
+        client.table("renders").upsert(row).execute()
+    except Exception as e:  # noqa: BLE001
+        print(f"[supabase] upsert_render failed: {e}")
+
+
+def get_render(render_id: str) -> dict[str, Any] | None:
+    client = get_client()
+    if client is None:
+        return None
+    try:
+        return _first(client.table("renders").select("*").eq("id", render_id).limit(1).execute())
+    except Exception as e:  # noqa: BLE001
+        print(f"[supabase] get_render failed: {e}")
+        return None
+
+
+def find_render(clip_id: str, style_hash: str) -> dict[str, Any] | None:
+    """Newest live (queued/rendering/done) render of this clip in exactly
+    this style, if any — failed renders are never reused."""
+    client = get_client()
+    if client is None:
+        return None
+    try:
+        res = (
+            client.table("renders").select("*")
+            .eq("clip_id", clip_id).eq("style_hash", style_hash)
+            .in_("status", ["queued", "rendering", "done"])
+            .order("created_at", desc=True).limit(1).execute()
+        )
+        return _first(res)
+    except Exception as e:  # noqa: BLE001
+        print(f"[supabase] find_render failed: {e}")
+        return None
