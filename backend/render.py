@@ -12,6 +12,7 @@ have a 10-concurrent-Lambda limit, and each render uses about 5.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import math
 import os
@@ -200,14 +201,15 @@ class RenderService:
         return True
 
     def _poll(self, r: Render) -> None:
-        if r.started_at is not None and self.now() - r.started_at > STUCK_AFTER_S:
-            r.status, r.error = "error", "timed out"
-            self.store.put(r)
-            return
+        # Check actual progress before the stuck-timeout: a render that
+        # finished on Lambda while nobody was polling must win the race
+        # against the 30-minute check, not be reported as timed out.
         try:
             p = self.renderer.progress(r.lambda_render_id, r.lambda_bucket)
         except Exception as e:  # noqa: BLE001
             print(f"[render] progress check failed for {r.id}, will retry: {e}")
+            self._apply_stuck_timeout(r)
+            self.store.put(r)
             return
         if p["fatal"]:
             messages = [str(e.get("message", e)) if isinstance(e, dict) else str(e) for e in p["errors"]]
@@ -216,12 +218,35 @@ class RenderService:
             return
         r.progress = round(float(p["overallProgress"]) * 100, 1)
         if p["done"]:
-            key = storage.render_key(r.id)
-            body = self.renderer.fetch_output(r.lambda_bucket, p["outKey"])
-            self.upload_output(body, key, f"highlyte-{r.clip_id}.mp4")
-            self.renderer.delete_output(r.lambda_bucket, p["outKey"])
-            r.status, r.progress, r.storage_key = "done", 100.0, key
+            self._finish(r, p)
+            return
+        self._apply_stuck_timeout(r)
         self.store.put(r)
+
+    def _apply_stuck_timeout(self, r: Render) -> None:
+        if r.started_at is not None and self.now() - r.started_at > STUCK_AFTER_S:
+            r.status, r.error = "error", "timed out"
+
+    def _finish(self, r: Render, p: dict[str, Any]) -> None:
+        key = storage.render_key(r.id)
+        try:
+            body = self.renderer.fetch_output(r.lambda_bucket, p["outKey"])
+            with contextlib.closing(body):
+                self.upload_output(body, key, f"highlyte-{r.clip_id}.mp4")
+        except Exception as e:  # noqa: BLE001
+            # Leave the render "rendering" (with its updated progress) so the
+            # next poll retries the copy instead of surfacing a 500.
+            print(f"[render] failed to copy output for {r.id}, will retry: {e}")
+            self.store.put(r)
+            return
+        r.status, r.progress, r.storage_key = "done", 100.0, key
+        self.store.put(r)
+        try:
+            # The S3 lifecycle rule is the backstop, so a failed delete here
+            # is only worth logging, never worth losing the finished render.
+            self.renderer.delete_output(r.lambda_bucket, p["outKey"])
+        except Exception as e:  # noqa: BLE001
+            print(f"[render] delete_output failed for {r.id}: {e}")
 
 
 class LambdaRenderer:

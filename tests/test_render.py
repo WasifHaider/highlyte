@@ -109,6 +109,54 @@ def test_stuck_render_times_out(setup):
     assert r.status == "error" and r.error == "timed out"
 
 
+def test_finished_after_stuck_window_is_not_timed_out(setup):
+    # A render that actually finished on Lambda while nobody polled must
+    # win the race against the stuck-timeout check, not lose to it.
+    svc, fake, uploads, clock = setup
+    r = svc.request("job1-0", ClipStyle(layout="fit"))
+    clock.t += render.STUCK_AFTER_S + 1
+    fake.progress_value = {"overallProgress": 1.0, "done": True, "fatal": False, "errors": [], "outKey": "renders/x/out.mp4"}
+    r = svc.refresh(r.id)
+    assert r.status == "done"
+    assert uploads == [(f"renders/{r.id}.mp4", "highlyte-job1-0.mp4", b"mp4")]
+
+
+def test_delete_output_failure_does_not_block_done(setup):
+    svc, fake, uploads, _ = setup
+    r = svc.request("job1-0", ClipStyle(layout="fit"))
+    fake.progress_value = {"overallProgress": 1.0, "done": True, "fatal": False, "errors": [], "outKey": "renders/x/out.mp4"}
+
+    def boom(bucket, key):
+        raise RuntimeError("s3 delete failed")
+
+    fake.delete_output = boom
+    r = svc.refresh(r.id)
+    assert r.status == "done" and r.progress == 100.0
+    assert r.storage_key == f"renders/{r.id}.mp4"
+    assert uploads == [(f"renders/{r.id}.mp4", "highlyte-job1-0.mp4", b"mp4")]
+
+
+def test_upload_failure_retries_on_next_poll(setup):
+    svc, fake, uploads, _ = setup
+    r = svc.request("job1-0", ClipStyle(layout="fit"))
+    fake.progress_value = {"overallProgress": 1.0, "done": True, "fatal": False, "errors": [], "outKey": "renders/x/out.mp4"}
+    calls = {"n": 0}
+    real_upload = svc.upload_output
+
+    def flaky(body, key, name):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("network blip")
+        real_upload(body, key, name)
+
+    svc.upload_output = flaky
+    r = svc.refresh(r.id)
+    assert r.status == "rendering"  # first attempt failed, no 500, will retry
+    r = svc.refresh(r.id)
+    assert r.status == "done"
+    assert uploads == [(f"renders/{r.id}.mp4", "highlyte-job1-0.mp4", b"mp4")]
+
+
 def test_throttled_start_stays_queued_then_retries(setup):
     svc, fake, _, clock = setup
     fake.start_error = RuntimeError("TooManyRequestsException: Rate Exceeded")
