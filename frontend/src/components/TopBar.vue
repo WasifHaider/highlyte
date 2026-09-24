@@ -14,6 +14,7 @@
           :class="{ 'tab-active': $route.path.startsWith('/jobs/') }"
         >Projects</router-link>
         <!-- A clips page belongs to a project, so the Projects tab stays highlighted there. -->
+        <router-link v-if="auth.isAdmin" to="/team" class="tab" active-class="tab-active">Team</router-link>
       </nav>
       <input
         v-model="url"
@@ -21,9 +22,18 @@
         placeholder="Paste a YouTube link"
         @keyup.enter="onGenerate"
       />
-      <button :disabled="submitting || !url" @click="onGenerate">
+      <button class="generate" :disabled="submitting || !url" @click="onGenerate">
         {{ submitting ? 'Starting…' : 'Generate' }}
       </button>
+      <div class="account">
+        <button class="account-btn" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen">
+          {{ auth.me?.team.name || 'Account' }} ▾
+        </button>
+        <div v-if="menuOpen" class="account-menu" role="menu">
+          <div class="account-email">{{ auth.me?.user.email }}</div>
+          <button class="logout" role="menuitem" @click="onLogout">Log out</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -32,11 +42,14 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useJobStore } from '../stores/jobStore'
+import { useAuthStore } from '../stores/authStore'
 
 const url = ref('')
 const submitting = ref(false)
 const router = useRouter()
 const jobStore = useJobStore()
+const auth = useAuthStore()
+const menuOpen = ref(false)
 
 async function onGenerate() {
   if (!url.value || submitting.value) return
@@ -49,6 +62,14 @@ async function onGenerate() {
   } finally {
     submitting.value = false
   }
+}
+
+async function onLogout() {
+  menuOpen.value = false
+  await auth.logout()
+  jobStore.stopPolling()
+  jobStore.$reset() // don't show this account's clips to the next person
+  router.replace('/login')
 }
 </script>
 
@@ -115,7 +136,7 @@ input {
   color: var(--ink);
   outline: none;
 }
-button {
+.generate {
   border: none;
   border-radius: 8px;
   padding: 10px 20px;
@@ -126,8 +147,19 @@ button {
   color: #fff;
   background: var(--accent);
 }
-button:disabled {
+.generate:disabled {
   cursor: default;
   background: rgba(0,71,65,0.45);
 }
+.account { position: relative; flex-shrink: 0; }
+.account-btn {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.account-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); min-width: 200px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.08); z-index: 30;
+}
+.account-email { font-size: 12.5px; color: var(--ink-soft); padding: 4px 6px 10px; border-bottom: 1px solid var(--border); margin-bottom: 8px; word-break: break-all; }
+.logout { width: 100%; text-align: left; background: none; color: #9C3B14; border: none; padding: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
 </style>
