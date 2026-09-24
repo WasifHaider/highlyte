@@ -25,7 +25,14 @@ export function useProjects(params) {
       error.value = null
       if (data.some(isProcessing)) timer = setTimeout(load, REFRESH_MS)
     } catch {
-      if (request === latest) error.value = "Couldn't load projects"
+      if (request !== latest) return // a newer search replaced this one
+      // A transient failure shouldn't blank out a list that's already
+      // showing something — keep it on screen and just try again later.
+      if (projects.value.length > 0) {
+        timer = setTimeout(load, REFRESH_MS)
+      } else {
+        error.value = "Couldn't load projects"
+      }
     } finally {
       if (request === latest) loading.value = false
     }
