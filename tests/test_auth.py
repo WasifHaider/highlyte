@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 
 from backend import auth
@@ -64,6 +66,17 @@ def test_logout_forgets_token(gotrue):
     session = auth.password_login("a@x.com", "password1")
     auth.logout(session.access_token)
     assert auth.user_for_token(session.access_token) is None
+    # Only this browser's session ends; the user stays logged in elsewhere.
+    assert gotrue.logout_scopes == ["local"]
+
+
+def test_expired_cache_entries_are_swept(gotrue, monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr(auth, "time", SimpleNamespace(monotonic=lambda: now[0]))
+    auth._remember("old-token", auth.AuthUser(id="u1", email="a@x.com"))
+    now[0] += auth.TOKEN_CACHE_TTL_S + 1
+    auth._remember("new-token", auth.AuthUser(id="u2", email="b@x.com"))
+    assert "old-token" not in auth._cache and "new-token" in auth._cache
 
 
 def test_generate_password():

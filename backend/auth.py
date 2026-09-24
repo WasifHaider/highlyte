@@ -78,8 +78,14 @@ def _request(method: str, path: str, *, bearer: str | None = None, json: dict | 
 
 
 def _remember(token: str, user: AuthUser) -> None:
+    now = time.monotonic()
     with _cache_lock:
-        _cache[token] = (time.monotonic() + TOKEN_CACHE_TTL_S, user)
+        # Tokens that are never checked again would otherwise stay forever,
+        # so each new entry sweeps out the expired ones. The cache only holds
+        # a minute's worth of active sessions, so the scan stays small.
+        for stale in [t for t, (expires, _) in _cache.items() if expires < now]:
+            del _cache[stale]
+        _cache[token] = (now + TOKEN_CACHE_TTL_S, user)
 
 
 def _session(data: dict) -> Session:
@@ -128,7 +134,9 @@ def logout(access_token: str) -> None:
     with _cache_lock:
         _cache.pop(access_token, None)
     try:
-        _request("POST", "/logout", bearer=access_token)
+        # scope=local ends only this browser's session; the default would
+        # log the user out on every device.
+        _request("POST", "/logout?scope=local", bearer=access_token)
     except AuthUnavailable:
         pass  # the cookies are cleared either way; the token expires on its own
 

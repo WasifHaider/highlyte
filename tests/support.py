@@ -17,6 +17,7 @@ class FakeGoTrue:
         self.access: dict[str, str] = {}      # access token -> email
         self.refresh: dict[str, str] = {}     # refresh token -> email
         self.down = False
+        self.logout_scopes: list[str | None] = []
         self._n = 0
 
     def add_user(self, email: str, password: str) -> str:
@@ -61,6 +62,7 @@ class FakeGoTrue:
                 return httpx.Response(401, json={"msg": "invalid token"})
             return httpx.Response(200, json={"id": self.users[email]["id"], "email": email})
         if path == "/auth/v1/logout":
+            self.logout_scopes.append(request.url.params.get("scope"))
             self.access.pop(bearer, None)
             return httpx.Response(204)
         if path == "/auth/v1/admin/users" and request.method == "POST":
