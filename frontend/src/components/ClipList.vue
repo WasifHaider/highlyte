@@ -1,5 +1,6 @@
 <template>
   <div>
+    <StyleAllBar v-if="hasVerticalClips" />
     <div class="results-header">
       <div class="results-title">Highlights</div>
       <div class="select-all" @click="jobStore.toggleSelectAll()">
@@ -23,10 +24,13 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import ClipCard from './ClipCard.vue'
+import StyleAllBar from './StyleAllBar.vue'
 
 const jobStore = useJobStore()
+const hasVerticalClips = computed(() => jobStore.clips.some(c => c.spec))
 </script>
 
 <style scoped>

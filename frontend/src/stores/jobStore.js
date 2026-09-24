@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import {
   clipDownloadUrl, createJob, getHealth, getJobStatus, getRender, saveClipStyle, startRender,
 } from '../services/highlyteApi'
+import { layoutAllowed } from '../utils/clipStyle'
 
 const POLL_INTERVAL_MS = 1000
 const RENDER_POLL_MS = 2000
@@ -107,6 +108,22 @@ export const useJobStore = defineStore('job', {
           this.error = e?.response?.data?.detail || 'Failed to save clip style'
         })
       }, STYLE_SAVE_DELAY_MS)
+    },
+    // Applies one style to every clip that has a vertical preview. A layout
+    // a clip can't use (a face layout with no faces found) falls back to
+    // that clip's automatic layout. Hook title text stays per clip.
+    applyStyleToAll(patch) {
+      let changed = 0
+      for (const clip of this.clips) {
+        if (!clip.spec) continue
+        const clipPatch = { ...patch }
+        if ('layout' in clipPatch && !layoutAllowed(clipPatch.layout, clip.spec.reframe.faces.length)) {
+          clipPatch.layout = clip.spec.reframe.auto
+        }
+        this.updateStyle(clip.id, clipPatch)
+        changed++
+      }
+      return changed
     },
     async exportSelected() {
       const clips = this.clips.filter(c => this.selected[c.id] && c.spec)

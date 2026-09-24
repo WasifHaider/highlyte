@@ -84,18 +84,7 @@ import { computed } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import { clipDownloadUrl } from '../services/highlyteApi'
 import RemotionPreview from './RemotionPreview.vue'
-
-const LAYOUTS = [
-  { value: 'follow', label: 'Follow face', minFaces: 1 },
-  { value: 'speaker', label: 'Follow speaker', minFaces: 1 },
-  { value: 'split', label: 'Split screen', minFaces: 2 },
-  { value: 'fit', label: 'Fit with blur', minFaces: 0 },
-]
-const PRESETS = [
-  { value: 'karaoke', label: 'Karaoke highlight' },
-  { value: 'pop', label: 'Pop word-by-word' },
-  { value: 'clean', label: 'Clean subtitle' },
-]
+import { LAYOUTS, PRESETS } from '../utils/clipStyle'
 
 const props = defineProps({
   clip: { type: Object, required: true },
