@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import os
 import threading
 import time
@@ -13,12 +14,14 @@ from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 
 from . import db, storage
-from .pipeline import cut, highlight, ingest, transcript
+from .pipeline import clipprep, cut, highlight, ingest, transcript
+from .spec import default_style
 from .validation import check_clip_filename, check_id
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(BASE_DIR, "data", "cache")
 CLIPS_DIR = os.path.join(BASE_DIR, "data", "clips")
+MODELS_DIR = os.path.join(BASE_DIR, "data", "models")
 os.makedirs(CACHE_DIR, exist_ok=True)
 os.makedirs(CLIPS_DIR, exist_ok=True)
 
@@ -50,7 +53,7 @@ class GenerateRequest(BaseModel):
 class Job:
     id: str
     url: str
-    status: str = "queued"  # queued|transcribing|analyzing|cutting|done|error
+    status: str = "queued"  # queued|transcribing|analyzing|preparing|done|error
     error: str | None = None
     video_meta: dict[str, Any] | None = None
     transcript_source: str | None = None
@@ -86,6 +89,96 @@ def _persist_job(job: Job, whisper_model: str, *, throttle: bool = False) -> Non
         row["video_channel"] = job.video_meta.get("channel")
         row["video_duration"] = job.video_meta.get("duration")
     db.upsert_job(row)
+
+
+def _clip_record(job_id: str, idx: int, clip: highlight.Clip, prepared: clipprep.PreparedClip) -> dict[str, Any]:
+    spec = prepared.spec
+    return {
+        "id": spec.clipId,
+        "start": clip.start,
+        "end": clip.end,
+        "startLabel": ingest.duration_label(clip.start),
+        "endLabel": ingest.duration_label(clip.end),
+        "durationLabel": ingest.duration_label(clip.end - clip.start),
+        "text": clip.text,
+        "tag": clip.tag,
+        "score": clip.score,
+        "hookTitle": spec.hookTitle,
+        "viralityScore": spec.viralityScore,
+        "downloadUrl": f"/api/clips/{job_id}/clip_{idx}.mp4",
+        "storageProvider": "r2" if prepared.storage_key else "local",
+        "storageKey": prepared.storage_key,
+        "spec": spec.model_dump(),
+        "style": default_style(spec).model_dump(),
+    }
+
+
+def _clip_row(job_id: str, idx: int, record: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": record["id"],
+        "job_id": job_id,
+        "idx": idx,
+        "start_s": record["start"],
+        "end_s": record["end"],
+        "text": record["text"],
+        "tag": record["tag"],
+        "score": record["score"],
+        "download_path": record["downloadUrl"],
+        "storage_provider": record["storageProvider"],
+        "storage_key": record["storageKey"],
+        "hook_title": record["hookTitle"],
+        "virality_score": record["viralityScore"],
+        "spec": record["spec"],
+        "style": record["style"],
+    }
+
+
+def _clip_row_to_api(r: dict[str, Any]) -> dict[str, Any]:
+    start_s = float(r.get("start_s") or 0.0)
+    end_s = float(r.get("end_s") or 0.0)
+    return {
+        "id": r["id"],
+        "jobId": r["job_id"],
+        "start": start_s,
+        "end": end_s,
+        "startLabel": ingest.duration_label(start_s),
+        "endLabel": ingest.duration_label(end_s),
+        "durationLabel": ingest.duration_label(end_s - start_s),
+        "text": r.get("text"),
+        "tag": r.get("tag"),
+        "score": r.get("score"),
+        "hookTitle": r.get("hook_title"),
+        "viralityScore": r.get("virality_score"),
+        "downloadUrl": r.get("download_path") or f"/api/clips/{r['job_id']}/clip_{r.get('idx', 0)}.mp4",
+        "storageProvider": r.get("storage_provider", "local"),
+        "storageKey": r.get("storage_key"),
+        "createdAt": r.get("created_at"),
+        "spec": r.get("spec"),
+        "style": r.get("style"),
+    }
+
+
+def _with_source_url(record: dict[str, Any]) -> dict[str, Any]:
+    """Copy of a clip record whose spec points the preview Player at the
+    clip's own download path. That path proxies to R2 or local disk (see
+    get_clip), so no expiring presigned URL ever reaches the client
+    or the database."""
+    out = dict(record)
+    if out.get("spec"):
+        out["spec"] = copy.deepcopy(out["spec"])
+        out["spec"]["source"]["url"] = out["downloadUrl"]
+    return out
+
+
+def _find_clip(clip_id: str) -> dict[str, Any] | None:
+    job_id = clip_id.rsplit("-", 1)[0]
+    job = JOBS.get(job_id)
+    if job is not None:
+        for c in job.clips:
+            if c["id"] == clip_id:
+                return c
+    row = db.get_clip(clip_id)
+    return _clip_row_to_api(row) if row else None
 
 
 def _run_pipeline(job: Job, whisper_model: str) -> None:
@@ -133,72 +226,44 @@ def _run_pipeline(job: Job, whisper_model: str) -> None:
         _persist_job(job, whisper_model)
         clips = highlight.detect_highlights(tr.segments)
 
-        job.status = "cutting"
-        job.progress = {"stage": "cutting", "percent": 0, "note": f"0/{len(clips)} clips cut"}
+        job.status = "preparing"
+        job.progress = {"stage": "preparing", "percent": 0, "note": f"0/{len(clips)} clips prepared"}
         _persist_job(job, whisper_model)
-        job_clip_dir = os.path.join(CLIPS_DIR, job.id)
-        results = []
+
+        groq_key = os.environ.get("GROQ_KEY") or None
+        # The captions transcript has no word timings, so clip words come
+        # from Groq; decide once per episode whether it needs the Roman
+        # Urdu seed prompt (see transcript._detect_needs_roman_urdu_hint).
+        prompt = None
+        if tr.source == "captions" and groq_key:
+            if transcript._detect_needs_roman_urdu_hint(meta.audio_path, groq_key):
+                prompt = transcript.ROMAN_URDU_HINDI_SEED
+
         for i, c in enumerate(clips):
-            out_name = f"clip_{i}.mp4"
-            out_path = os.path.join(job_clip_dir, out_name)
-            cut.cut_clip(meta.video_path, c.start, c.end, out_path)
+            def on_step(step: str, i: int = i) -> None:
+                job.progress = {
+                    "stage": "preparing",
+                    "percent": i / len(clips) * 100.0,
+                    "note": f"clip {i + 1}/{len(clips)}: {step}",
+                }
+                _persist_job(job, whisper_model, throttle=True)
 
-            # Upload to R2 when configured, then drop the local copy — the
-            # clip is served back out of the bucket, not local disk (see
-            # get_clip below). If the upload fails, keep the local file so
-            # the clip is still servable rather than losing it.
-            storage_provider = "local"
-            storage_key = None
-            if storage.is_enabled():
-                try:
-                    storage_key = storage.clip_key(job.id, out_name)
-                    storage.upload_clip(out_path, storage_key)
-                    os.remove(out_path)
-                    storage_provider = "r2"
-                except Exception as e:  # noqa: BLE001
-                    storage_key = None
-                    print(f"[r2] upload failed for {job.id}/{out_name}, keeping local copy: {e}")
+            prepared = clipprep.prepare_clip(
+                job_id=job.id, idx=i, clip=c,
+                video_path=meta.video_path, video_duration=meta.duration,
+                segments=tr.segments, transcript_source=tr.source, audio_path=meta.audio_path,
+                clips_dir=CLIPS_DIR, models_dir=MODELS_DIR,
+                groq_key=groq_key, prompt=prompt, on_step=on_step,
+            )
+            record = _clip_record(job.id, i, c, prepared)
+            job.clips.append(record)
+            # Saved per clip, so a failure later in the job doesn't lose
+            # the clips already prepared.
+            db.insert_clips([_clip_row(job.id, i, record)])
 
-            results.append({
-                "id": _clip_id(job.id, i),
-                "start": c.start,
-                "end": c.end,
-                "startLabel": ingest.duration_label(c.start),
-                "endLabel": ingest.duration_label(c.end),
-                "durationLabel": ingest.duration_label(c.end - c.start),
-                "text": c.text,
-                "tag": c.tag,
-                "score": c.score,
-                "downloadUrl": f"/api/clips/{job.id}/{out_name}",
-                "storageProvider": storage_provider,
-                "storageKey": storage_key,
-            })
-            job.progress = {
-                "stage": "cutting",
-                "percent": (i + 1) / len(clips) * 100.0 if clips else 100.0,
-                "note": f"{i + 1}/{len(clips)} clips cut",
-            }
-            _persist_job(job, whisper_model, throttle=True)
-        job.clips = results
         job.status = "done"
         job.progress = {}
         _persist_job(job, whisper_model)
-        db.insert_clips([
-            {
-                "id": r["id"],
-                "job_id": job.id,
-                "idx": i,
-                "start_s": r["start"],
-                "end_s": r["end"],
-                "text": r["text"],
-                "tag": r["tag"],
-                "score": r["score"],
-                "download_path": r["downloadUrl"],
-                "storage_provider": r["storageProvider"],
-                "storage_key": r["storageKey"],
-            }
-            for i, r in enumerate(results)
-        ])
     except Exception as e:  # noqa: BLE001
         job.status = "error"
         job.error = str(e)
@@ -223,17 +288,43 @@ def generate(req: GenerateRequest) -> dict[str, str]:
 
 @app.get("/api/status/{job_id}")
 def status(job_id: str) -> dict[str, Any]:
+    check_id(job_id, "job id")
     job = JOBS.get(job_id)
-    if job is None:
+    if job is not None:
+        return {
+            "id": job.id,
+            "status": job.status,
+            "error": job.error,
+            "videoMeta": job.video_meta,
+            "transcriptSource": job.transcript_source,
+            "clips": [_with_source_url(c) for c in job.clips],
+            "progress": job.progress,
+        }
+
+    # Not in memory (e.g. the backend restarted): rebuild it from Supabase.
+    row = db.get_job(job_id)
+    if row is None:
         raise HTTPException(404, "job not found")
+    status_value, error = row["status"], row.get("error")
+    if status_value not in ("done", "error"):
+        # Its worker thread died with the old process; it will never finish.
+        status_value, error = "error", "Processing was interrupted by a server restart. Please submit the video again."
+    video_meta = None
+    if row.get("video_title"):
+        video_meta = {
+            "title": row.get("video_title"),
+            "channel": row.get("video_channel"),
+            "duration": row.get("video_duration"),
+            "durationLabel": ingest.duration_label(float(row.get("video_duration") or 0)),
+        }
     return {
-        "id": job.id,
-        "status": job.status,
-        "error": job.error,
-        "videoMeta": job.video_meta,
-        "transcriptSource": job.transcript_source,
-        "clips": job.clips,
-        "progress": job.progress,
+        "id": row["id"],
+        "status": status_value,
+        "error": error,
+        "videoMeta": video_meta,
+        "transcriptSource": row.get("transcript_source"),
+        "clips": [_with_source_url(_clip_row_to_api(r)) for r in db.list_clips_for_job(job_id)],
+        "progress": {},
     }
 
 
@@ -249,30 +340,16 @@ def list_all_clips(limit: int = 100) -> list[dict[str, Any]]:
     Supabase (db.py); returns [] if it isn't configured, same as the
     other list endpoints, since there's nowhere else this history is
     durably tracked (the in-memory JOBS dict is lost on restart)."""
-    rows = db.list_clips(limit)
     out = []
-    for r in rows:
+    for r in db.list_clips(limit):
         job_info = r.get("jobs") or {}
-        start_s = r.get("start_s") or 0.0
-        end_s = r.get("end_s") or 0.0
-        out.append({
-            "id": r["id"],
-            "jobId": r["job_id"],
-            "start": start_s,
-            "end": end_s,
-            "startLabel": ingest.duration_label(start_s),
-            "endLabel": ingest.duration_label(end_s),
-            "durationLabel": ingest.duration_label(end_s - start_s),
-            "text": r.get("text"),
-            "tag": r.get("tag"),
-            "score": r.get("score"),
-            "downloadUrl": r.get("download_path") or f"/api/clips/{r['job_id']}/clip_{r.get('idx', 0)}.mp4",
-            "storageProvider": r.get("storage_provider", "local"),
-            "createdAt": r.get("created_at"),
+        record = _clip_row_to_api(r)
+        record.update({
             "videoTitle": job_info.get("video_title"),
             "videoChannel": job_info.get("video_channel"),
             "videoUrl": job_info.get("url"),
         })
+        out.append(record)
     return out
 
 

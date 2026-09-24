@@ -70,6 +70,55 @@ def list_jobs(limit: int = 20) -> list[dict[str, Any]]:
         return []
 
 
+def _first(res) -> dict[str, Any] | None:
+    rows = res.data or []
+    return rows[0] if rows else None
+
+
+def get_job(job_id: str) -> dict[str, Any] | None:
+    client = get_client()
+    if client is None:
+        return None
+    try:
+        return _first(client.table("jobs").select("*").eq("id", job_id).limit(1).execute())
+    except Exception as e:  # noqa: BLE001
+        print(f"[supabase] get_job failed: {e}")
+        return None
+
+
+def list_clips_for_job(job_id: str) -> list[dict[str, Any]]:
+    client = get_client()
+    if client is None:
+        return []
+    try:
+        res = client.table("clips").select("*").eq("job_id", job_id).order("idx").execute()
+        return res.data or []
+    except Exception as e:  # noqa: BLE001
+        print(f"[supabase] list_clips_for_job failed: {e}")
+        return []
+
+
+def get_clip(clip_id: str) -> dict[str, Any] | None:
+    client = get_client()
+    if client is None:
+        return None
+    try:
+        return _first(client.table("clips").select("*").eq("id", clip_id).limit(1).execute())
+    except Exception as e:  # noqa: BLE001
+        print(f"[supabase] get_clip failed: {e}")
+        return None
+
+
+def update_clip(clip_id: str, fields: dict[str, Any]) -> None:
+    client = get_client()
+    if client is None:
+        return
+    try:
+        client.table("clips").update(fields).eq("id", clip_id).execute()
+    except Exception as e:  # noqa: BLE001
+        print(f"[supabase] update_clip failed: {e}")
+
+
 def list_clips(limit: int = 100) -> list[dict[str, Any]]:
     """All clips across every job, newest first, each with its parent
     job's video info embedded (PostgREST foreign-key embed via the

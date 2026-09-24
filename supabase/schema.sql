@@ -68,3 +68,34 @@ drop trigger if exists jobs_set_updated_at on jobs;
 create trigger jobs_set_updated_at
   before update on jobs
   for each row execute function set_updated_at();
+
+-- Phase 1: vertical reframe + Remotion captions. The clip's padded 16:9
+-- segment is still the file at storage_key / download_path; these columns
+-- hold what the renderer needs to draw the 9:16 version of it.
+alter table clips add column if not exists spec jsonb;           -- ClipSpec (backend/spec.py); source.url left empty
+alter table clips add column if not exists style jsonb;          -- ClipStyle chosen by the team; null = defaults
+alter table clips add column if not exists hook_title text;
+alter table clips add column if not exists virality_score numeric;
+
+create table if not exists renders (
+  id text primary key,
+  clip_id text not null references clips(id) on delete cascade,
+  style jsonb not null,
+  style_hash text not null,
+  status text not null default 'queued',  -- queued|rendering|done|error
+  progress numeric not null default 0,
+  lambda_render_id text,
+  lambda_bucket text,
+  storage_key text,
+  error text,
+  started_epoch double precision,         -- unix seconds; used for the 30-minute stuck check
+  attempts integer not null default 0,    -- Lambda throttling retries
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists renders_clip_style_idx on renders(clip_id, style_hash);
+
+drop trigger if exists renders_set_updated_at on renders;
+create trigger renders_set_updated_at
+  before update on renders
+  for each row execute function set_updated_at();
