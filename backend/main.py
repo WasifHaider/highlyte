@@ -2,20 +2,22 @@ from __future__ import annotations
 
 import copy
 import os
+import tempfile
 import threading
 import time
 import uuid
+import zipfile
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
-from . import db, storage
+from . import db, render, storage
 from .pipeline import clipprep, cut, highlight, ingest, transcript
-from .spec import default_style
+from .spec import ClipStyle, default_style
 from .validation import check_clip_filename, check_id
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -40,6 +42,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+RENDERER_PACKAGE_JSON = os.path.join(BASE_DIR, "renderer", "package.json")
+MAX_ZIP_RENDERS = 20
 
 
 class GenerateRequest(BaseModel):
@@ -177,6 +182,42 @@ def _find_clip(clip_id: str) -> dict[str, Any] | None:
     return _clip_row_to_api(row) if row else None
 
 
+def _build_props(clip_id: str, style: dict[str, Any]) -> tuple[dict[str, Any], float]:
+    """Remotion input props for a Lambda render. Lambda can't reach this
+    machine, so the source must be a presigned R2 URL (fresh, since those
+    expire)."""
+    record = _find_clip(clip_id)
+    if record is None or not record.get("spec"):
+        raise RuntimeError("clip has no spec")
+    if not record.get("storageKey"):
+        raise RuntimeError("clip source is not in R2")
+    spec = copy.deepcopy(record["spec"])
+    spec["source"]["url"] = storage.clip_url(record["storageKey"])
+    return {"spec": spec, "style": style}, spec["end"] - spec["start"]
+
+
+RENDER_SERVICE = render.build_service(_build_props, storage.upload_fileobj)
+if RENDER_SERVICE is not None:
+    for _problem in render.check_versions(RENDERER_PACKAGE_JSON, os.environ.get("REMOTION_FUNCTION_NAME")):
+        print(f"[render] VERSION MISMATCH: {_problem}")
+
+
+def _clip_for_style(clip_id: str) -> dict[str, Any]:
+    check_id(clip_id, "clip id")
+    record = _find_clip(clip_id)
+    if record is None:
+        raise HTTPException(404, "clip not found")
+    if not record.get("spec"):
+        raise HTTPException(409, "This clip was made before vertical clips existed. Re-run the video to get one.")
+    return record
+
+
+def _save_style(record: dict[str, Any], style: ClipStyle) -> dict[str, Any]:
+    record["style"] = style.model_dump()
+    db.update_clip(record["id"], {"style": record["style"]})
+    return record["style"]
+
+
 def _run_pipeline(job: Job, whisper_model: str) -> None:
     _persist_job(job, whisper_model)
     try:
@@ -269,7 +310,7 @@ def _run_pipeline(job: Job, whisper_model: str) -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "supabase": db.is_enabled()}
+    return {"status": "ok", "supabase": db.is_enabled(), "rendering": RENDER_SERVICE is not None}
 
 
 @app.post("/api/generate")
@@ -372,3 +413,74 @@ def get_clip(job_id: str, filename: str):
     if not os.path.exists(path):
         raise HTTPException(404, "clip not found")
     return FileResponse(path, media_type="video/mp4", filename=filename)
+
+
+@app.patch("/api/clips/{clip_id}/style")
+def update_style(clip_id: str, style: ClipStyle = Body(...)) -> dict[str, Any]:
+    return _save_style(_clip_for_style(clip_id), style)
+
+
+@app.post("/api/clips/{clip_id}/render")
+def start_render(clip_id: str, style: ClipStyle = Body(...)) -> dict[str, Any]:
+    record = _clip_for_style(clip_id)
+    if RENDER_SERVICE is None:
+        raise HTTPException(503, "Rendering not configured")
+    if not record.get("storageKey"):
+        raise HTTPException(409, "This clip's source isn't in R2, which Lambda rendering needs.")
+    _save_style(record, style)
+    return RENDER_SERVICE.request(clip_id, style).to_api()
+
+
+def _get_render(render_id: str) -> render.Render:
+    check_id(render_id, "render id")
+    if RENDER_SERVICE is None:
+        raise HTTPException(503, "Rendering not configured")
+    r = RENDER_SERVICE.refresh(render_id)
+    if r is None:
+        raise HTTPException(404, "render not found")
+    return r
+
+
+# Declared before /api/renders/{render_id} so "zip" isn't taken as an id.
+@app.get("/api/renders/zip")
+def renders_zip(ids: str = Query(...)) -> StreamingResponse:
+    render_ids = [i for i in ids.split(",") if i][:MAX_ZIP_RENDERS]
+    renders = [_get_render(i) for i in render_ids]
+    if not renders or any(r.status != "done" for r in renders):
+        raise HTTPException(409, "all renders must be finished")
+    # Spools to disk past 64 MB; mp4s are already compressed, so store them as-is.
+    buf = tempfile.SpooledTemporaryFile(max_size=64 * 1024 * 1024)
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:
+        for r in renders:
+            with zf.open(f"highlyte-{r.clip_id}.mp4", "w") as dest:
+                src = storage.open_object(r.storage_key)
+                for chunk in iter(lambda: src.read(1024 * 1024), b""):
+                    dest.write(chunk)
+    buf.seek(0)
+
+    def stream():
+        try:
+            yield from iter(lambda: buf.read(1024 * 1024), b"")
+        finally:
+            buf.close()
+
+    return StreamingResponse(
+        stream(), media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="highlyte-clips.zip"'},
+    )
+
+
+@app.get("/api/renders/{render_id}")
+def get_render(render_id: str) -> dict[str, Any]:
+    return _get_render(render_id).to_api()
+
+
+@app.get("/api/renders/{render_id}/file")
+def get_render_file(render_id: str):
+    r = _get_render(render_id)
+    if r.status != "done" or not r.storage_key:
+        raise HTTPException(409, "render not finished")
+    url = storage.clip_url(r.storage_key)
+    if url is None:
+        raise HTTPException(503, "R2 not configured")
+    return RedirectResponse(url)
