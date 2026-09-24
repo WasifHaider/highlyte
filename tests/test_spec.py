@@ -62,6 +62,11 @@ def test_style_rejects_bad_accent():
         ClipStyle(layout="fit", accent="yellow")
 
 
+def test_style_rejects_hook_title_over_80_chars():
+    with pytest.raises(ValidationError):
+        ClipStyle(layout="fit", hookTitle="x" * 81)
+
+
 def test_style_hash_is_stable_and_sensitive():
     a = ClipStyle(layout="fit")
     b = ClipStyle(layout="fit")

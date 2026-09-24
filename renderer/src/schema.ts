@@ -46,7 +46,7 @@ export const clipStyleSchema = z.object({
   layout: layoutSchema,
   captionPreset: z.enum(['karaoke', 'pop', 'clean']),
   showHook: z.boolean(),
-  hookTitle: z.string().nullable(),
+  hookTitle: z.string().max(80).nullable(),
   accent: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
   captionPosition: z.enum(['lower', 'middle']),
 })

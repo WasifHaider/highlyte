@@ -82,7 +82,7 @@ class ClipStyle(BaseModel):
     layout: LayoutKind
     captionPreset: CaptionPreset = "karaoke"
     showHook: bool = True
-    hookTitle: str | None = None
+    hookTitle: str | None = Field(None, max_length=80)
     accent: str = Field("#FFD400", pattern=r"^#[0-9A-Fa-f]{6}$")
     captionPosition: Literal["lower", "middle"] = "lower"
 

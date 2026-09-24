@@ -23,6 +23,11 @@ describe('schema', () => {
     expect(clipStyleSchema.safeParse({ ...style, captionPreset: 'neon' }).success).toBe(false)
   })
 
+  it('rejects a hookTitle over 80 chars', () => {
+    expect(clipStyleSchema.safeParse({ ...style, hookTitle: 'x'.repeat(81) }).success).toBe(false)
+    expect(clipStyleSchema.safeParse({ ...style, hookTitle: 'x'.repeat(80) }).success).toBe(true)
+  })
+
   it('computes duration in frames', () => {
     expect(durationInFrames({ start: 1, end: 9 })).toBe(240)
     expect(durationInFrames({ start: 1, end: 1 })).toBe(1)
