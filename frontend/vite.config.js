@@ -23,6 +23,11 @@ export default defineConfig({
     port: 6100,
     strictPort: true,
     fs: { allow: ['..'] },
+    // The API is served from this same origin in development, so the
+    // backend's httpOnly login cookies travel with every request.
+    proxy: {
+      '/api': 'http://127.0.0.1:8000',
+    },
   },
   preview: {
     port: 6100,
