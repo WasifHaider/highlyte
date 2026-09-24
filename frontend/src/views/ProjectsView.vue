@@ -7,12 +7,11 @@
 
     <div class="controls">
       <input v-model="query" type="search" class="search" placeholder="Search by title" />
-      <div class="status-tabs" role="tablist">
+      <div class="status-tabs" role="group" aria-label="Filter by status">
         <button
           v-for="tab in STATUS_TABS"
           :key="tab.value"
-          role="tab"
-          :aria-selected="status === tab.value"
+          :aria-pressed="status === tab.value"
           :class="{ active: status === tab.value }"
           @click="status = tab.value"
         >{{ tab.label }}</button>
