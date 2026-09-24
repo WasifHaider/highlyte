@@ -7,7 +7,13 @@
       </router-link>
       <nav class="tabs">
         <router-link to="/" class="tab" exact-active-class="tab-active">Home</router-link>
-        <router-link to="/library" class="tab" active-class="tab-active">Library</router-link>
+        <router-link
+          to="/projects"
+          class="tab"
+          active-class="tab-active"
+          :class="{ 'tab-active': $route.path.startsWith('/jobs/') }"
+        >Projects</router-link>
+        <!-- A clips page belongs to a project, so the Projects tab stays highlighted there. -->
       </nav>
       <input
         v-model="url"

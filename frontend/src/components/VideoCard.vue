@@ -1,6 +1,9 @@
 <template>
   <div class="video-card">
-    <div class="thumb">video<br />thumbnail</div>
+    <div class="thumb">
+      <img v-if="meta.thumbnailUrl && !imgFailed" :src="meta.thumbnailUrl" alt="" @error="imgFailed = true" />
+      <span v-else class="play" aria-hidden="true"></span>
+    </div>
     <div class="video-info">
       <div class="video-title">{{ meta.title }}</div>
       <div class="video-meta">{{ meta.channel }} · {{ meta.durationLabel }}</div>
@@ -10,10 +13,13 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
+
 defineProps({
   meta: { type: Object, required: true },
   statusNote: { type: String, default: '' },
 })
+const imgFailed = ref(false)
 </script>
 
 <style scoped>
@@ -37,11 +43,11 @@ defineProps({
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: monospace;
-  font-size: 10px;
   color: var(--ink-faint);
-  text-align: center;
+  overflow: hidden;
 }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.play { width: 0; height: 0; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-left: 15px solid var(--ink-faint); }
 .video-info { flex: 1; min-width: 200px; display: flex; flex-direction: column; justify-content: center; }
 .video-title { font-family: var(--font-serif); font-size: 22px; font-weight: 500; line-height: 1.3; }
 .video-meta { margin-top: 8px; font-size: 13px; color: var(--ink-soft); }

@@ -12,12 +12,8 @@ export function getJobStatus(jobId) {
   return api.get(`/api/status/${jobId}`).then(r => r.data)
 }
 
-export function listJobs() {
-  return api.get('/api/jobs').then(r => r.data)
-}
-
-export function listAllClips(limit = 100) {
-  return api.get('/api/clips', { params: { limit } }).then(r => r.data)
+export function listProjects(params = {}) {
+  return api.get('/api/jobs', { params }).then(r => r.data)
 }
 
 export function clipDownloadUrl(path) {

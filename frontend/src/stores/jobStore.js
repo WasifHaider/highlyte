@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import {
-  clipDownloadUrl, createJob, getHealth, getJobStatus, getRender, listJobs, saveClipStyle, startRender,
+  clipDownloadUrl, createJob, getHealth, getJobStatus, getRender, saveClipStyle, startRender,
 } from '../services/highlyteApi'
 
 const POLL_INTERVAL_MS = 1000
@@ -11,7 +11,6 @@ export const useJobStore = defineStore('job', {
   state: () => ({
     currentJobId: null,
     job: null,
-    recentJobs: [],
     selected: {}, // clipId -> bool
     error: null,
     polling: false,
@@ -89,13 +88,6 @@ export const useJobStore = defineStore('job', {
     toggleSelectAll() {
       const target = !this.allSelected
       for (const c of this.clips) this.selected[c.id] = target
-    },
-    async loadRecentJobs() {
-      try {
-        this.recentJobs = await listJobs()
-      } catch {
-        this.recentJobs = []
-      }
     },
     async loadHealth() {
       try {
