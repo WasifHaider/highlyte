@@ -391,10 +391,11 @@ def list_projects(
 @app.get("/api/clips")
 def list_all_clips(limit: int = 100) -> list[dict[str, Any]]:
     """Every clip the user has generated, newest first, with its parent
-    video's title/channel attached — backs the Library tab. Requires
-    Supabase (db.py); returns [] if it isn't configured, same as the
-    other list endpoints, since there's nowhere else this history is
-    durably tracked (the in-memory JOBS dict is lost on restart)."""
+    video's title/channel attached (kept for API consumers; the Library
+    tab was replaced by Projects). Requires Supabase (db.py); returns []
+    if it isn't configured, same as the other list endpoints, since
+    there's nowhere else this history is durably tracked (the in-memory
+    JOBS dict is lost on restart)."""
     out = []
     for r in db.list_clips(limit):
         job_info = r.get("jobs") or {}

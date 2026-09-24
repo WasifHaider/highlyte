@@ -122,9 +122,9 @@ def update_clip(clip_id: str, fields: dict[str, Any]) -> None:
 def list_clips(limit: int = 100) -> list[dict[str, Any]]:
     """All clips across every job, newest first, each with its parent
     job's video info embedded (PostgREST foreign-key embed via the
-    clips.job_id -> jobs.id relationship) — this is what backs the
-    Library tab, so a clip is never shown without knowing which video and
-    which job it came from."""
+    clips.job_id -> jobs.id relationship), so a clip is never shown
+    without knowing which video and which job it came from (kept for
+    API consumers; the Library tab was replaced by Projects)."""
     client = get_client()
     if client is None:
         return []
