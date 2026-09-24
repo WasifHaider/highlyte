@@ -4,16 +4,16 @@ import os
 import zipfile
 
 import pytest
-from fastapi.testclient import TestClient
 
 from backend import main, render
 from backend.spec import ClipSpec, default_style
+from tests.support import TEST_TEAM_ID, api_client
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "..", "renderer", "src", "__fixtures__", "clip-spec.json")
 JOB_ID = "abc123def456"
 CLIP_ID = f"{JOB_ID}-0"
 
-client = TestClient(main.app)
+client = api_client()
 
 
 class FakeRenderer:
@@ -47,7 +47,7 @@ def env(monkeypatch):
         "storageKey": f"{JOB_ID}/clip_0.mp4",
         "spec": spec.model_dump(), "style": default_style(spec).model_dump(),
     }
-    main.JOBS[JOB_ID] = main.Job(id=JOB_ID, url="u", status="done", clips=[record])
+    main.JOBS[JOB_ID] = main.Job(id=JOB_ID, url="u", status="done", clips=[record], team_id=TEST_TEAM_ID)
     fake = FakeRenderer()
     uploads = {}
     svc = render.RenderService(fake, render.RenderStore(), main._build_props,

@@ -15,3 +15,24 @@ for _key in [
     "REMOTION_FUNCTION_NAME", "REMOTION_SERVE_URL",
 ]:
     os.environ[_key] = ""
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def logged_in_member(request):
+    """Most API tests act as a logged-in admin of TEST_TEAM_ID. Tests marked
+    `real_auth` exercise the real login dependency instead."""
+    if request.node.get_closest_marker("real_auth"):
+        yield None
+        return
+    from backend import accounts, main
+    from tests.support import TEST_TEAM_ID
+
+    member = accounts.Member(
+        user_id="00000000-0000-0000-0000-00000000test", email="tester@example.com",
+        team_id=TEST_TEAM_ID, team_name="Test team", role="admin",
+    )
+    main.app.dependency_overrides[accounts.current_member] = lambda: member
+    yield member
+    main.app.dependency_overrides.pop(accounts.current_member, None)

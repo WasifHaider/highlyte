@@ -144,3 +144,6 @@ def api_client() -> TestClient:
     from backend.main import app
 
     return TestClient(app, headers={"X-Requested-With": "highlyte"})
+
+
+TEST_TEAM_ID = "team-test"

@@ -52,7 +52,7 @@ def insert_clips(rows: list[dict[str, Any]]) -> None:
         print(f"[supabase] insert_clips failed: {e}")
 
 
-def list_jobs(limit: int = 20) -> list[dict[str, Any]]:
+def list_jobs(team_id: str, limit: int = 20) -> list[dict[str, Any]]:
     client = get_client()
     if client is None:
         return []
@@ -60,6 +60,7 @@ def list_jobs(limit: int = 20) -> list[dict[str, Any]]:
         res = (
             client.table("jobs")
             .select("*")
+            .eq("team_id", team_id)
             .order("created_at", desc=True)
             .limit(limit)
             .execute()
@@ -119,19 +120,22 @@ def update_clip(clip_id: str, fields: dict[str, Any]) -> None:
         print(f"[supabase] update_clip failed: {e}")
 
 
-def list_clips(limit: int = 100) -> list[dict[str, Any]]:
-    """All clips across every job, newest first, each with its parent
+def list_clips(team_id: str, limit: int = 100) -> list[dict[str, Any]]:
+    """All clips across the team's jobs, newest first, each with its parent
     job's video info embedded (PostgREST foreign-key embed via the
     clips.job_id -> jobs.id relationship), so a clip is never shown
     without knowing which video and which job it came from (kept for
-    API consumers; the Library tab was replaced by Projects)."""
+    API consumers; the Library tab was replaced by Projects). The `!inner`
+    join makes the team_id filter apply to the clips themselves, not just
+    the embedded job (a plain embed would still return every clip)."""
     client = get_client()
     if client is None:
         return []
     try:
         res = (
             client.table("clips")
-            .select("*, jobs(url, video_title, video_channel, video_duration)")
+            .select("*, jobs!inner(url, video_title, video_channel, video_duration, team_id)")
+            .eq("jobs.team_id", team_id)
             .order("created_at", desc=True)
             .limit(limit)
             .execute()

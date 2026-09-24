@@ -104,3 +104,30 @@ create trigger renders_set_updated_at
 -- Projects lists can show the video's thumbnail.
 alter table jobs add column if not exists video_id text;
 alter table jobs add column if not exists thumbnail_url text;
+
+-- Team accounts: a team admin signs up and adds users; everyone in a team
+-- shares its projects. Only the backend (service-role key) reads these.
+create table if not exists teams (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists team_members (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  team_id uuid not null references teams(id) on delete cascade,
+  role text not null check (role in ('admin', 'member')),
+  email text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists team_members_team_idx on team_members(team_id);
+
+alter table jobs add column if not exists team_id uuid references teams(id) on delete cascade;
+alter table jobs add column if not exists created_by uuid references auth.users(id) on delete set null;
+create index if not exists jobs_team_created_idx on jobs(team_id, created_at desc);
+
+alter table teams enable row level security;
+alter table team_members enable row level security;
+alter table jobs enable row level security;
+alter table clips enable row level security;
+alter table renders enable row level security;

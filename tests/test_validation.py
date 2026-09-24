@@ -1,11 +1,11 @@
 import pytest
 from fastapi import HTTPException
-from fastapi.testclient import TestClient
 
 from backend.main import app
 from backend.validation import check_clip_filename, check_id
+from tests.support import TEST_TEAM_ID, api_client
 
-client = TestClient(app)
+client = api_client()
 
 
 @pytest.mark.parametrize("value", ["abc123", "a1b2c3d4e5f6-0", "renders-1"])

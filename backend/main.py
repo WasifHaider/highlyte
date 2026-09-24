@@ -12,12 +12,13 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from fastapi import Body, FastAPI, HTTPException, Query
+from fastapi import Body, Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
 from . import accounts, db, projects, render, storage
+from .accounts import Member, current_member
 from .pipeline import clipprep, cut, highlight, ingest, transcript
 from .spec import ClipStyle, default_style
 from .validation import check_clip_filename, check_id
@@ -72,10 +73,31 @@ class Job:
     # chunk N/M. Always in-memory/fresh; only sampled into Supabase.
     progress: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    team_id: str | None = None
+    created_by: str | None = None
     _last_persist: float = field(default=0.0, repr=False)
 
 
 JOBS: dict[str, Job] = {}
+
+_MISSING = object()
+
+
+def _require_job(member: Member, job_id: str) -> None:
+    """404 unless the job exists and belongs to the caller's team. Another
+    team's job gets the same answer as a missing one, so ids can't be probed."""
+    job = JOBS.get(job_id)
+    if job is not None:
+        team_id = job.team_id
+    else:
+        row = db.get_job(job_id)
+        team_id = row.get("team_id") if row is not None else _MISSING
+    if team_id != member.team_id:
+        raise HTTPException(404, "job not found")
+
+
+def _job_id_of_clip(clip_id: str) -> str:
+    return clip_id.rsplit("-", 1)[0]
 
 
 def _persist_job(job: Job, whisper_model: str, *, throttle: bool = False) -> None:
@@ -90,6 +112,8 @@ def _persist_job(job: Job, whisper_model: str, *, throttle: bool = False) -> Non
         "error": job.error,
         "whisper_model": whisper_model,
         "transcript_source": job.transcript_source,
+        "team_id": job.team_id,
+        "created_by": job.created_by,
     }
     if job.video_meta:
         row["video_title"] = job.video_meta.get("title")
@@ -210,8 +234,9 @@ if RENDER_SERVICE is not None:
         print(f"[render] VERSION MISMATCH: {_problem}")
 
 
-def _clip_for_style(clip_id: str) -> dict[str, Any]:
+def _clip_for_style(clip_id: str, member: Member) -> dict[str, Any]:
     check_id(clip_id, "clip id")
+    _require_job(member, _job_id_of_clip(clip_id))
     record = _find_clip(clip_id)
     if record is None:
         raise HTTPException(404, "clip not found")
@@ -329,9 +354,9 @@ def health() -> dict[str, Any]:
 
 
 @app.post("/api/generate")
-def generate(req: GenerateRequest) -> dict[str, str]:
+def generate(req: GenerateRequest, member: Member = Depends(current_member)) -> dict[str, str]:
     job_id = uuid.uuid4().hex[:12]
-    job = Job(id=job_id, url=req.url)
+    job = Job(id=job_id, url=req.url, team_id=member.team_id, created_by=member.user_id)
     JOBS[job_id] = job
     t = threading.Thread(target=_run_pipeline, args=(job, req.whisper_model), daemon=True)
     t.start()
@@ -339,8 +364,9 @@ def generate(req: GenerateRequest) -> dict[str, str]:
 
 
 @app.get("/api/status/{job_id}")
-def status(job_id: str) -> dict[str, Any]:
+def status(job_id: str, member: Member = Depends(current_member)) -> dict[str, Any]:
     check_id(job_id, "job id")
+    _require_job(member, job_id)
     job = JOBS.get(job_id)
     if job is not None:
         return {
@@ -388,16 +414,17 @@ def list_projects(
     limit: int = Query(100, ge=1, le=200),
     q: str | None = None,
     status: Literal["processing", "done", "error"] | None = None,
+    member: Member = Depends(current_member),
 ) -> list[dict[str, Any]]:
     """Every submitted video for the Home and Projects pages, newest first."""
-    rows = db.list_jobs(limit=200)
+    rows = db.list_jobs(member.team_id, limit=200)
     counts = db.count_clips_by_job([r["id"] for r in rows])
-    memory = [projects.from_job(job) for job in list(JOBS.values())]
+    memory = [projects.from_job(job) for job in list(JOBS.values()) if job.team_id == member.team_id]
     return projects.build_projects(memory, rows, counts, q=q, status=status, limit=limit)
 
 
 @app.get("/api/clips")
-def list_all_clips(limit: int = 100) -> list[dict[str, Any]]:
+def list_all_clips(limit: int = 100, member: Member = Depends(current_member)) -> list[dict[str, Any]]:
     """Every clip the user has generated, newest first, with its parent
     video's title/channel attached (kept for API consumers; the Library
     tab was replaced by Projects). Requires Supabase (db.py); returns []
@@ -405,7 +432,7 @@ def list_all_clips(limit: int = 100) -> list[dict[str, Any]]:
     there's nowhere else this history is durably tracked (the in-memory
     JOBS dict is lost on restart)."""
     out = []
-    for r in db.list_clips(limit):
+    for r in db.list_clips(member.team_id, limit=limit):
         job_info = r.get("jobs") or {}
         record = _with_source_url(_clip_row_to_api(r))
         record.update({
@@ -418,13 +445,14 @@ def list_all_clips(limit: int = 100) -> list[dict[str, Any]]:
 
 
 @app.get("/api/clips/{job_id}/{filename}")
-def get_clip(job_id: str, filename: str):
+def get_clip(job_id: str, filename: str, member: Member = Depends(current_member)):
     # This path is what's persisted as each clip's downloadUrl, so it
     # stays stable regardless of where the bytes actually live — R2 or
     # local disk — and regardless of a presigned URL's expiry, since a
     # fresh one is generated per request here rather than stored.
     check_id(job_id, "job id")
     check_clip_filename(filename)
+    _require_job(member, job_id)
     path = os.path.join(CLIPS_DIR, job_id, filename)
     if storage.is_enabled():
         key = storage.clip_key(job_id, filename)
@@ -443,13 +471,13 @@ def get_clip(job_id: str, filename: str):
 
 
 @app.patch("/api/clips/{clip_id}/style")
-def update_style(clip_id: str, style: ClipStyle = Body(...)) -> dict[str, Any]:
-    return _save_style(_clip_for_style(clip_id), style)
+def update_style(clip_id: str, style: ClipStyle = Body(...), member: Member = Depends(current_member)) -> dict[str, Any]:
+    return _save_style(_clip_for_style(clip_id, member), style)
 
 
 @app.post("/api/clips/{clip_id}/render")
-def start_render(clip_id: str, style: ClipStyle = Body(...)) -> dict[str, Any]:
-    record = _clip_for_style(clip_id)
+def start_render(clip_id: str, style: ClipStyle = Body(...), member: Member = Depends(current_member)) -> dict[str, Any]:
+    record = _clip_for_style(clip_id, member)
     if RENDER_SERVICE is None:
         raise HTTPException(503, "Rendering not configured")
     if not record.get("storageKey"):
@@ -458,21 +486,23 @@ def start_render(clip_id: str, style: ClipStyle = Body(...)) -> dict[str, Any]:
     return RENDER_SERVICE.request(clip_id, style).to_api()
 
 
-def _get_render(render_id: str) -> render.Render:
+def _get_render(render_id: str, member: Member) -> render.Render:
     check_id(render_id, "render id")
     if RENDER_SERVICE is None:
         raise HTTPException(503, "Rendering not configured")
-    r = RENDER_SERVICE.refresh(render_id)
-    if r is None:
+    existing = RENDER_SERVICE.store.get(render_id)
+    if existing is None:
         raise HTTPException(404, "render not found")
-    return r
+    # Checked before refresh() so another team can't even advance the render.
+    _require_job(member, _job_id_of_clip(existing.clip_id))
+    return RENDER_SERVICE.refresh(render_id)
 
 
 # Declared before /api/renders/{render_id} so "zip" isn't taken as an id.
 @app.get("/api/renders/zip")
-def renders_zip(ids: str = Query(...)) -> StreamingResponse:
+def renders_zip(ids: str = Query(...), member: Member = Depends(current_member)) -> StreamingResponse:
     render_ids = [i for i in ids.split(",") if i][:MAX_ZIP_RENDERS]
-    renders = [_get_render(i) for i in render_ids]
+    renders = [_get_render(i, member) for i in render_ids]
     if not renders or any(r.status != "done" for r in renders):
         raise HTTPException(409, "all renders must be finished")
     # Spools to disk past 64 MB; mp4s are already compressed, so store them as-is.
@@ -497,13 +527,13 @@ def renders_zip(ids: str = Query(...)) -> StreamingResponse:
 
 
 @app.get("/api/renders/{render_id}")
-def get_render(render_id: str) -> dict[str, Any]:
-    return _get_render(render_id).to_api()
+def get_render(render_id: str, member: Member = Depends(current_member)) -> dict[str, Any]:
+    return _get_render(render_id, member).to_api()
 
 
 @app.get("/api/renders/{render_id}/file")
-def get_render_file(render_id: str):
-    r = _get_render(render_id)
+def get_render_file(render_id: str, member: Member = Depends(current_member)):
+    r = _get_render(render_id, member)
     if r.status != "done" or not r.storage_key:
         raise HTTPException(409, "render not finished")
     url = storage.clip_url(r.storage_key)

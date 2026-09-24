@@ -1,15 +1,14 @@
-from fastapi.testclient import TestClient
-
 from backend import main
+from tests.support import TEST_TEAM_ID, api_client
 
-client = TestClient(main.app)
+client = api_client()
 
 
 def _job_row(status="done"):
     return {
         "id": "feed00000001", "url": "https://youtu.be/x", "status": status, "error": None,
         "video_title": "Ep 1", "video_channel": "Pod", "video_duration": 120,
-        "transcript_source": "groq",
+        "transcript_source": "groq", "team_id": TEST_TEAM_ID,
     }
 
 
@@ -56,7 +55,7 @@ def test_status_unknown_job(monkeypatch):
 def test_list_all_clips_normalizes_source_url(monkeypatch):
     row = dict(_clip_row())
     row["jobs"] = {"url": "u", "video_title": "Ep 1", "video_channel": "Pod"}
-    monkeypatch.setattr(main.db, "list_clips", lambda limit: [row])
+    monkeypatch.setattr(main.db, "list_clips", lambda team_id, limit=100: [row])
     body = client.get("/api/clips").json()
     clip = body[0]
     assert clip["spec"]["source"]["url"] == "/api/clips/feed00000001/clip_0.mp4"

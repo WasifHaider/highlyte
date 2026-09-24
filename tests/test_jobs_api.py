@@ -1,8 +1,7 @@
-from fastapi.testclient import TestClient
-
 from backend import main
+from tests.support import TEST_TEAM_ID, api_client
 
-client = TestClient(main.app)
+client = api_client()
 
 
 def _row(**kw):
@@ -10,7 +9,7 @@ def _row(**kw):
         "id": "feed00000001", "url": "https://youtu.be/qt6YoGmksCc", "status": "done", "error": None,
         "video_title": "Ep 1", "video_channel": "Pod", "video_duration": 60,
         "video_id": "qt6YoGmksCc", "thumbnail_url": None, "transcript_source": "groq",
-        "created_at": "2026-09-24T10:00:00+00:00",
+        "created_at": "2026-09-24T10:00:00+00:00", "team_id": TEST_TEAM_ID,
     }
     base.update(kw)
     return base
@@ -23,7 +22,7 @@ def test_jobs_endpoint_returns_projects(monkeypatch):
         seen["ids"] = ids
         return {"feed00000001": 4}
 
-    monkeypatch.setattr(main.db, "list_jobs", lambda limit=20: [_row()])
+    monkeypatch.setattr(main.db, "list_jobs", lambda team_id, limit=20: [_row()])
     monkeypatch.setattr(main.db, "count_clips_by_job", fake_counts)
     body = client.get("/api/jobs").json()
     assert seen["ids"] == ["feed00000001"]
@@ -32,7 +31,7 @@ def test_jobs_endpoint_returns_projects(monkeypatch):
 
 
 def test_jobs_endpoint_filters(monkeypatch):
-    monkeypatch.setattr(main.db, "list_jobs", lambda limit=20: [_row(), _row(id="feed00000002", video_title="Other", status="error")])
+    monkeypatch.setattr(main.db, "list_jobs", lambda team_id, limit=20: [_row(), _row(id="feed00000002", video_title="Other", status="error")])
     monkeypatch.setattr(main.db, "count_clips_by_job", lambda ids: {})
     assert [p["id"] for p in client.get("/api/jobs?q=ep").json()] == ["feed00000001"]
     assert [p["id"] for p in client.get("/api/jobs?status=error").json()] == ["feed00000002"]
@@ -41,9 +40,9 @@ def test_jobs_endpoint_filters(monkeypatch):
 
 
 def test_jobs_endpoint_includes_in_memory_jobs(monkeypatch):
-    monkeypatch.setattr(main.db, "list_jobs", lambda limit=20: [])
+    monkeypatch.setattr(main.db, "list_jobs", lambda team_id, limit=20: [])
     monkeypatch.setattr(main.db, "count_clips_by_job", lambda ids: {})
-    main.JOBS["feed00000003"] = main.Job(id="feed00000003", url="https://youtu.be/_aw32rFL680", status="transcribing")
+    main.JOBS["feed00000003"] = main.Job(id="feed00000003", url="https://youtu.be/_aw32rFL680", status="transcribing", team_id=TEST_TEAM_ID)
     try:
         body = client.get("/api/jobs").json()
         assert body[0]["id"] == "feed00000003"
