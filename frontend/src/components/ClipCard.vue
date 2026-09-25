@@ -30,7 +30,7 @@
           <label class="field">
             <span>Layout</span>
             <select :value="clip.style.layout" @change="set({ layout: $event.target.value })">
-              <option v-for="l in LAYOUTS" :key="l.value" :value="l.value" :disabled="l.minFaces > faceCount">
+              <option v-for="l in LAYOUTS" :key="l.value" :value="l.value" :disabled="!layoutAllowed(l.value, clip.spec.reframe)">
                 {{ l.label }}{{ l.value === clip.spec.reframe.auto ? ' (auto)' : '' }}
               </option>
             </select>
@@ -84,7 +84,7 @@ import { computed } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import { clipDownloadUrl } from '../services/highlyteApi'
 import RemotionPreview from './RemotionPreview.vue'
-import { LAYOUTS, PRESETS } from '../utils/clipStyle'
+import { LAYOUTS, PRESETS, layoutAllowed } from '../utils/clipStyle'
 
 const props = defineProps({
   clip: { type: Object, required: true },
@@ -93,7 +93,6 @@ const props = defineProps({
 defineEmits(['toggle'])
 
 const jobStore = useJobStore()
-const faceCount = computed(() => props.clip.spec?.reframe.faces.length || 0)
 const render = computed(() => jobStore.renders[props.clip.id])
 const snippet = computed(() => {
   const t = props.clip.text || ''

@@ -122,7 +122,7 @@ export const useJobStore = defineStore('job', {
       for (const clip of this.clips) {
         if (!clip.spec) continue
         const clipPatch = { ...patch }
-        if ('layout' in clipPatch && !layoutAllowed(clipPatch.layout, clip.spec.reframe.faces.length)) {
+        if ('layout' in clipPatch && !layoutAllowed(clipPatch.layout, clip.spec.reframe)) {
           clipPatch.layout = clip.spec.reframe.auto
         }
         this.updateStyle(clip.id, clipPatch)
