@@ -1,12 +1,14 @@
-import { AbsoluteFill } from 'remotion'
+import { AbsoluteFill, useCurrentFrame, useVideoConfig } from 'remotion'
 import { Captions } from './captions/Captions'
 import { HookTitle } from './HookTitle'
 import { LayoutView } from './layouts/LayoutView'
+import { captionPositionAt } from './lib/view'
 import type { ClipProps } from './schema'
 
 export const ClipComposition: React.FC<ClipProps> = ({ spec, style }) => {
-  // Split layout puts captions on the seam between the two panels.
-  const position = style.layout === 'split' ? 'middle' : style.captionPosition
+  const frame = useCurrentFrame()
+  const { fps } = useVideoConfig()
+  const position = captionPositionAt(spec, style, frame / fps)
   return (
     <AbsoluteFill style={{ backgroundColor: 'black' }}>
       <LayoutView spec={spec} layout={style.layout} />

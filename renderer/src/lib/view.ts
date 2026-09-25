@@ -1,4 +1,4 @@
-import type { ClipSpec, Layout } from '../schema'
+import type { ClipSpec, ClipStyle, Layout } from '../schema'
 import { activeShot } from './shots'
 import { activeFace } from './speaker'
 
@@ -27,4 +27,13 @@ export function resolveView(spec: ClipSpec, layout: Layout, t: number): View {
   }
   if (layout === 'speaker') return { kind: 'one', faceId: activeFace(speakerTimeline, t) ?? faces[0].id }
   return { kind: 'one', faceId: faces[0].id }
+}
+
+// Split layout puts captions on the seam between the two panels, but only
+// while the frame is actually split — a close-up within a split clip keeps
+// captions off the speaker's face.
+export function captionPositionAt(spec: ClipSpec, style: ClipStyle, t: number): 'lower' | 'middle' {
+  if (resolveView(spec, style.layout, t).kind === 'two') return 'middle'
+  if (style.layout === 'split') return 'lower'
+  return style.captionPosition
 }

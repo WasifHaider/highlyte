@@ -1,4 +1,4 @@
-import { AbsoluteFill, OffthreadVideo, useCurrentFrame, useVideoConfig } from 'remotion'
+import { AbsoluteFill, Audio, OffthreadVideo, useCurrentFrame, useVideoConfig } from 'remotion'
 import { OUT_H, OUT_W } from '../constants'
 import { cropWindow } from '../lib/crop'
 import { sampleTrack } from '../lib/track'
@@ -23,35 +23,36 @@ export const LayoutView: React.FC<{ spec: ClipSpec; layout: Layout }> = ({ spec,
   if (view.kind === 'fit') {
     return (
       <AbsoluteFill style={{ backgroundColor: 'black' }}>
+        <Audio src={src} trimBefore={trimBefore} />
         <AbsoluteFill style={{ filter: 'blur(40px)', transform: 'scale(1.15)' }}>
           <OffthreadVideo src={src} trimBefore={trimBefore} muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </AbsoluteFill>
         <AbsoluteFill style={{ justifyContent: 'center' }}>
-          <OffthreadVideo src={src} trimBefore={trimBefore} style={{ width: OUT_W, height: (OUT_W * srcH) / srcW }} />
+          <OffthreadVideo src={src} trimBefore={trimBefore} muted style={{ width: OUT_W, height: (OUT_W * srcH) / srcW }} />
         </AbsoluteFill>
       </AbsoluteFill>
     )
   }
 
-  if (view.kind === 'two') {
-    const top = faces.find(f => f.id === view.topId) ?? faces[0]
-    const bottom = faces.find(f => f.id === view.bottomId) ?? faces[0]
-    const aspect = OUT_W / PANEL_H
-    return (
-      <AbsoluteFill style={{ backgroundColor: 'black' }}>
-        <CroppedVideo src={src} trimBefore={trimBefore} srcW={srcW} srcH={srcH} boxW={OUT_W} boxH={PANEL_H}
-          crop={cropWindow(srcW, srcH, sampleTrack(top.track, t).cx, aspect)} />
-        <CroppedVideo src={src} trimBefore={trimBefore} srcW={srcW} srcH={srcH} boxW={OUT_W} boxH={PANEL_H} muted
-          crop={cropWindow(srcW, srcH, sampleTrack(bottom.track, t).cx, aspect)} />
-      </AbsoluteFill>
-    )
-  }
+  // 'two' and 'one' share one tree shape (Audio, then a stable primary panel,
+  // then an optional secondary panel) so a switch at a camera cut only
+  // changes props on already-mounted elements instead of remounting them —
+  // that would restart audio and flash black in the browser preview.
+  const isTwo = view.kind === 'two'
+  const primaryFace = faces.find(f => f.id === (isTwo ? view.topId : view.faceId)) ?? faces[0]
+  const secondaryFace = isTwo ? faces.find(f => f.id === view.bottomId) ?? faces[0] : null
+  const primaryBoxH = isTwo ? PANEL_H : OUT_H
+  const primaryAspect = OUT_W / primaryBoxH
 
-  const face = faces.find(f => f.id === view.faceId) ?? faces[0]
   return (
     <AbsoluteFill style={{ backgroundColor: 'black' }}>
-      <CroppedVideo src={src} trimBefore={trimBefore} srcW={srcW} srcH={srcH} boxW={OUT_W} boxH={OUT_H}
-        crop={cropWindow(srcW, srcH, sampleTrack(face.track, t).cx, OUT_W / OUT_H)} />
+      <Audio src={src} trimBefore={trimBefore} />
+      <CroppedVideo key="primary" src={src} trimBefore={trimBefore} srcW={srcW} srcH={srcH} boxW={OUT_W} boxH={primaryBoxH} muted
+        crop={cropWindow(srcW, srcH, sampleTrack(primaryFace.track, t).cx, primaryAspect)} />
+      {secondaryFace ? (
+        <CroppedVideo key="secondary" src={src} trimBefore={trimBefore} srcW={srcW} srcH={srcH} boxW={OUT_W} boxH={PANEL_H} muted
+          crop={cropWindow(srcW, srcH, sampleTrack(secondaryFace.track, t).cx, OUT_W / PANEL_H)} />
+      ) : null}
     </AbsoluteFill>
   )
 }
