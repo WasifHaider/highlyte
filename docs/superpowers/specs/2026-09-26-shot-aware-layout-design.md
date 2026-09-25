@@ -41,7 +41,7 @@ normal motion median 0.004–0.008, p95 ≈ 0.022; the three real cuts
 | Auto layout | `split` when two-person shots cover ≥ 50 % of the clip; else `speaker` when the talker changes inside at least one two-person shot (whole-clip turn counts are inflated by cuts); else `follow`; `fit` rules unchanged. |
 | Renderer | Each frame looks up the active shot. **split**: two-person shot → left face top panel, right face bottom panel; one-person shot → that face full-frame; no face → fit. **follow**: the active shot's main face. **speaker**: the timeline's face if it is in the active shot, else the shot's main face. **fit**: unchanged. |
 | Old clips | `shots` defaults to `[]`; a spec without shots renders exactly as today. Re-running a video produces the new data. |
-| Captions in split | Unchanged: split's default caption position stays "middle" (the seam). During a one-person shot captions stay where the style puts them. |
+| Captions in split | Captions sit on the seam only while two panels show; during a one-person shot in split they move to the lower position (the stored style keeps "middle", which is split's default). |
 
 ## Data contract
 
