@@ -31,6 +31,9 @@ MIN_ACTIVITY = 0.01
 MIN_HOLD_S = 1.5
 FIT_MIN_FACE_FRACTION = 0.40
 FIT_MIN_FACE_AREA = 0.03
+# Lower than FIT_MIN_FACE_AREA: a wide two-person shot's faces (~0.03) must
+# not be mistaken for a tiny webcam-corner face in a screen share (~0.0025).
+FIT_MIN_FACE_AREA_SHOTS = 0.01
 TWO_FACE_PRESENCE = 0.50
 
 
@@ -179,7 +182,12 @@ def _shot_kind(tracks: list[_Track], n_samples: int) -> tuple[str, list[int]]:
 def choose_auto(
     frames: list[list[Detection]], tracks: list[_Track], shots: list[Shot], speaker_switches: bool
 ) -> LayoutKind:
-    if _needs_fit(frames, tracks):
+    n = len(frames)
+    if n == 0 or not tracks:
+        return "fit"
+    face_fraction = sum(1 for dets in frames if dets) / n
+    largest_area = max(statistics.median(d.w * d.h for _, d in tr.points) for tr in tracks)
+    if face_fraction < FIT_MIN_FACE_FRACTION or largest_area < FIT_MIN_FACE_AREA_SHOTS:
         return "fit"
     total = sum(s.end - s.start for s in shots) or 1.0
     two = sum(s.end - s.start for s in shots if s.kind == "two")

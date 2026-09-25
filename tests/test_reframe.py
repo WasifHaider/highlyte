@@ -132,3 +132,36 @@ def test_speaker_timeline_starts_each_shot_at_its_start():
     result = reframe.analyze(frames, times, cuts=[4.0])
     closeup = result.shots[1].faceIds[0]
     assert any(turn.t == 4.0 and turn.faceId == closeup for turn in result.speakerTimeline)
+
+
+def _wide_shot_then_closeup_realistic():
+    wide_times = _times(18.4)
+    close_times = [round(t, 3) for t in _times(34.4) if t >= 18.4]
+    times = wide_times + close_times
+    frames = []
+    for t in times:
+        if t < 18.4:
+            frames.append([Detection(0.3, 0.4, 0.118, 0.255, 0.1), Detection(0.72, 0.4, 0.118, 0.255, 0.1)])
+        else:
+            frames.append([Detection(0.5, 0.4, 0.25, 0.45, 0.1)])
+    return frames, times
+
+
+def test_analyze_real_footage_wide_shot_is_not_fit():
+    frames, times = _wide_shot_then_closeup_realistic()
+    result = reframe.analyze(frames, times, cuts=[18.4])
+    assert result.auto == "split"
+
+
+def test_analyze_wide_shot_alone_is_not_fit():
+    frames, times = _wide_shot_then_closeup_realistic()
+    wide_only_count = sum(1 for t in times if t < 18.4)
+    result = reframe.analyze(frames[:wide_only_count], times[:wide_only_count], cuts=[])
+    assert result.auto == "split"
+
+
+def test_analyze_tiny_webcam_corner_is_fit():
+    times = _times(4)
+    frames = [[Detection(0.9, 0.9, 0.05, 0.05, 0.1)] for _ in times]
+    result = reframe.analyze(frames, times, cuts=[])
+    assert result.auto == "fit"
