@@ -27,7 +27,9 @@ def test_sample_detections_on_faceless_video(tmp_path):
     path = str(tmp_path / "v.mp4")
     _make_video(path, seconds=3)
     model = face_detect.ensure_model(MODELS_DIR)
-    frames, times = face_detect.sample_detections(path, model, sample_fps=5.0)
+    frames, times, thumbs = face_detect.sample_detections(path, model, sample_fps=5.0)
     assert 14 <= len(times) <= 16
     assert times == sorted(times)
     assert all(dets == [] for dets in frames)
+    assert len(thumbs) == len(times)
+    assert thumbs[0].shape == (18, 32)

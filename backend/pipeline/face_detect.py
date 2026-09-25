@@ -19,6 +19,17 @@ MODEL_URL = (
 )
 MAX_FACES = 4
 
+THUMB_W, THUMB_H = 32, 18
+
+
+def thumbnail(frame_bgr) -> "np.ndarray":
+    """Tiny grayscale copy of a sampled frame, used to detect camera cuts."""
+    import cv2
+    import numpy as np
+
+    small = cv2.resize(frame_bgr, (THUMB_W, THUMB_H), interpolation=cv2.INTER_AREA)
+    return cv2.cvtColor(small, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
+
 
 def ensure_model(models_dir: str) -> str:
     path = os.path.join(models_dir, "face_landmarker.task")
@@ -32,7 +43,11 @@ def ensure_model(models_dir: str) -> str:
 
 def sample_detections(
     video_path: str, model_path: str, sample_fps: float = 5.0
-) -> tuple[list[list[Detection]], list[float]]:
+) -> tuple[list[list[Detection]], list[float], list["np.ndarray"]]:
+    """Sample the video and detect faces, also keeping a tiny grayscale
+    thumbnail of each sampled frame (see `thumbnail`) so camera cuts can
+    later be detected from the same samples.
+    """
     import cv2
     import mediapipe as mp
     from mediapipe.tasks.python import BaseOptions, vision
@@ -51,6 +66,7 @@ def sample_detections(
     )
     frames: list[list[Detection]] = []
     times: list[float] = []
+    thumbs: list["np.ndarray"] = []
     try:
         with vision.FaceLandmarker.create_from_options(options) as landmarker:
             idx = 0
@@ -68,10 +84,11 @@ def sample_detections(
                     result = landmarker.detect_for_video(image, int(t * 1000))
                     frames.append(_to_detections(result))
                     times.append(round(t, 3))
+                    thumbs.append(thumbnail(frame))
                 idx += 1
     finally:
         cap.release()
-    return frames, times
+    return frames, times, thumbs
 
 
 def _to_detections(result) -> list[Detection]:

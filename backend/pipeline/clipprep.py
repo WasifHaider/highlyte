@@ -11,7 +11,7 @@ from typing import Callable
 
 from .. import storage
 from ..spec import ClipSpec, Source
-from . import cut, face_detect, reframe, words
+from . import cut, face_detect, reframe, shots, words
 from .highlight import Clip
 from .transcript import TranscriptSegment
 
@@ -62,10 +62,13 @@ def prepare_clip(
 
     on_step("framing")
     try:
-        frames, times = face_detect.sample_detections(local_path, face_detect.ensure_model(models_dir))
+        frames, times, thumbs = face_detect.sample_detections(local_path, face_detect.ensure_model(models_dir))
         # Keep only samples inside the clip itself, re-based to its start.
-        kept = [(round(t - offset, 3), f) for t, f in zip(times, frames) if offset <= t <= offset + duration]
-        reframe_result = reframe.analyze([f for _, f in kept], [t for t, _ in kept])
+        kept = [(round(t - offset, 3), f, th) for t, f, th in zip(times, frames, thumbs)
+                if offset <= t <= offset + duration]
+        kept_times = [t for t, _, _ in kept]
+        cuts = shots.cut_times([th for _, _, th in kept], kept_times)
+        reframe_result = reframe.analyze([f for _, f, _ in kept], kept_times, cuts)
     except Exception as e:  # noqa: BLE001
         print(f"[reframe] face analysis failed for {clip_id}, using fit: {e}")
         reframe_result = reframe.fallback()

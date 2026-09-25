@@ -1,5 +1,7 @@
 import os
 
+import numpy as np
+
 from backend.pipeline import clipprep, cut, face_detect
 from backend.pipeline.highlight import Clip
 from backend.pipeline.reframe import Detection
@@ -39,7 +41,8 @@ def test_prepare_clip_builds_spec(tmp_path, monkeypatch):
     # segment starts at 10.0, so the clip starts 1.0 s into it
     times = [round(i / 5, 3) for i in range(80)]  # 0-16 s of the segment
     frames = [[Detection(0.5, 0.4, 0.2, 0.3, 0.1)] for _ in times]
-    _patch_media(monkeypatch, lambda path, model, sample_fps=5.0: (frames, times))
+    thumbs = [np.zeros((18, 32), dtype=np.float32) for _ in times]
+    _patch_media(monkeypatch, lambda path, model, sample_fps=5.0: (frames, times, thumbs))
 
     prepared = _prepare(tmp_path)
     spec = prepared.spec
@@ -55,6 +58,18 @@ def test_prepare_clip_builds_spec(tmp_path, monkeypatch):
     assert track[0].t == 0.0 and track[-1].t <= 14.0  # re-based to the clip start, trimmed to the clip
     assert prepared.storage_key is None  # R2 disabled in tests
     assert os.path.exists(os.path.join(tmp_path, "abc123def456", "clip_0.mp4"))
+    assert [s.kind for s in spec.reframe.shots] == ["one"]
+
+
+def test_prepare_clip_detects_a_camera_cut(tmp_path, monkeypatch):
+    times = [round(i / 5, 3) for i in range(80)]
+    frames = [[Detection(0.3, 0.4, 0.12, 0.25, 0.1), Detection(0.72, 0.4, 0.12, 0.25, 0.1)] if t < 9 else
+              [Detection(0.5, 0.4, 0.25, 0.45, 0.1)] for t in times]
+    thumbs = [np.full((18, 32), 0.2 if t < 9 else 0.7, dtype=np.float32) for t in times]
+    _patch_media(monkeypatch, lambda path, model, sample_fps=5.0: (frames, times, thumbs))
+    shots = _prepare(tmp_path).spec.reframe.shots
+    assert [s.kind for s in shots] == ["two", "one"]
+    assert shots[1].start == 8.0  # segment time 9.0 minus the 1.0 s offset
 
 
 def test_prepare_clip_survives_face_detection_failure(tmp_path, monkeypatch):
