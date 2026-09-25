@@ -20,6 +20,13 @@ GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 GROQ_HINGLISH_MODEL = "whisper-large-v3"  # the model the spike validated
 GROQ_ENGLISH_MODEL = "whisper-large-v3-turbo"
 GROQ_MAX_RETRIES = 2  # per chunk, on rate limits, before falling back
+# words_from_verbose drops words in a segment that crosses both of these:
+# Whisper (especially with the Hinglish seed prompt) invents text over
+# silence/music, and those segments are the ones it is least sure are even
+# speech (high no_speech_prob) while also least sure of the words it wrote
+# (low avg_logprob). Either signal alone is common in real speech too.
+HALLUCINATION_NO_SPEECH_PROB = 0.6
+HALLUCINATION_AVG_LOGPROB = -1.0
 
 _RETRY_AFTER_RE = re.compile(r"retry.{0,10}?(\d+(?:\.\d+)?)\s*s", re.IGNORECASE)
 
@@ -41,9 +48,15 @@ class AsrProvider(Protocol):
 def words_from_verbose(resp: dict[str, Any]) -> list[AsrWord]:
     """Words from a Groq verbose_json response. Groq gives no per-word
     probability, so each word takes exp(avg_logprob) of the segment it
-    falls in."""
+    falls in. Words in a segment Whisper likely hallucinated (see
+    HALLUCINATION_* thresholds) are dropped entirely rather than kept with
+    a low confidence, since the whole segment is probably invented text."""
     segs = [
-        (float(s["start"]), float(s["end"]), math.exp(float(s["avg_logprob"])))
+        (
+            float(s["start"]), float(s["end"]), math.exp(float(s["avg_logprob"])),
+            float(s.get("no_speech_prob", 0.0)) > HALLUCINATION_NO_SPEECH_PROB
+            and float(s["avg_logprob"]) < HALLUCINATION_AVG_LOGPROB,
+        )
         for s in resp.get("segments") or []
     ]
     out: list[AsrWord] = []
@@ -53,7 +66,10 @@ def words_from_verbose(resp: dict[str, Any]) -> list[AsrWord]:
             continue
         start, end = float(w["start"]), float(w["end"])
         mid = (start + end) / 2
-        prob = next((p for s, e, p in segs if s <= mid <= e), 1.0)
+        match = next(((p, hallucinated) for s, e, p, hallucinated in segs if s <= mid <= e), None)
+        if match is not None and match[1]:
+            continue
+        prob = match[0] if match is not None else 1.0
         out.append(AsrWord(text=text, start=start, end=end, prob=round(min(prob, 1.0), 3)))
     return out
 
@@ -76,7 +92,17 @@ class GroqAsr:
             kwargs["prompt"] = prompt
         with open(wav, "rb") as f:
             resp = client.audio.transcriptions.create(file=f, **kwargs)
-        return words_from_verbose(resp.model_dump())
+        # openai 1.57.4 types duration as str; Groq returns a float, so
+        # model_dump() would print a pydantic UserWarning on every call.
+        payload = resp.model_dump(warnings=False)
+        words = words_from_verbose(payload)
+        if not words and any((s.get("text") or "").strip() for s in payload.get("segments") or []):
+            # Groq gave segments with real speech text but no word list at
+            # all (distinct from a genuinely silent segment with no text);
+            # returning [] here would silently drop that speech instead of
+            # sending the chunk to the local fallback.
+            raise RuntimeError("groq returned no word timestamps")
+        return words
 
 
 _local_models: dict[str, Any] = {}

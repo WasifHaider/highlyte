@@ -28,6 +28,96 @@ def test_words_from_verbose_without_segments():
     assert words[0].prob == 1.0
 
 
+def test_words_from_verbose_drops_words_in_hallucinated_segments():
+    """A segment with high no_speech_prob and low avg_logprob is Whisper
+    inventing text over silence/music; its words must be dropped."""
+    resp = {
+        "segments": [
+            {"start": 0.0, "end": 2.0, "avg_logprob": -0.1, "no_speech_prob": 0.05},
+            {"start": 2.0, "end": 4.0, "avg_logprob": -1.5, "no_speech_prob": 0.9},
+        ],
+        "words": [
+            {"word": " hum", "start": 0.1, "end": 0.4},
+            {"word": "junk", "start": 2.2, "end": 2.6},
+        ],
+    }
+    words = asr.words_from_verbose(resp)
+    assert [w.text for w in words] == ["hum"]
+
+
+def test_words_from_verbose_keeps_words_with_only_one_hallucination_signal():
+    """Only dropped when BOTH no_speech_prob and avg_logprob cross their
+    thresholds; either alone is not enough to call it a hallucination."""
+    resp = {
+        "segments": [
+            {"start": 0.0, "end": 2.0, "avg_logprob": -0.1, "no_speech_prob": 0.9},
+            {"start": 2.0, "end": 4.0, "avg_logprob": -1.5, "no_speech_prob": 0.1},
+        ],
+        "words": [
+            {"word": "keep1", "start": 0.1, "end": 0.4},
+            {"word": "keep2", "start": 2.2, "end": 2.6},
+        ],
+    }
+    words = asr.words_from_verbose(resp)
+    assert [w.text for w in words] == ["keep1", "keep2"]
+
+
+class FakeOpenAIResponse:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def model_dump(self, **kwargs):  # noqa: ARG002 - accepts warnings=False
+        return self._payload
+
+
+class FakeTranscriptions:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def create(self, *, file, **kwargs):  # noqa: ARG002
+        return FakeOpenAIResponse(self.payload)
+
+
+class FakeAudio:
+    def __init__(self, payload):
+        self.transcriptions = FakeTranscriptions(payload)
+
+
+class FakeOpenAIClient:
+    def __init__(self, payload):
+        self.audio = FakeAudio(payload)
+
+
+def test_groq_asr_raises_when_segments_have_text_but_no_words(tmp_path, monkeypatch):
+    """Groq sometimes returns segments (with real speech text) but no word
+    list at all; returning [] would silently drop that speech instead of
+    sending the chunk to the local fallback."""
+    payload = {
+        "segments": [{"start": 0.0, "end": 2.0, "avg_logprob": -0.1, "text": "hum yahan hain"}],
+        "words": [],
+    }
+    monkeypatch.setattr("openai.OpenAI", lambda **kw: FakeOpenAIClient(payload))
+    wav = tmp_path / "c.wav"
+    wav.write_bytes(b"\x00")
+    provider = asr.GroqAsr("key", "whisper-large-v3")
+    with pytest.raises(RuntimeError, match="no word timestamps"):
+        provider.transcribe(str(wav), prompt=None)
+
+
+def test_groq_asr_returns_empty_when_segments_also_have_no_text(tmp_path, monkeypatch):
+    """Genuinely silent/no-speech segments (empty text) must not raise -
+    only the case where Groq has speech text but withheld word timings."""
+    payload = {
+        "segments": [{"start": 0.0, "end": 2.0, "avg_logprob": -0.1, "text": "  "}],
+        "words": [],
+    }
+    monkeypatch.setattr("openai.OpenAI", lambda **kw: FakeOpenAIClient(payload))
+    wav = tmp_path / "c.wav"
+    wav.write_bytes(b"\x00")
+    provider = asr.GroqAsr("key", "whisper-large-v3")
+    assert provider.transcribe(str(wav), prompt=None) == []
+
+
 class Fake:
     def __init__(self, name, answers):
         self.name, self.answers, self.calls = name, list(answers), []
