@@ -96,6 +96,11 @@ def transcribe(
         decision = langcheck.decide(audio.language_samples(samples, tmp_dir), requested, detect)
 
         chunks = audio.speech_chunks(samples, tmp_dir)
+        # samples is the full decoded audio (tens to hundreds of MB); chunks
+        # and language samples are already written to disk above, so drop
+        # the reference before ASR runs rather than holding it for the rest
+        # of the job.
+        del samples
         if not chunks:
             raise NoSpeechError("No speech found in this video.")
 
