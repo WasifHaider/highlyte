@@ -50,6 +50,8 @@ def from_job(job: Any) -> dict[str, Any]:
         "clipCount": len(job.clips),
         "progress": job.progress,
         "createdAt": job.created_at,
+        "language": job.language_used,
+        "languageNote": job.language_note,
     }
 
 
@@ -72,6 +74,8 @@ def from_row(row: dict[str, Any], clip_count: int) -> dict[str, Any]:
         "clipCount": clip_count,
         "progress": {},
         "createdAt": row.get("created_at"),
+        "language": row.get("language_used"),
+        "languageNote": row.get("language_note"),
     }
 
 

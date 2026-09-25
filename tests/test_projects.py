@@ -40,6 +40,7 @@ def _job(**kw):
                     "videoId": "_aw32rFL680", "thumbnailUrl": "https://x/live.jpg"},
         clips=[{}, {}], progress={"stage": "preparing", "percent": 50, "note": "clip 2/4"},
         created_at="2026-09-24T11:00:00+00:00",
+        language_used=None, language_note=None,
     )
     base.update(kw)
     return SimpleNamespace(**base)
@@ -52,6 +53,7 @@ def test_from_row_shape_and_fallback_thumbnail():
         "videoTitle": "Ep 1", "videoChannel": "Pod", "durationLabel": "2:05",
         "thumbnailUrl": "https://i.ytimg.com/vi/qt6YoGmksCc/hqdefault.jpg",
         "clipCount": 3, "progress": {}, "createdAt": "2026-09-24T10:00:00+00:00",
+        "language": None, "languageNote": None,
     }
 
 

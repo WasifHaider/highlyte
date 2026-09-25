@@ -1,6 +1,7 @@
 import pytest
 from fastapi import HTTPException
 
+from backend import main
 from backend.main import app
 from backend.validation import check_clip_filename, check_id
 from tests.support import TEST_TEAM_ID, api_client
@@ -39,6 +40,17 @@ def test_get_clip_rejects_bad_filename():
     assert client.get("/api/clips/abc123/secret.txt").status_code == 400
 
 
-def test_generate_rejects_unknown_whisper_model():
-    r = client.post("/api/generate", json={"url": "https://youtu.be/x", "whisper_model": "large-v3"})
+def test_generate_rejects_unknown_language():
+    r = client.post("/api/generate", json={"url": "https://youtu.be/x", "language": "french"})
     assert r.status_code == 422
+
+
+def test_generate_accepts_language_and_defaults_to_hinglish(monkeypatch):
+    started = []
+    monkeypatch.setattr(main.threading, "Thread", lambda target, args, daemon: type(
+        "T", (), {"start": lambda self: started.append(args[0])})())
+    client.post("/api/generate", json={"url": "https://youtu.be/x"})
+    client.post("/api/generate", json={"url": "https://youtu.be/y", "language": "english"})
+    assert [j.language_requested for j in started] == ["hinglish", "english"]
+    for j in started:
+        main.JOBS.pop(j.id, None)

@@ -58,3 +58,29 @@ def test_status_fallback_includes_thumbnail(monkeypatch):
     meta = client.get("/api/status/feed00000001").json()["videoMeta"]
     assert meta["videoId"] == "qt6YoGmksCc"
     assert meta["thumbnailUrl"] == "https://x/t.jpg"
+
+
+def test_status_includes_language_note_from_memory():
+    main.JOBS["feed00000004"] = main.Job(
+        id="feed00000004", url="https://youtu.be/_aw32rFL680", status="done", team_id=TEST_TEAM_ID,
+        language_used="english", language_note="Detected English audio. Captions will be in English.",
+    )
+    try:
+        body = client.get("/api/status/feed00000004").json()
+        assert body["language"] == "english"
+        assert body["languageNote"].startswith("Detected English")
+    finally:
+        main.JOBS.pop("feed00000004", None)
+
+
+def test_status_fallback_includes_language(monkeypatch):
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: _row(language_used="hinglish", language_note=None))
+    monkeypatch.setattr(main.db, "list_clips_for_job", lambda job_id: [])
+    body = client.get("/api/status/feed00000001").json()
+    assert body["language"] == "hinglish" and body["languageNote"] is None
+
+
+def test_project_list_includes_language(monkeypatch):
+    monkeypatch.setattr(main.db, "list_jobs", lambda team_id, limit=20: [_row(language_used="english")])
+    monkeypatch.setattr(main.db, "count_clips_by_job", lambda ids: {})
+    assert client.get("/api/jobs").json()[0]["language"] == "english"

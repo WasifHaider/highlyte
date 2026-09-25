@@ -58,9 +58,7 @@ MAX_ZIP_RENDERS = 20
 
 class GenerateRequest(BaseModel):
     url: str
-    # Allowlisted: this is passed straight to faster-whisper, which would
-    # otherwise download whatever model name a client sends.
-    whisper_model: Literal["tiny", "base", "small", "medium"] = "small"
+    language: Literal["hinglish", "english"] = "hinglish"
 
 
 @dataclass
@@ -78,6 +76,9 @@ class Job:
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     team_id: str | None = None
     created_by: str | None = None
+    language_requested: str = "hinglish"
+    language_used: str | None = None
+    language_note: str | None = None
     _last_persist: float = field(default=0.0, repr=False)
 
 
@@ -103,7 +104,7 @@ def _job_id_of_clip(clip_id: str) -> str:
     return clip_id.rsplit("-", 1)[0]
 
 
-def _persist_job(job: Job, whisper_model: str, *, throttle: bool = False) -> None:
+def _persist_job(job: Job, *, throttle: bool = False) -> None:
     now = time.monotonic()
     if throttle and (now - job._last_persist) < PROGRESS_PERSIST_INTERVAL_S:
         return
@@ -113,7 +114,9 @@ def _persist_job(job: Job, whisper_model: str, *, throttle: bool = False) -> Non
         "url": job.url,
         "status": job.status,
         "error": job.error,
-        "whisper_model": whisper_model,
+        "language_requested": job.language_requested,
+        "language_used": job.language_used,
+        "language_note": job.language_note,
         "transcript_source": job.transcript_source,
         "team_id": job.team_id,
         "created_by": job.created_by,
@@ -254,16 +257,16 @@ def _save_style(record: dict[str, Any], style: ClipStyle) -> dict[str, Any]:
     return record["style"]
 
 
-def _run_pipeline(job: Job, whisper_model: str) -> None:
-    _persist_job(job, whisper_model)
+def _run_pipeline(job: Job) -> None:
+    _persist_job(job)
     try:
         job.status = "transcribing"
         job.progress = {"stage": "downloading", "percent": 0, "note": "starting download…"}
-        _persist_job(job, whisper_model)
+        _persist_job(job)
 
         def on_ingest_progress(stage: str, percent: float | None, note: str) -> None:
             job.progress = {"stage": stage, "percent": percent, "note": note}
-            _persist_job(job, whisper_model, throttle=True)
+            _persist_job(job, throttle=True)
 
         meta = ingest.ingest(job.url, CACHE_DIR, on_progress=on_ingest_progress)
         job.video_meta = {
@@ -275,44 +278,36 @@ def _run_pipeline(job: Job, whisper_model: str) -> None:
             "thumbnailUrl": projects.thumbnail_url(meta.video_id, meta.thumbnail_url),
         }
         job.progress = {"stage": "downloading", "percent": 100, "note": "download complete"}
-        _persist_job(job, whisper_model)
+        _persist_job(job)
 
-        def on_transcribe_progress(chunk_idx: int, total_chunks: int, latest_text: str) -> None:
-            pct = (chunk_idx / total_chunks * 100.0) if total_chunks else None
+        def on_transcribe_progress(part: int, total: int, latest_text: str) -> None:
             job.progress = {
                 "stage": "transcribing",
-                "percent": pct,
-                "note": f"chunk {chunk_idx}/{total_chunks}",
-                "chunk": chunk_idx,
-                "totalChunks": total_chunks,
+                "percent": (part / total * 100.0) if total else None,
+                "note": f"part {part} of {total}",
+                "chunk": part,
+                "totalChunks": total,
                 "latestText": latest_text[:160],
             }
-            _persist_job(job, whisper_model, throttle=True)
+            _persist_job(job, throttle=True)
 
-        job.progress = {"stage": "transcribing", "percent": 0, "note": "loading model…"}
-        _persist_job(job, whisper_model)
-        tr = transcript.get_transcript(
-            meta.video_id, meta.audio_path, whisper_model, on_progress=on_transcribe_progress
-        )
+        job.progress = {"stage": "transcribing", "percent": 0, "note": "checking language…"}
+        _persist_job(job)
+        tr = transcript.transcribe(meta.audio_path, job.language_requested, on_progress=on_transcribe_progress)
+        job.language_used, job.language_note = tr.language, tr.note
         job.transcript_source = tr.source
+        _persist_job(job)
+        db.save_transcript(job.id, tr.language, tr.source, [s.to_dict() for s in tr.segments])
+        word_segments = transcript.to_word_segments(tr)
 
         job.status = "analyzing"
         job.progress = {"stage": "analyzing", "percent": None, "note": "scoring highlights…"}
-        _persist_job(job, whisper_model)
-        clips = highlight.detect_highlights(tr.segments)
+        _persist_job(job)
+        clips = highlight.detect_highlights(word_segments)
 
         job.status = "preparing"
         job.progress = {"stage": "preparing", "percent": 0, "note": f"0/{len(clips)} clips prepared"}
-        _persist_job(job, whisper_model)
-
-        groq_key = os.environ.get("GROQ_KEY") or None
-        # The captions transcript has no word timings, so clip words come
-        # from Groq; decide once per episode whether it needs the Roman
-        # Urdu seed prompt (see transcript._detect_needs_roman_urdu_hint).
-        prompt = None
-        if tr.source == "captions" and groq_key:
-            if transcript._detect_needs_roman_urdu_hint(meta.audio_path, groq_key):
-                prompt = transcript.ROMAN_URDU_HINDI_SEED
+        _persist_job(job)
 
         for i, c in enumerate(clips):
             def on_step(step: str, i: int = i) -> None:
@@ -321,14 +316,13 @@ def _run_pipeline(job: Job, whisper_model: str) -> None:
                     "percent": i / len(clips) * 100.0,
                     "note": f"clip {i + 1}/{len(clips)}: {step}",
                 }
-                _persist_job(job, whisper_model, throttle=True)
+                _persist_job(job, throttle=True)
 
             prepared = clipprep.prepare_clip(
                 job_id=job.id, idx=i, clip=c,
                 video_path=meta.video_path, video_duration=meta.duration,
-                segments=tr.segments, transcript_source=tr.source, audio_path=meta.audio_path,
-                clips_dir=CLIPS_DIR, models_dir=MODELS_DIR,
-                groq_key=groq_key, prompt=prompt, on_step=on_step,
+                segments=word_segments,
+                clips_dir=CLIPS_DIR, models_dir=MODELS_DIR, on_step=on_step,
             )
             record = _clip_record(job.id, i, c, prepared)
             job.clips.append(record)
@@ -338,12 +332,12 @@ def _run_pipeline(job: Job, whisper_model: str) -> None:
 
         job.status = "done"
         job.progress = {}
-        _persist_job(job, whisper_model)
+        _persist_job(job)
     except Exception as e:  # noqa: BLE001
         job.status = "error"
         job.error = str(e)
         job.progress = {}
-        _persist_job(job, whisper_model)
+        _persist_job(job)
 
 
 @app.get("/api/health")
@@ -359,9 +353,10 @@ def health() -> dict[str, Any]:
 @app.post("/api/generate")
 def generate(req: GenerateRequest, member: Member = Depends(current_member)) -> dict[str, str]:
     job_id = uuid.uuid4().hex[:12]
-    job = Job(id=job_id, url=req.url, team_id=member.team_id, created_by=member.user_id)
+    job = Job(id=job_id, url=req.url, team_id=member.team_id, created_by=member.user_id,
+              language_requested=req.language)
     JOBS[job_id] = job
-    t = threading.Thread(target=_run_pipeline, args=(job, req.whisper_model), daemon=True)
+    t = threading.Thread(target=_run_pipeline, args=(job,), daemon=True)
     t.start()
     return {"job_id": job_id}
 
@@ -378,6 +373,8 @@ def status(job_id: str, member: Member = Depends(current_member)) -> dict[str, A
             "error": job.error,
             "videoMeta": job.video_meta,
             "transcriptSource": job.transcript_source,
+            "language": job.language_used,
+            "languageNote": job.language_note,
             "clips": [_with_source_url(c) for c in job.clips],
             "progress": job.progress,
         }
@@ -407,6 +404,8 @@ def status(job_id: str, member: Member = Depends(current_member)) -> dict[str, A
         "error": error,
         "videoMeta": video_meta,
         "transcriptSource": row.get("transcript_source"),
+        "language": row.get("language_used"),
+        "languageNote": row.get("language_note"),
         "clips": [_with_source_url(_clip_row_to_api(r)) for r in db.list_clips_for_job(job_id)],
         "progress": {},
     }
