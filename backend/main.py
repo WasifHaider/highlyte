@@ -40,7 +40,10 @@ app = FastAPI(title="Highlyte")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:6100", "http://127.0.0.1:6100"],
+    # Production traffic arrives through the Vercel /api rewrite, which is
+    # same-origin, so CORS_ORIGINS is only for callers hitting the API directly.
+    allow_origins=["http://localhost:6100", "http://127.0.0.1:6100"]
+    + [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

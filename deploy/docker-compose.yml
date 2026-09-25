@@ -1,0 +1,19 @@
+# Production compose file for the HighLyte EC2 instance. The deploy workflow
+# copies this to ~/highlyte on the server; secrets live in ~/highlyte/.env.
+services:
+  backend:
+    image: ${ECR_REGISTRY}/highlyte-backend:latest
+    restart: unless-stopped
+    env_file: .env
+    # Only reachable from the host itself: Cloudflare Tunnel (cloudflared on
+    # the host) is the public entry point, so no inbound port is opened.
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      # Clip files, the download cache and the face model survive redeploys.
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

@@ -1,0 +1,78 @@
+name: Deploy backend
+
+# The frontend deploys itself on Vercel; this only ships the API to EC2.
+on:
+  push:
+    branches: [master]
+    paths:
+      - "backend/**"
+      - "requirements.txt"
+      - "renderer/package.json"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "deploy/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: highlyte-backend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          docker build \
+            -t $REGISTRY/$ECR_REPOSITORY:latest \
+            -t $REGISTRY/$ECR_REPOSITORY:${{ github.sha }} \
+            .
+          docker push --all-tags $REGISTRY/$ECR_REPOSITORY
+
+      - name: Copy compose file to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: deploy/docker-compose.yml
+          target: highlyte
+          strip_components: 1
+
+      - name: Restart on EC2
+        uses: appleboy/ssh-action@v1
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: REGISTRY,AWS_REGION
+          script: |
+            set -e
+            cd ~/highlyte
+            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $REGISTRY
+            export ECR_REGISTRY=$REGISTRY
+            docker-compose pull
+            docker-compose up -d --force-recreate
+            docker image prune -f
