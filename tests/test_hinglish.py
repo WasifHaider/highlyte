@@ -39,6 +39,19 @@ def test_apply_glossary_single_word_keeps_punctuation():
     assert hinglish.apply_glossary([w("instagram.")])[0].t == "Instagram."
 
 
+def test_glossary_has_no_identity_lowercase_entries():
+    """An entry whose value is just the key lowercased (e.g. "podcast":
+    "podcast") turns a capitalised sentence-start word like "Podcast." into
+    "podcast." — it only ever lowercases, so it must not be in the
+    glossary. Real fixes (spelling/casing changes, merges) are fine."""
+    raw = json.loads((DATA / "glossary.json").read_text(encoding="utf-8"))
+    assert not any(v == k.lower() for k, v in raw.items())
+
+
+def test_apply_glossary_leaves_capitalised_sentence_start_word_unchanged():
+    assert hinglish.apply_glossary([w("Podcast.")])[0].t == "Podcast."
+
+
 def test_classify():
     assert hinglish.classify("2026") == "num"
     assert hinglish.classify("video,") == "en"

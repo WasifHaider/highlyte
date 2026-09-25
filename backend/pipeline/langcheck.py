@@ -58,7 +58,9 @@ def groq_detector(key: str) -> Callable[[str], str | None]:
             resp = client.audio.transcriptions.create(
                 model=asr.GROQ_ENGLISH_MODEL, file=f, response_format="verbose_json",
             )
-        return resp.model_dump().get("language")
+        # openai 1.57.4 types duration as str while Groq returns a float,
+        # so a plain model_dump() prints a pydantic UserWarning per call.
+        return resp.model_dump(warnings=False).get("language")
 
     return detect
 
