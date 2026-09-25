@@ -17,16 +17,24 @@ Handles episodes that mix English with Roman-script Hindi/Urdu.
 
 ## Roman Urdu/Hindi transcription
 
-The fallback ASR path (`backend/pipeline/transcript.py`) uses
-`faster-whisper` (free, local, CPU-capable) with `language="en"` and a
-Roman-Urdu/Hindi `initial_prompt` seed. This keeps Whisper decoding
-code-switched speech in Latin letters instead of switching to
-Devanagari/Nastaliq script or silently translating to English. See the
-docstring in that file for the mechanism and hard constraints (do not set
-`language="ur"`/`"hi"`, do not strip the seed prompt).
+Every job asks for the spoken language: **Hinglish** (default) or
+**English**. Three short samples are checked with Whisper first; clear
+English audio switches to English captions and clear Hindi/Urdu speech
+switches to Hinglish, and the job page says so when that happens.
 
-YouTube captions are tried first (fast, free, no model download); Whisper
-only runs when captions are unavailable/disabled.
+Transcription (`backend/pipeline/transcript.py`) normalises the audio,
+splits it into chunks of at most two minutes at silences (Silero VAD
+bundled with faster-whisper), and runs Whisper with `language="en"` on
+each chunk: Groq when `GROQ_KEY` is set, local faster-whisper otherwise or
+when Groq fails. Hinglish chunks get a Roman Urdu/Hindi seed prompt so
+Whisper writes Roman letters instead of switching script or translating.
+A glossary (`backend/pipeline/data/glossary.json`) and a house spelling
+list (`spelling.json`) are then applied in code; both are plain JSON and
+can grow without code changes. The transcript is stored in the
+`transcripts` table.
+
+Hindi mode plus transliteration was tested and rejected; see "Spike
+results" in `docs/superpowers/specs/2026-09-25-hinglish-v1-roadmap.md`.
 
 ## Setup
 
@@ -149,8 +157,8 @@ cd renderer && npm test
 ## How it works
 
 1. **Ingest** — pull the audio via `yt-dlp`, cached by video ID.
-2. **Transcript** — YouTube captions first; local faster-whisper fallback
-   with Roman Urdu/Hindi decoding (see above).
+2. **Transcript** — language check, VAD chunks, Whisper (Groq, else local
+   faster-whisper), then glossary and spelling fixes in code.
 3. **Highlight detection** — chunk the transcript into ~45s windows, score
    each for "meaningful" content (heuristic scorer by default; optional
    LLM scorer if `GROQ_KEY` is set), keep the top ones.
