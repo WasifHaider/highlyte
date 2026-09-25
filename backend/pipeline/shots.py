@@ -30,6 +30,22 @@ def _duration(times: list[float], start: int, end: int) -> float:
 
 
 def split_shots(times: list[float], cuts: list[float], min_len_s: float = MIN_SHOT_S) -> list[tuple[int, int]]:
+    """Split samples into shot ranges, merging shots shorter than min_len_s.
+
+    Args:
+        times: List of sample times in seconds (e.g. [0.0, 0.2, 0.4, ...]).
+        cuts: List of cut times (first sample of each new shot). Must be values
+            taken directly from `times`; typically the output of cut_times() on
+            the same `times` list. Cuts found via exact float equality, so
+            recomputed or rounded times will silently be lost.
+        min_len_s: Minimum shot duration in seconds. Shots shorter than this
+            are merged: mid-shots into the previous shot, first shot into the next.
+
+    Returns:
+        List of half-open sample-index ranges [start, end) covering all samples.
+        Example: [(0, 10), (10, 25), (25, 40)] for 40 samples with cuts at
+        indices 10 and 25. All samples are included exactly once.
+    """
     if not times:
         return []
     cut_set = set(cuts)
