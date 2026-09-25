@@ -1,6 +1,9 @@
--- Highlyte Supabase schema
--- Run this in the Supabase SQL editor (or via `supabase db push` with this
--- file as a migration). Metadata only — the actual clip video files live
+-- Highlyte Supabase schema: baseline migration.
+-- This is the schema as it stood before migrations existed (formerly
+-- supabase/schema.sql). Every statement is idempotent, so applying it to a
+-- database that already has these tables is safe. New changes go in new
+-- files under supabase/migrations/, never in this one.
+-- Metadata only — the actual clip video files live
 -- in local disk or a Cloudflare R2 bucket (see backend/storage.py), not
 -- in Supabase; these tables just track what was generated and where to
 -- find it, so a user's clip history survives a backend restart.

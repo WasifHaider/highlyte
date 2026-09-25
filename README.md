@@ -12,8 +12,8 @@ Handles episodes that mix English with Roman-script Hindi/Urdu.
   disk under `data/clips/` unless R2 is configured.
 - `frontend/` — Vue 3 + Vite SPA (Pinia store, Vue Router, axios). Polls job
   status and renders the highlight list.
-- `supabase/schema.sql` — jobs/clips tables + indexes. Run in the Supabase
-  SQL editor for your project.
+- `supabase/migrations/` — the database schema as ordered migration files,
+  applied with the Supabase CLI (see "Database migrations" below).
 
 ## Roman Urdu/Hindi transcription
 
@@ -55,11 +55,33 @@ the backend's httpOnly login cookies travel with every request.
 
 ### Supabase (required)
 1. Create a project at supabase.com.
-2. Run `supabase/schema.sql` in the SQL editor.
+2. Apply the migrations: `npx supabase db push --db-url "<connection string>"`
+   (see "Database migrations" below for which connection string).
 3. Put `SUPABASE_URL` and `SUPABASE_KEY` (the service-role key) in `.env` at
    the repo root.
 Accounts live in Supabase Auth, so without these set login, signup and every
 project endpoint answer 503 "Accounts need Supabase".
+
+### Database migrations
+Schema changes live in `supabase/migrations/` as timestamped SQL files.
+Supabase records which ones a database has applied, so each file runs once
+and nothing is ever re-run by hand.
+
+- **Change the schema:** `npx supabase migration new <name>` creates an empty
+  file; write only the change in it (`alter table jobs add column ...`).
+  Never edit a migration that has already been applied.
+- **Production:** the deploy workflow runs `supabase db push` before the new
+  backend starts, on every push to master that touches
+  `supabase/migrations/`. It needs the `SUPABASE_DB_URL` GitHub secret: the
+  **Session pooler** connection string from the Supabase dashboard
+  (Connect → Session pooler), with the database password filled in. The
+  direct `db.<ref>.supabase.co` host is IPv6-only and GitHub runners can't
+  reach it.
+- **By hand:** `npx supabase db push --db-url "<same string>" --dry-run`
+  lists what would be applied; drop `--dry-run` to apply.
+- The first migration, `20260924000000_baseline.sql`, is the old
+  `schema.sql`. Every statement in it is idempotent, so it applies safely to
+  the existing production database.
 
 ## Team accounts
 
