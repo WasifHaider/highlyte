@@ -5,11 +5,12 @@ Handles episodes that mix English with Roman-script Hindi/Urdu.
 
 ## Architecture
 
-- `backend/` — FastAPI app. Pipeline: yt-dlp ingest -> transcript (YouTube
-  captions, else local faster-whisper) -> heuristic/LLM highlight scoring ->
-  ffmpeg cuts. Job/clip metadata persisted to Supabase Postgres, and logins
-  go through Supabase Auth (required, see below). Clip files stay on local
-  disk under `data/clips/` unless R2 is configured.
+- `backend/` — FastAPI app. Pipeline: yt-dlp ingest -> transcript (language
+  check, VAD chunks, Whisper via Groq else local faster-whisper, then glossary
+  and spelling fixes) -> heuristic/LLM highlight scoring -> ffmpeg cuts.
+  Job/clip metadata persisted to Supabase Postgres, and logins go through
+  Supabase Auth (required, see below). Clip files stay on local disk under
+  `data/clips/` unless R2 is configured.
 - `frontend/` — Vue 3 + Vite SPA (Pinia store, Vue Router, axios). Polls job
   status and renders the highlight list.
 - `supabase/migrations/` — the database schema as ordered migration files,
@@ -168,6 +169,6 @@ cd renderer && npm test
 ## Open questions (carried over from original scope)
 
 - [x] Output format: vertical 9:16 shorts (Phase 1)
-- [ ] Caption quality check before trusting auto-captions over Whisper
+- [x] Caption quality check before trusting auto-captions over Whisper (dropped: every job now uses Whisper)
 - [ ] LLM highlight scoring model choice, if/when the heuristic scorer isn't
       good enough
