@@ -58,11 +58,25 @@ class SpeakerTurn(BaseModel):
     faceId: int
 
 
+ShotKind = Literal["two", "one", "none"]
+
+
+class Shot(BaseModel):
+    """One camera shot of the clip. faceIds refer to Reframe.faces; for a
+    "two" shot they are ordered left to right (top panel first in split)."""
+    start: float
+    end: float
+    kind: ShotKind
+    faceIds: list[int]
+
+
 class Reframe(BaseModel):
     auto: LayoutKind
     # Sorted by how often each face is present, most present first.
     faces: list[FaceTrack]
     speakerTimeline: list[SpeakerTurn]
+    # Empty for clips analysed before shots existed; they render as before.
+    shots: list[Shot] = Field(default_factory=list)
 
 
 class ClipSpec(BaseModel):

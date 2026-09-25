@@ -767,6 +767,25 @@
         "t": 4.0,
         "faceId": 1
       }
+    ],
+    "shots": [
+      {
+        "start": 0.0,
+        "end": 4.0,
+        "kind": "two",
+        "faceIds": [
+          0,
+          1
+        ]
+      },
+      {
+        "start": 4.0,
+        "end": 8.0,
+        "kind": "one",
+        "faceIds": [
+          1
+        ]
+      }
     ]
   }
 }

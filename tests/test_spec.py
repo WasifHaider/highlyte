@@ -81,3 +81,15 @@ def test_fixture_is_a_valid_spec():
         spec = ClipSpec.model_validate(json.load(f))
     assert spec.source.url == "fixture.mp4"
     assert len(spec.reframe.faces) == 2
+
+
+def test_reframe_shots_default_and_round_trip():
+    from backend.spec import Reframe
+
+    old = Reframe.model_validate({"auto": "follow", "faces": [], "speakerTimeline": []})
+    assert old.shots == []
+    new = Reframe.model_validate({
+        "auto": "split", "faces": [], "speakerTimeline": [],
+        "shots": [{"start": 0.0, "end": 4.0, "kind": "two", "faceIds": [0, 1]}],
+    })
+    assert new.model_dump()["shots"][0] == {"start": 0.0, "end": 4.0, "kind": "two", "faceIds": [0, 1]}

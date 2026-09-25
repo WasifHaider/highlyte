@@ -52,6 +52,7 @@ def build() -> ClipSpec:
             "auto": "speaker",
             "faces": [{"id": 0, "track": left}, {"id": 1, "track": right}],
             "speakerTimeline": [{"t": 0.0, "faceId": 0}, {"t": 4.0, "faceId": 1}],
+            "shots": [{"start": 0.0, "end": 4.0, "kind": "two", "faceIds": [0, 1]}, {"start": 4.0, "end": 8.0, "kind": "one", "faceIds": [1]}],
         },
     })
 

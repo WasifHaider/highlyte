@@ -32,4 +32,17 @@ describe('schema', () => {
     expect(durationInFrames({ start: 1, end: 9 })).toBe(240)
     expect(durationInFrames({ start: 1, end: 1 })).toBe(1)
   })
+
+  it('reads shots from the fixture and defaults them for old specs', () => {
+    expect(clipSpecSchema.parse(fixture).reframe.shots).toHaveLength(2)
+    const old = structuredClone(fixture) as any
+    delete old.reframe.shots
+    expect(clipSpecSchema.parse(old).reframe.shots).toEqual([])
+  })
+
+  it('rejects an unknown shot kind', () => {
+    const bad = structuredClone(fixture) as any
+    bad.reframe.shots = [{ start: 0, end: 1, kind: 'three', faceIds: [] }]
+    expect(clipSpecSchema.safeParse(bad).success).toBe(false)
+  })
 })
