@@ -11,7 +11,10 @@ const noShots = clipSpecSchema.parse({ ...fixture, reframe: { ...fixture.reframe
 // the raw spec straight to the Player; Lambda gets raw input props). Build
 // that shape directly instead of going through clipSpecSchema.parse, whose
 // `.default([])` on shots would mask the bug.
-const raw = structuredClone(fixture) as typeof fixture & { reframe: { shots?: unknown } }
+type RawOldSpec = Omit<typeof fixture, 'reframe'> & {
+  reframe: Omit<typeof fixture.reframe, 'shots'> & { shots?: unknown }
+}
+const raw = structuredClone(fixture) as RawOldSpec
 delete raw.reframe.shots
 const rawOldSpec = raw as unknown as ReturnType<typeof clipSpecSchema.parse>
 
