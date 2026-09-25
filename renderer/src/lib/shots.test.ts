@@ -16,4 +16,7 @@ describe('activeShot', () => {
   it('handles no shots', () => {
     expect(activeShot([], 1)).toBeNull()
   })
+  it('handles undefined shots (clips analysed before shots existed, unparsed)', () => {
+    expect(activeShot(undefined, 1)).toBeNull()
+  })
 })

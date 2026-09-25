@@ -7,7 +7,8 @@ import { activeFace } from './speaker'
 export type View = { kind: 'fit' } | { kind: 'one'; faceId: number } | { kind: 'two'; topId: number; bottomId: number }
 
 export function resolveView(spec: ClipSpec, layout: Layout, t: number): View {
-  const { faces, speakerTimeline, shots } = spec.reframe
+  const { faces, speakerTimeline } = spec.reframe
+  const shots = spec.reframe.shots ?? []
   if (faces.length === 0 || layout === 'fit') return { kind: 'fit' }
 
   const shot = activeShot(shots, t)

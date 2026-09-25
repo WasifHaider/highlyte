@@ -6,6 +6,15 @@ import { captionPositionAt, resolveView } from './view'
 const spec = clipSpecSchema.parse(fixture) // faces 0 (x .30) and 1 (x .70); shots: two [0,1] 0-4, one [1] 4-8
 const noShots = clipSpecSchema.parse({ ...fixture, reframe: { ...fixture.reframe, shots: [] } })
 
+// Clips analysed before this branch: stored raw in Supabase, no `shots` key at
+// all, and reach the renderer without a zod parse (RemotionPreview.vue passes
+// the raw spec straight to the Player; Lambda gets raw input props). Build
+// that shape directly instead of going through clipSpecSchema.parse, whose
+// `.default([])` on shots would mask the bug.
+const raw = structuredClone(fixture) as typeof fixture & { reframe: { shots?: unknown } }
+delete raw.reframe.shots
+const rawOldSpec = raw as unknown as ReturnType<typeof clipSpecSchema.parse>
+
 const style = (layout: ClipStyle['layout'], captionPosition: ClipStyle['captionPosition'] = 'lower'): ClipStyle => ({
   layout,
   captionPreset: 'clean',
@@ -48,6 +57,24 @@ describe('resolveView without shots (clips analysed before shots existed)', () =
   })
   it('speaker follows the timeline', () => {
     expect(resolveView(noShots, 'speaker', 5)).toEqual({ kind: 'one', faceId: 1 })
+  })
+})
+
+describe('resolveView on a raw old spec with no shots key (unparsed, pre-shots clip)', () => {
+  it('split orders the first two faces by their first position', () => {
+    expect(resolveView(rawOldSpec, 'split', 1)).toEqual({ kind: 'two', topId: 0, bottomId: 1 })
+  })
+  it('follow uses the most present face', () => {
+    expect(resolveView(rawOldSpec, 'follow', 1)).toEqual({ kind: 'one', faceId: 0 })
+  })
+  it('speaker follows the timeline', () => {
+    expect(resolveView(rawOldSpec, 'speaker', 5)).toEqual({ kind: 'one', faceId: 1 })
+  })
+  it('fit stays fit', () => {
+    expect(resolveView(rawOldSpec, 'fit', 1)).toEqual({ kind: 'fit' })
+  })
+  it('captionPositionAt splits captions for the whole clip', () => {
+    expect(captionPositionAt(rawOldSpec, style('split'), 1)).toBe('middle')
   })
 })
 
