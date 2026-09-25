@@ -99,6 +99,29 @@ def list_clips_for_job(job_id: str) -> list[dict[str, Any]]:
         return []
 
 
+def save_transcript(job_id: str, language: str, source: str, segments: list[dict[str, Any]]) -> None:
+    """Store a job's transcript. Unlike the job/clip writes above, a failure
+    raises: nudging and regenerating clips later depends on this row, so a
+    job without it must not be reported as done."""
+    client = get_client()
+    if client is None:
+        return
+    client.table("transcripts").upsert({
+        "job_id": job_id, "language": language, "source": source, "segments": segments,
+    }).execute()
+
+
+def get_transcript(job_id: str) -> dict[str, Any] | None:
+    client = get_client()
+    if client is None:
+        return None
+    try:
+        return _first(client.table("transcripts").select("*").eq("job_id", job_id).limit(1).execute())
+    except Exception as e:  # noqa: BLE001
+        print(f"[supabase] get_transcript failed: {e}")
+        return None
+
+
 def get_clip(clip_id: str) -> dict[str, Any] | None:
     client = get_client()
     if client is None:
