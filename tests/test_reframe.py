@@ -81,3 +81,54 @@ def test_analyze_returns_valid_reframe_and_fallback():
     assert result.auto == "follow"
     assert result.faces[0].id == 0 and len(result.faces[0].track) == len(times)
     assert reframe.fallback().auto == "fit" and reframe.fallback().faces == []
+
+
+def _wide_then_closeup():
+    times = _times(8)
+    frames = []
+    for t in times:
+        if t < 4.0:
+            frames.append([Detection(0.3, 0.4, 0.12, 0.25, 0.1), Detection(0.72, 0.4, 0.12, 0.25, 0.1)])
+        else:
+            frames.append([Detection(0.5, 0.4, 0.25, 0.45, 0.1)])  # close-up, centred
+    return frames, times
+
+
+def test_analyze_without_cuts_has_no_shots():
+    frames, times = _wide_then_closeup()
+    assert reframe.analyze(frames, times).shots == []
+
+
+def test_analyze_per_shot_tracks_and_kinds():
+    frames, times = _wide_then_closeup()
+    result = reframe.analyze(frames, times, cuts=[4.0])
+    assert [(s.start, s.kind) for s in result.shots] == [(0.0, "two"), (4.0, "one")]
+    left, right = result.shots[0].faceIds
+    by_id = {f.id: f for f in result.faces}
+    assert by_id[left].track[0].cx < by_id[right].track[0].cx  # left face first -> top panel
+    closeup = result.shots[1].faceIds[0]
+    assert closeup not in (left, right)  # tracking restarts at the cut
+    for face in result.faces:  # no track spans the cut
+        ts = [p.t for p in face.track]
+        assert max(ts) < 4.0 or min(ts) >= 4.0
+    assert result.auto == "split"  # two-person shot covers >= 50 %
+
+
+def test_analyze_with_empty_cuts_is_one_shot():
+    frames, times = _wide_then_closeup()
+    result = reframe.analyze(frames[:20], times[:20], cuts=[])
+    assert [(s.start, s.kind) for s in result.shots] == [(0.0, "two")]
+
+
+def test_choose_auto_prefers_follow_when_mostly_closeups():
+    times = _times(10)
+    frames = [[Detection(0.3, 0.4, 0.12, 0.25, 0.1), Detection(0.72, 0.4, 0.12, 0.25, 0.1)] if t < 2 else
+              [Detection(0.5, 0.4, 0.25, 0.45, 0.1)] for t in times]
+    assert reframe.analyze(frames, times, cuts=[2.0]).auto == "follow"
+
+
+def test_speaker_timeline_starts_each_shot_at_its_start():
+    frames, times = _wide_then_closeup()
+    result = reframe.analyze(frames, times, cuts=[4.0])
+    closeup = result.shots[1].faceIds[0]
+    assert any(turn.t == 4.0 and turn.faceId == closeup for turn in result.speakerTimeline)
