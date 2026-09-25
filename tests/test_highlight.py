@@ -50,3 +50,82 @@ def test_select_clips_keeps_hook_title_and_emphasis():
     picked = highlight._select_clips([cand], sents)
     assert picked[0].hook_title == "Hook"
     assert picked[0].emphasis == ["x"]
+
+
+def _recording_client(content: str, finish_reason: str = "stop", calls: list | None = None):
+    def create(**kw):
+        if calls is not None:
+            calls.append(kw)
+        return SimpleNamespace(choices=[SimpleNamespace(
+            message=SimpleNamespace(content=content), finish_reason=finish_reason)])
+    return SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+
+
+def test_llm_window_asks_for_low_reasoning_effort():
+    calls = []
+    highlight._llm_score_window(_recording_client("[]", calls=calls), _sentences(), {})
+    assert calls[0]["extra_body"] == {"reasoning_effort": "low"}
+
+
+def test_llm_window_cut_off_answer_is_a_failure_not_an_empty_result():
+    import pytest
+
+    sents = _sentences()
+    with pytest.raises(highlight.WindowFailed, match="cut off"):
+        highlight._llm_score_window(_recording_client('[{"start_idx": 0', "length"), sents, {s.idx: s for s in sents})
+
+
+def test_llm_window_unreadable_answer_is_a_failure():
+    import pytest
+
+    with pytest.raises(highlight.WindowFailed):
+        highlight._llm_score_window(_recording_client("I think nothing here."), _sentences(), {})
+
+
+def test_llm_window_empty_array_is_a_real_empty_result():
+    assert highlight._llm_score_window(_recording_client("[]"), _sentences(), {}) == []
+
+
+def _long_sentences(n=400):
+    return [Sentence(start=i * 5.0, end=i * 5.0 + 4.8, text="word " * 40, idx=i) for i in range(n)]
+
+
+def test_all_windows_rate_limited_raises_clear_error(monkeypatch):
+    import pytest
+
+    monkeypatch.setenv("GROQ_KEY", "k")
+
+    def boom(client, window, by_idx):
+        raise RuntimeError("Error code: 429 - Rate limit reached ... Please try again in 21m0.576s.")
+
+    monkeypatch.setattr(highlight, "_llm_score_window", boom)
+    with pytest.raises(highlight.ClipSelectionError, match="daily limit.*21 minutes"):
+        highlight.score_chunks_llm_boundaries(_long_sentences())
+
+
+def test_all_windows_cut_off_raises_generic_error(monkeypatch):
+    import pytest
+
+    monkeypatch.setenv("GROQ_KEY", "k")
+
+    def cut(client, window, by_idx):
+        raise highlight.WindowFailed("cut off at 2200 tokens")
+
+    monkeypatch.setattr(highlight, "_llm_score_window", cut)
+    with pytest.raises(highlight.ClipSelectionError, match="Clip selection failed"):
+        highlight.score_chunks_llm_boundaries(_long_sentences())
+
+
+def test_some_windows_failing_keeps_clips_from_the_rest(monkeypatch):
+    monkeypatch.setenv("GROQ_KEY", "k")
+    seen = []
+
+    def half(client, window, by_idx):
+        seen.append(window[0].idx)
+        if len(seen) % 2:
+            raise highlight.WindowFailed("cut off at 2200 tokens")
+        return [Clip(start=window[0].start, end=window[0].start + 20, text="x", score=5, tag="Key insight")]
+
+    monkeypatch.setattr(highlight, "_llm_score_window", half)
+    clips = highlight.score_chunks_llm_boundaries(_long_sentences())
+    assert len(seen) > 2 and len(clips) == len(seen) // 2

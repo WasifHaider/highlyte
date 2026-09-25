@@ -226,6 +226,34 @@ LLM_WINDOW_OVERLAP_SENTENCES = 8
 LLM_SPANS_PER_WINDOW = 4
 
 _JSON_ARRAY_RE = re.compile(r"\[.*\]", re.DOTALL)
+_TRY_AGAIN_RE = re.compile(r"try again in\s+(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:([\d.]+)s)?", re.IGNORECASE)
+
+
+class WindowFailed(Exception):
+    """One window's LLM call produced no usable answer (cut off or
+    unreadable). Distinct from a real "[]" answer, which means the model
+    looked and found nothing worth clipping."""
+
+
+class ClipSelectionError(RuntimeError):
+    """Every window failed, so clip selection never really ran. Raised
+    instead of returning a near-empty clip list the user can't explain."""
+
+
+def _is_rate_limit(exc: Exception) -> bool:
+    return type(exc).__name__ == "RateLimitError" or "429" in str(exc) or "rate limit" in str(exc).lower()
+
+
+def _wait_label(exc: Exception) -> str | None:
+    """"try again in 21m0.576s" -> "about 21 minutes"."""
+    match = _TRY_AGAIN_RE.search(str(exc))
+    if not match or not any(match.groups()):
+        return None
+    hours, minutes, seconds = (float(g) if g else 0.0 for g in match.groups())
+    total_min = hours * 60 + minutes + seconds / 60
+    if total_min < 1:
+        return "about a minute"
+    return f"about {round(total_min)} minutes"
 
 
 def _llm_windows(
@@ -294,15 +322,23 @@ def _llm_score_window(client, window: list[Sentence], sentences_by_idx: dict[int
         # measured ~850 completion tokens on a 70-line window, so 2200
         # leaves real margin without letting a stuck response run away.
         max_tokens=2200,
+        # Without this, long windows spent the whole 2200-token budget on
+        # hidden reasoning and the JSON answer was cut off or never written
+        # (measured: ~400-450 tokens per window at low effort). Sent via
+        # extra_body because the pinned openai client predates the field.
+        extra_body={"reasoning_effort": "low"},
     )
-    content = resp.choices[0].message.content or ""
+    choice = resp.choices[0]
+    if getattr(choice, "finish_reason", None) == "length":
+        raise WindowFailed("cut off at the token limit")
+    content = choice.message.content or ""
     match = _JSON_ARRAY_RE.search(content)
     if not match:
-        return []
+        raise WindowFailed("answer had no JSON array")
     try:
         spans = json.loads(match.group(0))
-    except json.JSONDecodeError:
-        return []
+    except json.JSONDecodeError as e:
+        raise WindowFailed(f"unreadable JSON: {e}") from e
 
     clips: list[Clip] = []
     for i, span in enumerate(spans if isinstance(spans, list) else []):
@@ -365,11 +401,25 @@ def score_chunks_llm_boundaries(sentences: list[Sentence]) -> list[Clip] | None:
     windows = _llm_windows(sentences, LLM_WINDOW_CHARS)
 
     all_clips: list[Clip] = []
+    failures: list[Exception] = []
     for window in windows:
         try:
             all_clips.extend(_llm_score_window(client, window, sentences_by_idx))
-        except Exception:
-            continue  # this window's LLM call failed — skip it, keep going
+        except Exception as e:  # noqa: BLE001
+            # One bad window must not sink the job: keep the clips from the
+            # rest, but say which part of the episode was skipped and why.
+            failures.append(e)
+            print(f"[highlight] window {window[0].start:.0f}-{window[-1].end:.0f}s skipped: {e}")
+
+    if windows and len(failures) == len(windows):
+        limited = [e for e in failures if _is_rate_limit(e)]
+        if limited:
+            wait = _wait_label(limited[-1])
+            raise ClipSelectionError(
+                "Clip selection hit Groq's daily limit."
+                + (f" Try again in {wait}." if wait else " Try again later.")
+            )
+        raise ClipSelectionError("Clip selection failed for this video. Try again.")
     return all_clips
 
 
