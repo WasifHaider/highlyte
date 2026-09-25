@@ -1,8 +1,8 @@
 import { AbsoluteFill, OffthreadVideo, useCurrentFrame, useVideoConfig } from 'remotion'
 import { OUT_H, OUT_W } from '../constants'
 import { cropWindow } from '../lib/crop'
-import { activeFace } from '../lib/speaker'
 import { sampleTrack } from '../lib/track'
+import { resolveView } from '../lib/view'
 import type { ClipSpec, Layout } from '../schema'
 import { resolveSrc } from '../source'
 import { CroppedVideo } from './CroppedVideo'
@@ -18,10 +18,9 @@ export const LayoutView: React.FC<{ spec: ClipSpec; layout: Layout }> = ({ spec,
   const { width: srcW, height: srcH } = spec.source
   const faces = spec.reframe.faces
 
-  // Layouts that need faces fall back gracefully when analysis found none.
-  const effective: Layout = faces.length === 0 ? 'fit' : layout === 'split' && faces.length < 2 ? 'follow' : layout
+  const view = resolveView(spec, layout, t)
 
-  if (effective === 'fit') {
+  if (view.kind === 'fit') {
     return (
       <AbsoluteFill style={{ backgroundColor: 'black' }}>
         <AbsoluteFill style={{ filter: 'blur(40px)', transform: 'scale(1.15)' }}>
@@ -34,9 +33,9 @@ export const LayoutView: React.FC<{ spec: ClipSpec; layout: Layout }> = ({ spec,
     )
   }
 
-  if (effective === 'split') {
-    // Order panels by where each person sits at the start, so they never swap mid-clip.
-    const [top, bottom] = [faces[0], faces[1]].sort((a, b) => (a.track[0]?.cx ?? 0.5) - (b.track[0]?.cx ?? 0.5))
+  if (view.kind === 'two') {
+    const top = faces.find(f => f.id === view.topId) ?? faces[0]
+    const bottom = faces.find(f => f.id === view.bottomId) ?? faces[0]
     const aspect = OUT_W / PANEL_H
     return (
       <AbsoluteFill style={{ backgroundColor: 'black' }}>
@@ -48,8 +47,7 @@ export const LayoutView: React.FC<{ spec: ClipSpec; layout: Layout }> = ({ spec,
     )
   }
 
-  const faceId = effective === 'speaker' ? activeFace(spec.reframe.speakerTimeline, t) ?? faces[0].id : faces[0].id
-  const face = faces.find(f => f.id === faceId) ?? faces[0]
+  const face = faces.find(f => f.id === view.faceId) ?? faces[0]
   return (
     <AbsoluteFill style={{ backgroundColor: 'black' }}>
       <CroppedVideo src={src} trimBefore={trimBefore} srcW={srcW} srcH={srcH} boxW={OUT_W} boxH={OUT_H}
