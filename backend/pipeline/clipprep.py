@@ -42,12 +42,8 @@ def prepare_clip(
     video_path: str,
     video_duration: float,
     segments: list[TranscriptSegment],
-    transcript_source: str,
-    audio_path: str,
     clips_dir: str,
     models_dir: str,
-    groq_key: str | None,
-    prompt: str | None,
     on_step: Callable[[str], None],
 ) -> PreparedClip:
     clip_id = f"{job_id}-{idx}"
@@ -62,10 +58,7 @@ def prepare_clip(
     width, height, fps = cut.probe_video(local_path)
 
     on_step("timing captions")
-    clip_word_list, approx = words.clip_words(
-        segments, transcript_source, audio_path, clip.start, clip.end, clip.emphasis,
-        groq_key=groq_key, prompt=prompt,
-    )
+    clip_word_list = words.clip_words(segments, clip.start, clip.end, clip.emphasis)
 
     on_step("framing")
     try:
@@ -94,7 +87,7 @@ def prepare_clip(
         start=round(offset, 3),
         end=round(offset + duration, 3),
         words=clip_word_list,
-        wordsApprox=approx,
+        wordsApprox=False,
         hookTitle=clip.hook_title,
         viralityScore=max(0.0, min(10.0, round(clip.score, 1))),
         reframe=reframe_result,

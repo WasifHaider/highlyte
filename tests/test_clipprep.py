@@ -30,9 +30,8 @@ def _prepare(tmp_path):
         job_id="abc123def456", idx=0, clip=clip,
         video_path="v.mp4", video_duration=100.0,
         segments=[Seg(11.2, 11.5, "hey"), Seg(11.5, 11.9, "there")],
-        transcript_source="groq", audio_path="a.m4a",
         clips_dir=str(tmp_path), models_dir=str(tmp_path),
-        groq_key=None, prompt=None, on_step=lambda s: None,
+        on_step=lambda s: None,
     )
 
 
