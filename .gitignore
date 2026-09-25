@@ -18,3 +18,6 @@ renderer/public/fixture.mp4
 
 # SSH keys
 *.pem
+
+# Spike audio, transcripts and reports (throwaway)
+data/spike/

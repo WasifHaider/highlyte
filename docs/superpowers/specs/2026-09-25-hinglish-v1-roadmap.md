@@ -32,10 +32,10 @@ These are where v1 deliberately differs from the original scope draft.
 |---|---|
 | Rendering | Stay on Remotion: live in-browser preview, MP4 rendered on Lambda at export. FFmpeg burn-in for export only if the Remotion license (more than 3 people) or volume demands it. HyperFrames is not used: user edits are structured data, not AI-written visuals. |
 | Language choice | A spoken-language picker (Hinglish / English) is kept. It describes the audio, never the caption language; nothing is translated. |
-| Language detection | Local faster-whisper `detect_language` on three 20s samples (start, middle, end) checks the choice. All-English with high confidence forces the English path; any Hindi/Urdu forces the Hinglish path; otherwise the user's choice wins. An override is shown as `language_note`. Inside the Hinglish path each VAD chunk is detected too, so English stretches take the English path. |
-| Hindi and Urdu speakers | One path for both: Whisper `language="hi"` → glossary → IndicXlit on Indic tokens only → a fixed spelling list → constrained LLM cleanup. No per-chunk Hindi/Urdu routing, which would make spelling inconsistent inside one clip. |
-| Spelling | `spelling.json` fixes chat shortcuts (hy→hai, kia→kya, mjhy→mujhe) and Urdu-origin sounds that Whisper drops the nukta from (jindagi→zindagi, jyada→zyada, khwaish→khwahish). Plain data, editable without code, grows from eval misses. |
-| VAD | faster-whisper's bundled Silero VAD (ONNX). No PyTorch dependency for VAD. |
+| Language detection | Local faster-whisper `detect_language` on three 20s samples (start, middle, end) checks the choice. All-English with high confidence forces the English path; any Hindi/Urdu forces the Hinglish path; otherwise the user's choice wins. An override is shown as `language_note`. No per-chunk detection: after the spike both paths use Whisper's English mode, so there is nothing to route per chunk. |
+| Hindi and Urdu speakers | One path for both, decided by the spike (below): Whisper `language="en"` with the Roman Hindi/Urdu seed prompt, which is what the app already does, then the glossary, the spelling list and optional LLM cleanup, all on Roman text. The English choice uses `language="en"` without the seed prompt. |
+| Spelling | `spelling.json` sets one house spelling for chat forms both Indian and Pakistani readers recognise (ye, woh, toh, cheez, kuch, bohat, farq, kyunki) and fixes Whisper's chat shortcuts (bhoat→bohat, fark→farq, kia→kya, hy→hai). English words are never touched. Plain data, editable without code, grows from eval misses. |
+| VAD | faster-whisper's bundled Silero VAD (ONNX). No PyTorch dependency. |
 | Rendering timing | Clips are not rendered upfront. Preview is live; the MP4 renders only on export, so nudges are instant. |
 | Database changes | Supabase CLI migrations in `supabase/migrations/`, applied by `supabase db push` in the deploy workflow. No Prisma: the backend is Python and the schema uses `auth.users` foreign keys and triggers. |
 | YouTube blocking | EC2 downloads through teammates' home laptops via Tailscale exit nodes (sidecar SOCKS5 proxies, ordered failover), with upload as the fallback. |
@@ -59,12 +59,12 @@ These are where v1 deliberately differs from the original scope draft.
 | Step | Piece | Size | Outcome |
 |---|---|---|---|
 | 0 | Groundwork: Supabase CLI migrations (baseline + `db push` in CI); untrack committed log files and ignore `*.log` | ½ day | No more manual SQL |
-| 1 | Spike (throwaway): IndicXlit on Python 3.11 in Docker; compare the current path (`en` + seed prompt) against `hi` + xlit + spelling list on 2 Indian and 2 Pakistani episodes; also try `ur` on the Pakistani ones | 1–2 days | Go / no-go on the new transcription path |
-| 2 | Piece 1, language and transcription: picker, detection, audio normalisation, VAD, `AsrProvider` (Groq + local), `hinglish.py`, `cleanup.py`, segment data contract, `transcripts` table. A temporary adapter feeds the current highlight scorer so the app keeps working. | ~1 week | Accurate Roman captions for all speakers |
+| 1 | Spike (throwaway): **done, no-go on the `hi` path.** See "Spike results" below. | done | Keep the current `en` + seed prompt transcription |
+| 2 | Piece 1, language and transcription: picker, upfront detection, audio normalisation, VAD, `AsrProvider` (Groq + local), `hinglish.py` (glossary + spelling list on Roman text), optional `cleanup.py`, segment data contract, `transcripts` table. A temporary adapter feeds the current highlight scorer so the app keeps working. | ~3–4 days | Accurate Roman captions for all speakers |
 | 3 | Piece 2, clip selection: utterances, LLM ranker, cut points snapped in code, scoring and packing, QA gate. Replaces `highlight.py`. | ~1 week | 5–8 clips that start and end cleanly |
 | 4 | Piece 3, review and nudge: single-clip edits and regeneration, caption card editing, SRT export, video upload. Caption presets trimmed to clean / outline / bold. | ~1 week | The fix-in-place loop |
 | 5 | Tailscale download route: sidecars, `YTDLP_PROXIES` failover, clear errors, teammate setup guide | 1–2 days | Production downloads work again |
-| 6 | Eval and tuning: 30 labelled clips split between Indian and Pakistani speakers; native WER, Roman readability 1–5, entity hit rate, English-preserved %, cold-watchable %, clean start/end %. Paid ASR only if the sheet shows real mishearing after the glossary and spelling list are good. | ongoing | Measured quality |
+| 6 | Eval and tuning: 30 labelled clips split between Indian and Pakistani speakers, from more than one channel each; word error rate on Roman text after spelling normalisation (so bohat and bahut are not errors), Roman readability 1–5, entity hit rate, English-preserved %, cold-watchable %, clean start/end %. Paid ASR only if the sheet shows real mishearing after the glossary and spelling list are good. | ongoing | Measured quality |
 
 Step 5 is independent and can move earlier if teammates need the deployed
 app before the pipeline work lands.
@@ -80,29 +80,51 @@ Every utterance and clip uses one object per segment:
   "end": 16.08,
   "speaker": "A",
   "language": "hi-Latn-EN",
-  "native": "हम YouTube पर ये video upload कर रहे थे यार",
-  "hinglish": "hum YouTube par ye video upload kar rahe the yaar",
-  "words": [{"t": "hum", "src": "हम", "start": 12.41, "end": 12.62, "kind": "indic"}],
+  "raw": "hum YouTube pe ye video upload kar rahe the yar",
+  "hinglish": "hum YouTube pe ye video upload kar rahe the yaar",
+  "words": [{"t": "yaar", "raw": "yar", "start": 15.70, "end": 16.08, "kind": "hinglish"}],
   "confidence": 0.91
 }
 ```
 
-Captions and exports use `hinglish` only (for English videos it equals
-`native`). The ranker may read both.
+`raw` is Whisper's Roman output as heard; `hinglish` is after the glossary,
+spelling list and optional cleanup. Word `kind` is `en`, `hinglish` or
+`num`; spelling fixes never touch `en` words. There is no native-script
+field (see "Spike results"). Captions, exports and the ranker use
+`hinglish`; for English videos it equals `raw` apart from glossary fixes.
 
 ## Pipeline rules kept from the original scope
 
 - Do not collapse the pipeline into one model. ASR hears, the script layer
-  writes Hinglish, the LLM edits text or scores clips, and code owns cut
-  points and romanization.
-- Never ask Whisper to emit Roman on the Hinglish path, never use
-  `task=translate`, never cut on fixed 30s chunks.
-- Cleanup may not add or drop words; an edit that changes the token count
-  (other than brand merges such as "you tube" → "YouTube") is rejected and
-  the uncleaned text is kept.
+  fixes spelling, the LLM edits text or scores clips, and code owns cut
+  points.
+- Never use `task=translate`, never cut on fixed 30s chunks.
+- Cleanup may fix a clearly misheard word from context but never
+  translates, and code checks every change: if more than 15% of a
+  segment's words change, the edit is rejected and the uncleaned text is
+  kept.
 - The ranker picks utterance ids only; its timestamps are ignored and start
   and end are snapped in code.
 - Keep `AsrProvider` swappable from day one.
+
+## Spike results (2026-09-25)
+
+Four podcasts, 38 one-minute chunks (18 from two Indian episodes of one
+channel, 20 from two Pakistani episodes), all on Groq `whisper-large-v3`.
+Script and report: `scripts/spike/` (throwaway).
+
+| Path | Result |
+|---|---|
+| A: `en` + Roman seed prompt (current code) | Best. English words and names correct (September, control, content, Telegraph); Urdu vocabulary in natural Pakistani spelling (sirf, raftaar, qeemat, zaroor). No drift into English translation: common-English-word rate equal to B (about 4%). Weak spots: a few mishearings and chat spellings (fark, bhoat). |
+| B: `hi` → Aksharamukha → spelling list | Rejected. Whisper `hi` wrote 93–94% of all tokens in Devanagari, English words included, so the scope's "Latin tokens pass through" assumption fails: September→sitambar, control→kantrol, culture→kalchar, provide→pravaid. Loses z/q/f sounds (sirf→siriph, qeemat→kimat). Better than A only on a few Hindi words (farq, kyunki, rakh), which a spelling list can fix on A. |
+| E: `hi` → IndicXlit | Rejected. Turns function words into English lookalikes (के→key, थे→they, कर→curr, है→haye). Only runs on Python 3.10 (fairseq crashes on 3.11) and needs a 2.6GB PyTorch image. |
+| D: `ur` → Aksharamukha | Rejected. Unconverted Urdu letters left in all 20 chunks; Urdu script omits short vowels. |
+| LLM cleanup as specified | Near useless: changed 1 word of 3,516; 12 of 38 calls errored. The same-word-count rule makes it too timid. |
+
+A and B agreed on only 52% (Indian) and 45% (Pakistani) of words, so the
+choice matters. Two scope rules were overturned by this evidence: "never
+`language="en"` as the Hinglish default" and "do not ask Whisper to emit
+Roman". The sample is small; the Step 6 eval confirms or reopens this.
 
 ## Deferred past v1
 
@@ -113,6 +135,5 @@ B-roll, custom Roman-Urdu Whisper.
 
 ## Start
 
-Step 0, then Step 1. Every later piece adds database changes, and the spike
-is the largest risk: if IndicXlit will not install or the `hi` path is not
-clearly better, piece 1 changes.
+Steps 0 and 1 are done. Next is piece 1 (Step 2), built on the current
+transcription path as the spike decided.
