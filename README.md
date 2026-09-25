@@ -115,6 +115,14 @@ an optional hook title. The clip page previews every change live in the
 browser; the final mp4 is rendered on AWS Lambda with
 [Remotion](https://www.remotion.dev) only when you export.
 
+Layouts follow the camera: face analysis detects cuts (a jump in a tiny
+grayscale thumbnail between samples) and tracks faces per shot. Split
+shows the left person on top and the right person below only during
+wide two-person shots; close-ups show one person full-frame. Clips made
+before this change keep their old behaviour until the video is re-run.
+After changing anything in `renderer/src`, re-run `npm run deploy:site`
+so Lambda exports use the same layout as the preview.
+
 - `renderer/` — the Remotion composition (layouts, caption presets, hook
   title). The same code runs in the browser preview and on Lambda.
   `npm run studio` opens Remotion Studio for designing presets;
