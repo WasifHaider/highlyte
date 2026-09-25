@@ -39,6 +39,13 @@ MAX_CLIP_S = 240.0
 MAX_CLIPS = 8
 MIN_CLIP_GAP_S = 4.0  # minimum gap enforced between picked clips
 
+# Air around each clip. Cutting exactly on the first/last word's timestamp
+# clipped syllables (Whisper word ends run slightly early) and made endings
+# feel abrupt; the padding never reaches into a neighbouring word.
+PREROLL_S = 0.2
+TAIL_S = 0.4
+EDGE_GUARD_S = 0.05
+
 HOOK_TITLE_MAX_WORDS = 8
 MAX_EMPHASIS_WORDS = 5
 
@@ -511,6 +518,21 @@ def _select_clips(candidates: list[Clip], sentences: list[Sentence]) -> list[Cli
     return picked
 
 
+def _pad_edges(clips: list[Clip], segments: list[TranscriptSegment]) -> list[Clip]:
+    """Add PREROLL_S before and TAIL_S after each clip, stopping short of
+    the previous/next word so the padding is silence, never speech."""
+    out: list[Clip] = []
+    for c in clips:
+        prev_end = max((s.end for s in segments if s.end <= c.start + 0.001), default=0.0)
+        next_start = min((s.start for s in segments if s.start >= c.end - 0.001), default=None)
+        start = max(c.start - PREROLL_S, prev_end, 0.0)
+        end = c.end + TAIL_S
+        if next_start is not None:
+            end = min(end, max(next_start - EDGE_GUARD_S, c.end))
+        out.append(replace(c, start=round(start, 3), end=round(end, 3)))
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
@@ -527,4 +549,4 @@ def detect_highlights(segments: list[TranscriptSegment]) -> list[Clip]:
         chunks = _group_candidates(sentences, CHUNK_WINDOW_S)
         candidates = score_chunks_heuristic(chunks)
 
-    return _select_clips(candidates, sentences)
+    return _pad_edges(_select_clips(candidates, sentences), segments)

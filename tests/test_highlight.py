@@ -129,3 +129,28 @@ def test_some_windows_failing_keeps_clips_from_the_rest(monkeypatch):
     monkeypatch.setattr(highlight, "_llm_score_window", half)
     clips = highlight.score_chunks_llm_boundaries(_long_sentences())
     assert len(seen) > 2 and len(clips) == len(seen) // 2
+
+
+def _words(*spans):
+    from backend.pipeline.transcript import TranscriptSegment
+    return [TranscriptSegment(s, e, t) for s, e, t in spans]
+
+
+def test_pad_edges_adds_air_before_and_after():
+    segs = _words((9.0, 9.5, "before."), (12.0, 12.4, "Start"), (30.0, 30.5, "end."), (32.0, 32.3, "after"))
+    [c] = highlight._pad_edges([Clip(start=12.0, end=30.5, text="x", score=5, tag="Key insight")], segs)
+    assert c.start == 12.0 - highlight.PREROLL_S
+    assert c.end == 30.5 + highlight.TAIL_S
+
+
+def test_pad_edges_never_runs_into_neighbouring_words():
+    segs = _words((11.9, 11.95, "prev"), (12.0, 12.4, "Start"), (30.0, 30.5, "end."), (30.6, 30.9, "next"))
+    [c] = highlight._pad_edges([Clip(start=12.0, end=30.5, text="x", score=5, tag="Key insight")], segs)
+    assert c.start == 11.95  # previous word's end, not into it
+    assert c.end == 30.6 - highlight.EDGE_GUARD_S
+
+
+def test_pad_edges_clamps_at_zero():
+    [c] = highlight._pad_edges([Clip(start=0.05, end=20.0, text="x", score=5, tag="Key insight")],
+                               _words((0.05, 0.4, "Hi"), (19.5, 20.0, "bye.")))
+    assert c.start == 0.0
