@@ -170,13 +170,16 @@ def choose_layout(
 
 
 def _shot_kind(tracks: list[_Track], n_samples: int) -> tuple[str, list[int]]:
+    if not tracks:
+        return "none", []
+    largest_area = max(statistics.median(d.w * d.h for _, d in tr.points) for tr in tracks)
+    if largest_area < FIT_MIN_FACE_AREA_SHOTS:
+        return "none", []
     frequent = [tr for tr in tracks if len(tr.points) / n_samples >= TWO_FACE_PRESENCE]
     if len(frequent) >= 2:
         pair = sorted(frequent[:2], key=lambda tr: statistics.median(d.cx for _, d in tr.points))
         return "two", [tr.id for tr in pair]
-    if tracks:
-        return "one", [(frequent or tracks)[0].id]
-    return "none", []
+    return "one", [(frequent or tracks)[0].id]
 
 
 def choose_auto(
@@ -212,16 +215,22 @@ def analyze(frames: list[list[Detection]], times: list[float], cuts: list[float]
     timeline: list[SpeakerTurn] = []
     shots: list[Shot] = []
     speaker_switches = False
+    # A shot's layout should switch as close to the actual cut as possible,
+    # not just at the next sample, which can lag the cut by up to one sample
+    # gap (0.2 s at 5 fps). Start it at the midpoint between the sample just
+    # before the cut and the cut sample itself.
     for k, (i0, i1) in enumerate(shot_ranges.split_shots(times, cuts)):
         ts = times[i0:i1]
         tracks = keep_main_tracks(build_tracks(frames[i0:i1], ts), len(ts))
         base = len(all_tracks)
         for tr in tracks:
             tr.id += base  # ids unique across the whole clip
-        start = 0.0 if k == 0 else ts[0]
+        start = 0.0 if k == 0 else round((times[i0 - 1] + times[i0]) / 2, 3)
         end = times[i1] if i1 < len(times) else ts[-1]
         kind, face_ids = _shot_kind(tracks, len(ts))
         shots.append(Shot(start=round(start, 3), end=round(end, 3), kind=kind, faceIds=face_ids))
+        if k > 0:
+            shots[-2] = Shot(start=shots[-2].start, end=start, kind=shots[-2].kind, faceIds=shots[-2].faceIds)
         turns = speaker_timeline(tracks, ts)
         if kind == "two" and len(turns) > 1:
             speaker_switches = True

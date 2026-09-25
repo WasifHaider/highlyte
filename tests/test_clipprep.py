@@ -69,7 +69,9 @@ def test_prepare_clip_detects_a_camera_cut(tmp_path, monkeypatch):
     _patch_media(monkeypatch, lambda path, model, sample_fps=5.0: (frames, times, thumbs))
     shots = _prepare(tmp_path).spec.reframe.shots
     assert [s.kind for s in shots] == ["two", "one"]
-    assert shots[1].start == 8.0  # segment time 9.0 minus the 1.0 s offset
+    # cut sample at segment time 9.0, previous sample at 8.8 -> midpoint 8.9,
+    # minus the 1.0 s offset
+    assert shots[1].start == 7.9
 
 
 def test_prepare_clip_survives_face_detection_failure(tmp_path, monkeypatch):
