@@ -22,6 +22,17 @@
         placeholder="Paste a YouTube link"
         @keyup.enter="onGenerate"
       />
+      <div class="lang" role="group" aria-label="Spoken language">
+        <button
+          v-for="opt in LANGUAGES"
+          :key="opt.value"
+          type="button"
+          class="lang-opt"
+          :class="{ 'lang-active': language === opt.value }"
+          :aria-pressed="language === opt.value"
+          @click="language = opt.value"
+        >{{ opt.label }}</button>
+      </div>
       <button class="generate" :disabled="submitting || !url" @click="onGenerate">
         {{ submitting ? 'Starting…' : 'Generate' }}
       </button>
@@ -45,6 +56,12 @@ import { useJobStore } from '../stores/jobStore'
 import { useAuthStore } from '../stores/authStore'
 
 const url = ref('')
+// The language spoken in the video; the server checks it against the audio.
+const LANGUAGES = [
+  { value: 'hinglish', label: 'Hinglish' },
+  { value: 'english', label: 'English' },
+]
+const language = ref('hinglish')
 const submitting = ref(false)
 const router = useRouter()
 const jobStore = useJobStore()
@@ -55,7 +72,7 @@ async function onGenerate() {
   if (!url.value || submitting.value) return
   submitting.value = true
   try {
-    const jobId = await jobStore.submitUrl(url.value)
+    const jobId = await jobStore.submitUrl(url.value, language.value)
     router.push({ name: 'job', params: { id: jobId } })
   } catch (e) {
     jobStore.error = e?.message || 'Failed to start job'
@@ -136,6 +153,10 @@ input {
   color: var(--ink);
   outline: none;
 }
+.lang { display: flex; flex-shrink: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.lang-opt { border: 0; background: transparent; padding: 6px 10px; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
+.lang-opt + .lang-opt { border-left: 1px solid var(--border); }
+.lang-active { background: var(--accent-soft); color: var(--accent-text); }
 .generate {
   border: none;
   border-radius: 8px;

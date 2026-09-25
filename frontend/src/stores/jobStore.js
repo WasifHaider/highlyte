@@ -37,9 +37,9 @@ export const useJobStore = defineStore('job', {
       .filter(Boolean),
   },
   actions: {
-    async submitUrl(url, whisperModel = 'small') {
+    async submitUrl(url, language = 'hinglish') {
       this.error = null
-      const { job_id } = await createJob(url, whisperModel)
+      const { job_id } = await createJob(url, language)
       this.currentJobId = job_id
       this.job = null
       this.selected = {}

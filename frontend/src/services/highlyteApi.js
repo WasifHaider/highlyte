@@ -27,8 +27,8 @@ api.interceptors.response.use(
   },
 )
 
-export function createJob(url, whisperModel = 'small') {
-  return api.post('/api/generate', { url, whisper_model: whisperModel }).then(r => r.data)
+export function createJob(url, language = 'hinglish') {
+  return api.post('/api/generate', { url, language }).then(r => r.data)
 }
 
 export function getJobStatus(jobId) {

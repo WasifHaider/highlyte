@@ -9,6 +9,7 @@
     />
 
     <ProcessingSteps v-if="jobStore.isProcessing" :status="jobStore.job.status" :progress="jobStore.progress" />
+    <p v-if="jobStore.job?.languageNote" class="lang-note">{{ jobStore.job.languageNote }}</p>
 
     <ClipList v-if="jobStore.isDone" />
   </div>
@@ -76,4 +77,5 @@ watch(() => props.id, (newId) => startForId(newId))
   margin-bottom: 24px;
   font-size: 13.5px;
 }
+.lang-note { margin: 12px 0 0; font-size: 13px; color: var(--ink-soft); }
 </style>
