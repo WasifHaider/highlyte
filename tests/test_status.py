@@ -104,6 +104,20 @@ def test_retry_selection_restarts_selection(monkeypatch):
     assert ran == [(main._run_selection_retry, (job, stored))]
 
 
+def test_retry_selection_second_call_conflicts_while_first_is_in_flight(monkeypatch):
+    main.JOBS.pop("feed00000001", None)
+    _start_inline(monkeypatch)  # the first call's thread never actually runs
+    stored = {"segments": [{"id": "seg_0001"}], "loudness": [-20.0]}
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: _failed_row())
+    monkeypatch.setattr(main.db, "get_transcript", lambda job_id: stored)
+    monkeypatch.setattr(main.db, "upsert_job", lambda row: None)
+    first = client.post("/api/jobs/feed00000001/select")
+    assert first.status_code == 200
+    second = client.post("/api/jobs/feed00000001/select")
+    assert second.status_code == 409
+    main.JOBS.pop("feed00000001", None)
+
+
 def test_retry_selection_only_after_it_failed(monkeypatch):
     main.JOBS.pop("feed00000001", None)
     _start_inline(monkeypatch)

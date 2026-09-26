@@ -89,6 +89,13 @@ JOBS: dict[str, Job] = {}
 
 _MISSING = object()
 
+# Guards the check-then-set on Job.status in retry_selection: without it, two
+# concurrent POSTs (a double-click, or two requests racing after a restart,
+# each building their own Job from the row) could both see "selection_failed"
+# and both start a selection thread, doubling Groq quota use and writing the
+# same clip ids twice.
+_SELECTION_LOCK = threading.Lock()
+
 
 def _require_job(member: Member, job_id: str) -> None:
     """404 unless the job exists and belongs to the caller's team. Another
@@ -441,21 +448,32 @@ def retry_selection(job_id: str, member: Member = Depends(current_member)) -> di
     (usually Groq's daily limit). Download and transcription are skipped."""
     check_id(job_id, "job id")
     _require_job(member, job_id)
-    job = JOBS.get(job_id)
-    if job is None:
-        row = db.get_job(job_id)
-        if row is None:
-            raise HTTPException(404, "job not found")
-        job = _job_from_row(row)
-    if job.status != "selection_failed":
-        raise HTTPException(409, "Clip selection can only be retried after it failed.")
+    with _SELECTION_LOCK:
+        job = JOBS.get(job_id)
+        if job is None:
+            row = db.get_job(job_id)
+            if row is None:
+                raise HTTPException(404, "job not found")
+            # setdefault, not JOBS[job_id] = ..., so a second request that
+            # raced here shares the same Job another request just installed
+            # rather than building its own and re-passing the status check.
+            job = JOBS.setdefault(job_id, _job_from_row(row))
+        if job.status != "selection_failed":
+            raise HTTPException(409, "Clip selection can only be retried after it failed.")
+        previous_error = job.error
+        job.status, job.error, job.selection_note, job.clips = "analyzing", None, None, []
+        job.progress = {"stage": "analyzing", "percent": None, "note": "picking clips…"}
+        JOBS[job_id] = job
+        _persist_job(job)
+
+    # The Supabase round trip runs outside the lock so it can't block other
+    # requests; a missing transcript just puts the job back where it was.
     stored = db.get_transcript(job_id)
     if not stored or not stored.get("segments"):
+        with _SELECTION_LOCK:
+            job.status, job.error = "selection_failed", previous_error
+            _persist_job(job)
         raise HTTPException(409, "This video's transcript wasn't saved. Submit the video again.")
-    job.status, job.error, job.selection_note, job.clips = "analyzing", None, None, []
-    job.progress = {"stage": "analyzing", "percent": None, "note": "picking clips…"}
-    JOBS[job_id] = job
-    _persist_job(job)
     _start_thread(_run_selection_retry, job, stored)
     return {"job_id": job_id}
 
