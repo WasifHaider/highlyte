@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import fixture from './__fixtures__/clip-spec.json'
+import v2fixture from './__fixtures__/clip-spec-v2.json'
 import { clipPropsSchema, clipSpecSchema, clipStyleSchema } from './schema'
 import { durationInFrames } from './constants'
 
@@ -44,5 +45,13 @@ describe('schema', () => {
     const bad = structuredClone(fixture) as any
     bad.reframe.shots = [{ start: 0, end: 1, kind: 'three', faceIds: [] }]
     expect(clipSpecSchema.safeParse(bad).success).toBe(false)
+  })
+})
+
+describe('spec v2', () => {
+  it('parses the Python-generated v2 fixture', () => {
+    const parsed = clipSpecSchema.parse(v2fixture)
+    expect(parsed.version).toBe(2)
+    expect(parsed.source.duration).toBe(12)
   })
 })

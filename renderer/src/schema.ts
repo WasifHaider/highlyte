@@ -1,6 +1,7 @@
 // Mirrors backend/spec.py. The Python-generated fixture in __fixtures__ is
 // parsed by schema.test.ts, so a change on one side that the other side
 // doesn't know about fails a test instead of a render.
+// Spec v2 stores times from file start; v1 from clip start (see lib/timeline.ts).
 import { z } from 'zod'
 
 export const layoutSchema = z.enum(['follow', 'speaker', 'split', 'fit'])
@@ -28,13 +29,14 @@ export const shotSchema = z.object({
 })
 
 export const clipSpecSchema = z.object({
-  version: z.literal(1),
+  version: z.union([z.literal(1), z.literal(2)]),
   clipId: z.string(),
   source: z.object({
     url: z.string(),
     width: z.number().int().positive(),
     height: z.number().int().positive(),
     fps: z.number().positive(),
+    duration: z.number().positive().nullable().optional(),
   }),
   start: z.number().min(0),
   end: z.number(),
