@@ -80,6 +80,13 @@ def test_busy_clip_cannot_be_trimmed(clip):
     assert client.patch(f"/api/clips/{JOB}-0/bounds", json={"start": 1.5, "end": 10.3}).status_code == 409
 
 
+def test_busy_clip_cannot_update_style(clip):
+    record, _ = clip
+    record["pendingAction"] = "swap"
+    r = client.patch(f"/api/clips/{JOB}-0/style", json={"layout": "fit"})
+    assert r.status_code == 409 and r.json()["detail"] == "This clip is being replaced. Wait for it to finish."
+
+
 def test_busy_clip_cannot_be_reset(clip):
     record, _ = clip
     record["pendingAction"] = "regenerate"

@@ -288,6 +288,18 @@ def _with_source_url(record: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _clear_orphaned_pending_action(row: dict[str, Any], record: dict[str, Any]) -> None:
+    """A clip rebuilt from the database (job not in memory, e.g. after a
+    restart) may still carry a pending_action from before: the thread that
+    would have cleared it is gone, so left alone it would 409 every action
+    and edit on this clip forever. Clear it here, in memory and in the row,
+    the same way the status DB fallback already reports it."""
+    if row.get("pending_action"):
+        record["pendingAction"] = None
+        record["actionError"] = "Interrupted by a server restart. Try again."
+        db.update_clip(row["id"], {"pending_action": None, "action_error": record["actionError"]})
+
+
 def _find_clip(clip_id: str) -> dict[str, Any] | None:
     job_id = clip_id.rsplit("-", 1)[0]
     job = JOBS.get(job_id)
@@ -296,7 +308,11 @@ def _find_clip(clip_id: str) -> dict[str, Any] | None:
             if c["id"] == clip_id:
                 return c
     row = db.get_clip(clip_id)
-    return _clip_row_to_api(row) if row else None
+    if row is None:
+        return None
+    record = _clip_row_to_api(row)
+    _clear_orphaned_pending_action(row, record)
+    return record
 
 
 def _build_props(clip_id: str, style: dict[str, Any]) -> tuple[dict[str, Any], float]:
@@ -545,12 +561,10 @@ def status(job_id: str, member: Member = Depends(current_member)) -> dict[str, A
     clips = []
     for r in db.list_clips_for_job(job_id):
         c = _clip_row_to_api(r)
-        if r.get("pending_action"):
-            # Its action thread died with the old process too, but unlike
-            # the job status above this doesn't fail the whole job — just
-            # that one clip, which is safe to retry.
-            c["pendingAction"] = None
-            c["actionError"] = "Interrupted by a server restart. Try again."
+        # Its action thread died with the old process too, but unlike the
+        # job status above this doesn't fail the whole job — just that one
+        # clip, which is safe to retry.
+        _clear_orphaned_pending_action(r, c)
         clips.append(c)
     return {
         "id": row["id"],
@@ -642,7 +656,10 @@ def get_clip(job_id: str, filename: str, member: Member = Depends(current_member
 
 @app.patch("/api/clips/{clip_id}/style")
 def update_style(clip_id: str, style: ClipStyle = Body(...), member: Member = Depends(current_member)) -> dict[str, Any]:
-    return _save_style(_clip_for_style(clip_id, member), style)
+    record = _clip_for_style(clip_id, member)
+    if record.get("pendingAction"):
+        raise HTTPException(409, "This clip is being replaced. Wait for it to finish.")
+    return _save_style(record, style)
 
 
 class CaptionsBody(BaseModel):
@@ -656,6 +673,8 @@ def _captions_reply(record: dict[str, Any]) -> dict[str, Any]:
 @app.put("/api/clips/{clip_id}/captions")
 def save_captions(clip_id: str, body: CaptionsBody = Body(...), member: Member = Depends(current_member)) -> dict[str, Any]:
     record = _clip_for_style(clip_id, member)
+    if record.get("pendingAction"):
+        raise HTTPException(409, "This clip is being replaced. Wait for it to finish.")
     spec = record["spec"]
     try:
         words = captions.validate_words(body.words, window_duration(spec) or (spec["end"] - spec["start"]))
@@ -676,6 +695,8 @@ def save_captions(clip_id: str, body: CaptionsBody = Body(...), member: Member =
 @app.post("/api/clips/{clip_id}/captions/reset")
 def reset_captions(clip_id: str, member: Member = Depends(current_member)) -> dict[str, Any]:
     record = _clip_for_style(clip_id, member)
+    if record.get("pendingAction"):
+        raise HTTPException(409, "This clip is being replaced. Wait for it to finish.")
     if record.get("wordsOriginal") is not None:
         new_spec = {**record["spec"], "words": record["wordsOriginal"]}
         try:
@@ -791,7 +812,12 @@ def _start_clip_action(clip_id: str, kind: str, member: Member) -> dict[str, Any
             if row is None:
                 raise HTTPException(404, "job not found")
             job = JOBS.setdefault(job_id, _job_from_row(row))
-            job.clips = [_clip_row_to_api(r) for r in db.list_clips_for_job(job_id)]
+            new_clips = []
+            for r in db.list_clips_for_job(job_id):
+                c = _clip_row_to_api(r)
+                _clear_orphaned_pending_action(r, c)
+                new_clips.append(c)
+            job.clips = new_clips
         if job.status != "done":
             raise HTTPException(409, "Clips can be changed once the video is done.")
         record = next((c for c in job.clips if c["id"] == clip_id), None)
@@ -801,6 +827,8 @@ def _start_clip_action(clip_id: str, kind: str, member: Member) -> dict[str, Any
             raise HTTPException(409, "This clip has no vertical version. Re-run the video.")
         if record.get("pendingAction"):
             raise HTTPException(409, "This clip is already being replaced.")
+        if any(c.get("pendingAction") for c in job.clips if c["id"] != clip_id):
+            raise HTTPException(409, "Another clip is being replaced. Wait for it to finish.")
         if kind == "swap":
             current = (record["start"], record["end"])
             others = [(c["start"], c["end"]) for c in job.clips if c["id"] != clip_id]
@@ -811,7 +839,11 @@ def _start_clip_action(clip_id: str, kind: str, member: Member) -> dict[str, Any
                 raise HTTPException(409, "Regenerate needs GROQ_KEY.")
         record["pendingAction"] = kind
         record["actionError"] = None
-    db.update_clip(clip_id, {"pending_action": kind, "action_error": None})
+    try:
+        db.update_clip(clip_id, {"pending_action": kind, "action_error": None})
+    except Exception:
+        record["pendingAction"] = None
+        raise
     _start_thread(_run_clip_action, job, clip_id, kind)
     return {"clipId": clip_id, "pendingAction": kind}
 
@@ -826,7 +858,7 @@ def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:
             record["actionError"] = message
         db.update_clip(clip_id, {"pending_action": None, "action_error": message})
 
-    alt_idx: int | None = None
+    picked_alt: dict[str, Any] | None = None
     new_record: dict[str, Any] | None = None
     try:
         stored = db.get_transcript(job.id)
@@ -842,7 +874,13 @@ def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:
             if alt_idx is None:
                 fail("No other moments left to swap in.")
                 return
-            new_clip = selection.alternate_to_clip(job.alternates[alt_idx])
+            # Captured by value rather than by this index: the long
+            # prepare_clip below can take a while, and only one action per
+            # job runs at a time now, but removing by value rather than a
+            # possibly-stale index is cheap insurance against ever popping
+            # the wrong alternate (or raising IndexError) if that changes.
+            picked_alt = job.alternates[alt_idx]
+            new_clip = selection.alternate_to_clip(picked_alt)
         else:
             try:
                 new_clip = selection.regenerate(segs, stored.get("loudness") or [], current, others)
@@ -885,7 +923,10 @@ def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:
             job.clips[pos] = new_record
             break
     if kind == "swap":
-        job.alternates.pop(alt_idx)
+        try:
+            job.alternates.remove(picked_alt)
+        except ValueError:
+            pass  # already gone somehow; nothing left to remove
         _persist_job(job)
 
 

@@ -131,3 +131,77 @@ def test_download_failure_is_reported(env, monkeypatch):
     monkeypatch.setattr(main.ingest, "ingest", boom)
     client.post(f"/api/clips/{JOB}-0/swap")
     assert job.clips[0]["actionError"] == "Couldn't fetch the video again: Sign in to confirm you're not a bot."
+
+
+def test_other_clip_busy_rejects_action(env):
+    job, _, _ = env
+    job.clips[1]["pendingAction"] = "regenerate"
+    r = client.post(f"/api/clips/{JOB}-0/swap")
+    assert r.status_code == 409
+    assert r.json()["detail"] == "Another clip is being replaced. Wait for it to finish."
+
+
+def test_start_clip_action_rolls_back_pending_flag_on_db_failure(env, monkeypatch):
+    job, _, _ = env
+
+    def boom(cid, fields):
+        raise RuntimeError("supabase down")
+
+    monkeypatch.setattr(main.db, "update_clip", boom)
+    with pytest.raises(RuntimeError):
+        client.post(f"/api/clips/{JOB}-0/swap")
+    assert job.clips[0]["pendingAction"] is None
+
+
+def _clip_row_for_rebuild(idx, start, end, pending_action=None):
+    with open(FIXTURE_V2, encoding="utf-8") as f:
+        spec = json.load(f)
+    spec["clipId"] = f"{JOB}-{idx}"
+    return {
+        "id": f"{JOB}-{idx}", "job_id": JOB, "idx": idx, "start_s": start, "end_s": end,
+        "text": "old", "tag": "Key insight", "score": 5.0,
+        "download_path": f"/api/clips/{JOB}/clip_{idx}.mp4",
+        "storage_provider": "local", "storage_key": None, "hook_title": None, "virality_score": 5.0,
+        "spec": spec,
+        "style": {"layout": "fit", "captionPreset": "pop", "accent": "#123456", "captionPosition": "middle",
+                  "showHook": False, "hookTitle": None},
+        "qa_flags": [], "reason": "", "pending_action": pending_action, "action_error": None,
+        "bounds_original": None, "revision": 0,
+    }
+
+
+def test_swap_recovers_a_job_rebuilt_with_an_orphaned_pending_action(monkeypatch):
+    main.JOBS.pop(JOB, None)
+    updates = []
+    monkeypatch.setattr(main, "_start_thread", lambda target, *args: target(*args))
+    monkeypatch.setattr(main.db, "get_transcript", lambda job_id: {"segments": [], "loudness": []})
+    monkeypatch.setattr(main.db, "update_clip", lambda cid, f: updates.append((cid, f)))
+    monkeypatch.setattr(main.db, "update_clip_checked", lambda cid, f: None)
+    monkeypatch.setattr(main.db, "upsert_job", lambda row: None)
+    monkeypatch.setattr(main.ingest, "ingest", lambda url, cache_dir, on_progress=None: VideoMeta(
+        video_id="x", title="t", channel="c", duration=900.0, audio_path="a", video_path="v", thumbnail_url=None))
+
+    def fake_prepare(**kw):
+        with open(FIXTURE_V2, encoding="utf-8") as f:
+            spec = json.load(f)
+        spec["clipId"] = f"{JOB}-{kw['idx']}"
+        return clipprep.PreparedClip(spec=ClipSpec.model_validate(spec), storage_key=None, face_at_start=True)
+
+    monkeypatch.setattr(main.clipprep, "prepare_clip", fake_prepare)
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: {
+        "id": JOB, "url": "https://youtu.be/x", "status": "done", "team_id": TEST_TEAM_ID,
+        "alternates": [{"start": 500.0, "end": 520.0, "text": "fresh", "score": 8.0, "tag": "Key insight",
+                        "flags": [], "reason": "r2", "emphasis": []}],
+    })
+    monkeypatch.setattr(main.db, "list_clips_for_job", lambda job_id: [
+        _clip_row_for_rebuild(0, 100.0, 120.0, pending_action="swap"),
+        _clip_row_for_rebuild(1, 300.0, 320.0),
+    ])
+
+    r = client.post(f"/api/clips/{JOB}-0/swap")
+    assert r.status_code == 200 and r.json() == {"clipId": f"{JOB}-0", "pendingAction": "swap"}
+    # The orphaned pending_action was cleared (and reported) before the new
+    # action's own pending_action write, so the rebuild's clearing write
+    # comes before the final "swap done" write in the recorded updates.
+    assert (f"{JOB}-0", {"pending_action": None, "action_error": "Interrupted by a server restart. Try again."}) in updates
+    main.JOBS.pop(JOB, None)

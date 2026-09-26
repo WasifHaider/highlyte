@@ -97,6 +97,20 @@ def test_captions_need_a_spec(env):
     assert client.put(f"/api/clips/{CLIP_ID}/captions", json={"words": []}).status_code == 409
 
 
+def test_busy_clip_cannot_save_captions(env):
+    record, _ = env
+    record["pendingAction"] = "swap"
+    r = client.put(f"/api/clips/{CLIP_ID}/captions", json={"words": _edited(record)})
+    assert r.status_code == 409 and r.json()["detail"] == "This clip is being replaced. Wait for it to finish."
+
+
+def test_busy_clip_cannot_reset_captions(env):
+    record, _ = env
+    record["pendingAction"] = "regenerate"
+    r = client.post(f"/api/clips/{CLIP_ID}/captions/reset")
+    assert r.status_code == 409 and r.json()["detail"] == "This clip is being replaced. Wait for it to finish."
+
+
 def test_captions_are_team_scoped(env, monkeypatch):
     main.JOBS[JOB_ID].team_id = "00000000-0000-0000-0000-0000000other"
     assert client.put(f"/api/clips/{CLIP_ID}/captions", json={"words": []}).status_code == 404
