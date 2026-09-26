@@ -168,6 +168,17 @@ def test_selection_retry_runs_from_the_stored_transcript(monkeypatch):
     assert got["segs"] == [_segment()] and got["loudness"] == [-20.0]
 
 
+def test_selection_retry_ingest_failure_stays_retryable(monkeypatch):
+    def fail_ingest(url, cache_dir, on_progress=None):
+        raise RuntimeError("network blip")
+
+    monkeypatch.setattr(main.ingest, "ingest", fail_ingest)
+    job = main.Job(id="job9", url="https://youtu.be/x", status="analyzing")
+    main._run_selection_retry(job, {"segments": [_segment().to_dict()], "loudness": [-20.0]})
+    assert job.status == "selection_failed"
+    assert job.error == "Couldn't fetch the video again: network blip. Try again."
+
+
 def test_qa_flags_add_no_face_start_only_when_known():
     assert main._qa_flags(["weak_pick"], False) == ["weak_pick", "no_face_start"]
     assert main._qa_flags([], True) == []

@@ -363,6 +363,15 @@ def _select_and_prepare(job: Job, meta: ingest.VideoMeta, segs: list[Segment], l
 def _run_selection_retry(job: Job, stored: dict[str, Any]) -> None:
     try:
         meta = ingest.ingest(job.url, CACHE_DIR)
+    except Exception as e:  # noqa: BLE001
+        # The video is still there and Retry selection will try the
+        # download again, so this stays retryable rather than a dead end.
+        job.status = "selection_failed"
+        job.error = f"Couldn't fetch the video again: {e}. Try again."
+        job.progress = {}
+        _persist_job(job)
+        return
+    try:
         segs = [segment_from_dict(d) for d in stored.get("segments") or []]
         _select_and_prepare(job, meta, segs, stored.get("loudness") or [])
     except Exception as e:  # noqa: BLE001
