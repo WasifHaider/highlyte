@@ -96,3 +96,14 @@ def test_build_projects_merges_sorts_and_filters():
     assert [p["id"] for p in projects.build_projects(memory, rows, counts, status="processing")] == ["job2"]
     assert [p["id"] for p in projects.build_projects(memory, rows, counts, status="error")] == ["job3"]
     assert len(projects.build_projects(memory, rows, counts, limit=1)) == 1
+
+
+def test_from_row_keeps_selection_failed():
+    row = {"id": "j1", "url": "https://youtu.be/x", "status": "selection_failed", "error": "limit"}
+    out = projects.from_row(row, 0)
+    assert out["status"] == "selection_failed" and out["error"] == "limit"
+
+
+def test_selection_failed_is_grouped_with_errors():
+    assert projects._status_group("selection_failed") == "error"
+    assert projects._status_group("analyzing") == "processing"

@@ -19,7 +19,9 @@ from pydantic import BaseModel, ValidationError
 
 from . import accounts, captions, db, projects, render, storage
 from .accounts import Member, current_member
-from .pipeline import clipprep, cut, highlight, ingest, transcript
+from .pipeline import clipprep, cut, ingest, selection, transcript
+from .pipeline.segments import Segment
+from .pipeline.segments import from_dict as segment_from_dict
 from .spec import ClipStyle, Word, default_style
 from .validation import check_clip_filename, check_id
 
@@ -65,7 +67,7 @@ class GenerateRequest(BaseModel):
 class Job:
     id: str
     url: str
-    status: str = "queued"  # queued|transcribing|analyzing|preparing|done|error
+    status: str = "queued"  # queued|transcribing|analyzing|preparing|done|error|selection_failed
     error: str | None = None
     video_meta: dict[str, Any] | None = None
     transcript_source: str | None = None
@@ -79,6 +81,7 @@ class Job:
     language_requested: str = "hinglish"
     language_used: str | None = None
     language_note: str | None = None
+    selection_note: str | None = None
     _last_persist: float = field(default=0.0, repr=False)
 
 
@@ -118,6 +121,7 @@ def _persist_job(job: Job, *, throttle: bool = False) -> None:
         "language_used": job.language_used,
         "language_note": job.language_note,
         "transcript_source": job.transcript_source,
+        "selection_note": job.selection_note,
         "team_id": job.team_id,
         "created_by": job.created_by,
     }
@@ -130,7 +134,44 @@ def _persist_job(job: Job, *, throttle: bool = False) -> None:
     db.upsert_job(row)
 
 
-def _clip_record(job_id: str, idx: int, clip: highlight.Clip, prepared: clipprep.PreparedClip) -> dict[str, Any]:
+def _qa_flags(flags: list[str], face_at_start: bool | None) -> list[str]:
+    out = list(flags)
+    if face_at_start is False and "no_face_start" not in out:
+        out.append("no_face_start")
+    return out
+
+
+def _video_meta_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    if not row.get("video_title"):
+        return None
+    video_id = row.get("video_id") or projects.youtube_id(row.get("url"))
+    return {
+        "title": row.get("video_title"),
+        "channel": row.get("video_channel"),
+        "duration": row.get("video_duration"),
+        "durationLabel": ingest.duration_label(float(row.get("video_duration") or 0)),
+        "videoId": video_id,
+        "thumbnailUrl": projects.thumbnail_url(video_id, row.get("thumbnail_url")),
+    }
+
+
+def _job_from_row(row: dict[str, Any]) -> Job:
+    return Job(
+        id=row["id"], url=row["url"], status=row["status"], error=row.get("error"),
+        video_meta=_video_meta_from_row(row), transcript_source=row.get("transcript_source"),
+        team_id=row.get("team_id"), created_by=row.get("created_by"),
+        language_requested=row.get("language_requested") or "hinglish",
+        language_used=row.get("language_used"), language_note=row.get("language_note"),
+        selection_note=row.get("selection_note"),
+        created_at=row.get("created_at") or datetime.now(timezone.utc).isoformat(),
+    )
+
+
+def _start_thread(target, *args) -> None:
+    threading.Thread(target=target, args=args, daemon=True).start()
+
+
+def _clip_record(job_id: str, idx: int, clip: selection.Clip, prepared: clipprep.PreparedClip) -> dict[str, Any]:
     spec = prepared.spec
     return {
         "id": spec.clipId,
@@ -149,6 +190,7 @@ def _clip_record(job_id: str, idx: int, clip: highlight.Clip, prepared: clipprep
         "storageKey": prepared.storage_key,
         "spec": spec.model_dump(),
         "style": default_style(spec).model_dump(),
+        "qaFlags": _qa_flags(clip.flags, prepared.face_at_start),
     }
 
 
@@ -169,6 +211,7 @@ def _clip_row(job_id: str, idx: int, record: dict[str, Any]) -> dict[str, Any]:
         "virality_score": record["viralityScore"],
         "spec": record["spec"],
         "style": record["style"],
+        "qa_flags": record["qaFlags"],
     }
 
 
@@ -196,6 +239,7 @@ def _clip_row_to_api(r: dict[str, Any]) -> dict[str, Any]:
         "style": r.get("style"),
         "wordsOriginal": r.get("words_original"),
         "captionsEdited": r.get("words_original") is not None,
+        "qaFlags": r.get("qa_flags") or [],
     }
 
 
@@ -260,6 +304,67 @@ def _save_style(record: dict[str, Any], style: ClipStyle) -> dict[str, Any]:
     return record["style"]
 
 
+def _select_and_prepare(job: Job, meta: ingest.VideoMeta, segs: list[Segment], loudness: list[float]) -> None:
+    """Pick clips from the transcript, then cut and frame each one. A
+    selection that cannot run is not an error: the transcript is kept and
+    the job waits in selection_failed for Retry selection."""
+    job.status = "analyzing"
+    job.progress = {"stage": "analyzing", "percent": None, "note": "picking clips…"}
+    _persist_job(job)
+    try:
+        result = selection.select(segs, loudness)
+    except selection.SelectionFailed as e:
+        job.status = "selection_failed"
+        job.error = str(e)
+        job.progress = {}
+        _persist_job(job)
+        return
+    job.selection_note = result.note
+    clips = result.clips
+    word_segments = transcript.word_segments(segs)
+
+    job.status = "preparing"
+    job.progress = {"stage": "preparing", "percent": 0, "note": f"0/{len(clips)} clips prepared"}
+    _persist_job(job)
+
+    for i, c in enumerate(clips):
+        def on_step(step: str, i: int = i) -> None:
+            job.progress = {
+                "stage": "preparing",
+                "percent": i / len(clips) * 100.0,
+                "note": f"clip {i + 1}/{len(clips)}: {step}",
+            }
+            _persist_job(job, throttle=True)
+
+        prepared = clipprep.prepare_clip(
+            job_id=job.id, idx=i, clip=c,
+            video_path=meta.video_path, video_duration=meta.duration,
+            segments=word_segments,
+            clips_dir=CLIPS_DIR, models_dir=MODELS_DIR, on_step=on_step,
+        )
+        record = _clip_record(job.id, i, c, prepared)
+        job.clips.append(record)
+        # Saved per clip, so a failure later in the job doesn't lose
+        # the clips already prepared.
+        db.insert_clips([_clip_row(job.id, i, record)])
+
+    job.status = "done"
+    job.progress = {}
+    _persist_job(job)
+
+
+def _run_selection_retry(job: Job, stored: dict[str, Any]) -> None:
+    try:
+        meta = ingest.ingest(job.url, CACHE_DIR)
+        segs = [segment_from_dict(d) for d in stored.get("segments") or []]
+        _select_and_prepare(job, meta, segs, stored.get("loudness") or [])
+    except Exception as e:  # noqa: BLE001
+        job.status = "error"
+        job.error = str(e)
+        job.progress = {}
+        _persist_job(job)
+
+
 def _run_pipeline(job: Job) -> None:
     _persist_job(job)
     try:
@@ -300,42 +405,8 @@ def _run_pipeline(job: Job) -> None:
         job.language_used, job.language_note = tr.language, tr.note
         job.transcript_source = tr.source
         _persist_job(job)
-        db.save_transcript(job.id, tr.language, tr.source, [s.to_dict() for s in tr.segments])
-        word_segments = transcript.to_word_segments(tr)
-
-        job.status = "analyzing"
-        job.progress = {"stage": "analyzing", "percent": None, "note": "scoring highlights…"}
-        _persist_job(job)
-        clips = highlight.detect_highlights(word_segments)
-
-        job.status = "preparing"
-        job.progress = {"stage": "preparing", "percent": 0, "note": f"0/{len(clips)} clips prepared"}
-        _persist_job(job)
-
-        for i, c in enumerate(clips):
-            def on_step(step: str, i: int = i) -> None:
-                job.progress = {
-                    "stage": "preparing",
-                    "percent": i / len(clips) * 100.0,
-                    "note": f"clip {i + 1}/{len(clips)}: {step}",
-                }
-                _persist_job(job, throttle=True)
-
-            prepared = clipprep.prepare_clip(
-                job_id=job.id, idx=i, clip=c,
-                video_path=meta.video_path, video_duration=meta.duration,
-                segments=word_segments,
-                clips_dir=CLIPS_DIR, models_dir=MODELS_DIR, on_step=on_step,
-            )
-            record = _clip_record(job.id, i, c, prepared)
-            job.clips.append(record)
-            # Saved per clip, so a failure later in the job doesn't lose
-            # the clips already prepared.
-            db.insert_clips([_clip_row(job.id, i, record)])
-
-        job.status = "done"
-        job.progress = {}
-        _persist_job(job)
+        db.save_transcript(job.id, tr.language, tr.source, [s.to_dict() for s in tr.segments], tr.loudness)
+        _select_and_prepare(job, meta, tr.segments, tr.loudness)
     except Exception as e:  # noqa: BLE001
         job.status = "error"
         job.error = str(e)
@@ -364,6 +435,31 @@ def generate(req: GenerateRequest, member: Member = Depends(current_member)) -> 
     return {"job_id": job_id}
 
 
+@app.post("/api/jobs/{job_id}/select")
+def retry_selection(job_id: str, member: Member = Depends(current_member)) -> dict[str, str]:
+    """Re-run clip selection from the stored transcript after it failed
+    (usually Groq's daily limit). Download and transcription are skipped."""
+    check_id(job_id, "job id")
+    _require_job(member, job_id)
+    job = JOBS.get(job_id)
+    if job is None:
+        row = db.get_job(job_id)
+        if row is None:
+            raise HTTPException(404, "job not found")
+        job = _job_from_row(row)
+    if job.status != "selection_failed":
+        raise HTTPException(409, "Clip selection can only be retried after it failed.")
+    stored = db.get_transcript(job_id)
+    if not stored or not stored.get("segments"):
+        raise HTTPException(409, "This video's transcript wasn't saved. Submit the video again.")
+    job.status, job.error, job.selection_note, job.clips = "analyzing", None, None, []
+    job.progress = {"stage": "analyzing", "percent": None, "note": "picking clips…"}
+    JOBS[job_id] = job
+    _persist_job(job)
+    _start_thread(_run_selection_retry, job, stored)
+    return {"job_id": job_id}
+
+
 @app.get("/api/status/{job_id}")
 def status(job_id: str, member: Member = Depends(current_member)) -> dict[str, Any]:
     check_id(job_id, "job id")
@@ -378,6 +474,7 @@ def status(job_id: str, member: Member = Depends(current_member)) -> dict[str, A
             "transcriptSource": job.transcript_source,
             "language": job.language_used,
             "languageNote": job.language_note,
+            "selectionNote": job.selection_note,
             "clips": [_with_source_url(c) for c in job.clips],
             "progress": job.progress,
         }
@@ -387,20 +484,10 @@ def status(job_id: str, member: Member = Depends(current_member)) -> dict[str, A
     if row is None:
         raise HTTPException(404, "job not found")
     status_value, error = row["status"], row.get("error")
-    if status_value not in ("done", "error"):
+    if status_value not in ("done", "error", "selection_failed"):
         # Its worker thread died with the old process; it will never finish.
         status_value, error = "error", projects.INTERRUPTED_ERROR
-    video_meta = None
-    if row.get("video_title"):
-        video_id = row.get("video_id") or projects.youtube_id(row.get("url"))
-        video_meta = {
-            "title": row.get("video_title"),
-            "channel": row.get("video_channel"),
-            "duration": row.get("video_duration"),
-            "durationLabel": ingest.duration_label(float(row.get("video_duration") or 0)),
-            "videoId": video_id,
-            "thumbnailUrl": projects.thumbnail_url(video_id, row.get("thumbnail_url")),
-        }
+    video_meta = _video_meta_from_row(row)
     return {
         "id": row["id"],
         "status": status_value,
@@ -409,6 +496,7 @@ def status(job_id: str, member: Member = Depends(current_member)) -> dict[str, A
         "transcriptSource": row.get("transcript_source"),
         "language": row.get("language_used"),
         "languageNote": row.get("language_note"),
+        "selectionNote": row.get("selection_note"),
         "clips": [_with_source_url(_clip_row_to_api(r)) for r in db.list_clips_for_job(job_id)],
         "progress": {},
     }

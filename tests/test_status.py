@@ -60,3 +60,67 @@ def test_list_all_clips_normalizes_source_url(monkeypatch):
     clip = body[0]
     assert clip["spec"]["source"]["url"] == "/api/clips/feed00000001/clip_0.mp4"
     assert clip["videoTitle"] == "Ep 1"
+
+
+def _failed_row(**extra):
+    return {**_job_row(status="selection_failed"),
+            "error": "Clip selection hit Groq's daily limit. Try again later.", **extra}
+
+
+def test_status_keeps_selection_failed_and_note(monkeypatch):
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: _failed_row(selection_note="n"))
+    monkeypatch.setattr(main.db, "list_clips_for_job", lambda job_id: [])
+    body = client.get("/api/status/feed00000001").json()
+    assert body["status"] == "selection_failed"
+    assert body["error"].startswith("Clip selection hit")
+    assert body["selectionNote"] == "n"
+
+
+def test_status_clip_has_qa_flags(monkeypatch):
+    row = {**_clip_row(), "qa_flags": ["low_confidence"]}
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: _job_row())
+    monkeypatch.setattr(main.db, "list_clips_for_job", lambda job_id: [row, _clip_row()])
+    clips = client.get("/api/status/feed00000001").json()["clips"]
+    assert clips[0]["qaFlags"] == ["low_confidence"] and clips[1]["qaFlags"] == []
+
+
+def _start_inline(monkeypatch):
+    ran = []
+    monkeypatch.setattr(main, "_start_thread", lambda target, *args: ran.append((target, args)))
+    return ran
+
+
+def test_retry_selection_restarts_selection(monkeypatch):
+    main.JOBS.pop("feed00000001", None)
+    ran = _start_inline(monkeypatch)
+    stored = {"segments": [{"id": "seg_0001"}], "loudness": [-20.0]}
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: _failed_row())
+    monkeypatch.setattr(main.db, "get_transcript", lambda job_id: stored)
+    monkeypatch.setattr(main.db, "upsert_job", lambda row: None)
+    r = client.post("/api/jobs/feed00000001/select")
+    assert r.status_code == 200 and r.json() == {"job_id": "feed00000001"}
+    job = main.JOBS.pop("feed00000001")
+    assert job.status == "analyzing" and job.error is None
+    assert ran == [(main._run_selection_retry, (job, stored))]
+
+
+def test_retry_selection_only_after_it_failed(monkeypatch):
+    main.JOBS.pop("feed00000001", None)
+    _start_inline(monkeypatch)
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: _job_row(status="done"))
+    assert client.post("/api/jobs/feed00000001/select").status_code == 409
+
+
+def test_retry_selection_needs_a_stored_transcript(monkeypatch):
+    main.JOBS.pop("feed00000001", None)
+    _start_inline(monkeypatch)
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: _failed_row())
+    monkeypatch.setattr(main.db, "get_transcript", lambda job_id: None)
+    assert client.post("/api/jobs/feed00000001/select").status_code == 409
+
+
+def test_retry_selection_other_team_is_not_found(monkeypatch):
+    main.JOBS.pop("feed00000001", None)
+    _start_inline(monkeypatch)
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: _failed_row(team_id="someone-else"))
+    assert client.post("/api/jobs/feed00000001/select").status_code == 404
