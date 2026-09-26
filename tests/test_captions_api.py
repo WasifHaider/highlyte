@@ -79,3 +79,17 @@ def test_clip_row_reports_captions_edited():
     row = {"id": "a-0", "job_id": "a", "start_s": 1, "end_s": 2, "words_original": [{"text": "x", "start": 0, "end": 1}]}
     assert main._clip_row_to_api(row)["captionsEdited"] is True
     assert main._clip_row_to_api({**row, "words_original": None})["captionsEdited"] is False
+
+
+def test_status_reports_captions_edited_for_in_memory_clip(env):
+    record, _ = env
+    client.put(f"/api/clips/{CLIP_ID}/captions", json={"words": _edited(record)})
+    r = client.get(f"/api/status/{JOB_ID}")
+    clip = next(c for c in r.json()["clips"] if c["id"] == CLIP_ID)
+    assert clip["captionsEdited"] is True
+    assert clip["spec"]["words"][0]["text"] == "Honestly,"
+
+    client.post(f"/api/clips/{CLIP_ID}/captions/reset")
+    r = client.get(f"/api/status/{JOB_ID}")
+    clip = next(c for c in r.json()["clips"] if c["id"] == CLIP_ID)
+    assert clip["captionsEdited"] is False

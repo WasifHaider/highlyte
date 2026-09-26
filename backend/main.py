@@ -498,6 +498,7 @@ def save_captions(clip_id: str, body: CaptionsBody = Body(...), member: Member =
     if record.get("wordsOriginal") is None:
         record["wordsOriginal"] = spec["words"]  # kept from the first edit, for Reset
     record["spec"] = {**spec, "words": [w.model_dump() for w in words]}
+    record["captionsEdited"] = record.get("wordsOriginal") is not None
     db.update_clip(record["id"], {"spec": record["spec"], "words_original": record["wordsOriginal"]})
     return _captions_reply(record)
 
@@ -508,6 +509,7 @@ def reset_captions(clip_id: str, member: Member = Depends(current_member)) -> di
     if record.get("wordsOriginal") is not None:
         record["spec"] = {**record["spec"], "words": record["wordsOriginal"]}
         record["wordsOriginal"] = None
+        record["captionsEdited"] = record.get("wordsOriginal") is not None
         db.update_clip(record["id"], {"spec": record["spec"], "words_original": None})
     return _captions_reply(record)
 
