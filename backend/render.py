@@ -146,8 +146,11 @@ class RenderService:
         self.now = now
         self._lock = threading.Lock()
 
-    def request(self, clip_id: str, style: ClipStyle, words: list[Word] | None = None) -> Render:
-        hash_value = style_hash(style) if words is None else render_hash(style, words)
+    def request(
+        self, clip_id: str, style: ClipStyle, words: list[Word] | None = None,
+        bounds: tuple[float, float] | None = None,
+    ) -> Render:
+        hash_value = style_hash(style) if words is None else render_hash(style, words, bounds)
         with self._lock:
             existing = self.store.find(clip_id, hash_value)
             if existing is not None:
@@ -190,8 +193,9 @@ class RenderService:
                 # while it sat in the queue: the mp4 would show new text but
                 # be cached under the old hash. Fail instead of rendering it.
                 words = [Word(**w) for w in props["spec"]["words"]]
-                if render_hash(style, words) != r.style_hash:
-                    r.status, r.error = "error", "Captions changed after this export was requested. Export again."
+                bounds = (props["spec"]["start"], props["spec"]["end"])
+                if r.style_hash not in (render_hash(style, words, bounds), render_hash(style, words)):
+                    r.status, r.error = "error", "Captions or trim changed after this export was requested. Export again."
                     self.store.put(r)
                     return False
             lambda_id, bucket = self.renderer.start(props, duration_s)

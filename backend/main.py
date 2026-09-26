@@ -12,18 +12,23 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal
 
+import math
+
 from fastapi import Body, Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, ValidationError
 
-from . import accounts, captions, db, projects, render, storage
+from . import accounts, captions, db, projects, render, srt, storage
 from .accounts import Member, current_member
 from .pipeline import clipprep, cut, ingest, selection, transcript
 from .pipeline.segments import Segment
 from .pipeline.segments import from_dict as segment_from_dict
-from .spec import ClipStyle, Word, default_style
+from .spec import ClipStyle, Word, default_style, window_duration
 from .validation import check_clip_filename, check_id
+
+MIN_CLIP_S = 8.0
+MAX_CLIP_S = 60.0
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(BASE_DIR, "data", "cache")
@@ -198,6 +203,12 @@ def _clip_record(job_id: str, idx: int, clip: selection.Clip, prepared: clipprep
         "spec": spec.model_dump(),
         "style": default_style(spec).model_dump(),
         "qaFlags": _qa_flags(clip.flags, prepared.face_at_start),
+        "reason": clip.reason,
+        "pendingAction": None,
+        "actionError": None,
+        "boundsOriginal": None,
+        "boundsEdited": False,
+        "revision": 0,
     }
 
 
@@ -219,6 +230,8 @@ def _clip_row(job_id: str, idx: int, record: dict[str, Any]) -> dict[str, Any]:
         "spec": record["spec"],
         "style": record["style"],
         "qa_flags": record["qaFlags"],
+        "reason": record["reason"],
+        "revision": record["revision"],
     }
 
 
@@ -247,6 +260,12 @@ def _clip_row_to_api(r: dict[str, Any]) -> dict[str, Any]:
         "wordsOriginal": r.get("words_original"),
         "captionsEdited": r.get("words_original") is not None,
         "qaFlags": r.get("qa_flags") or [],
+        "reason": r.get("reason") or "",
+        "pendingAction": r.get("pending_action"),
+        "actionError": r.get("action_error"),
+        "boundsOriginal": r.get("bounds_original"),
+        "boundsEdited": r.get("bounds_original") is not None,
+        "revision": r.get("revision") or 0,
     }
 
 
@@ -257,9 +276,12 @@ def _with_source_url(record: dict[str, Any]) -> dict[str, Any]:
     or the database."""
     out = dict(record)
     out.pop("wordsOriginal", None)
+    out.pop("boundsOriginal", None)
     if out.get("spec"):
         out["spec"] = copy.deepcopy(out["spec"])
-        out["spec"]["source"]["url"] = out["downloadUrl"]
+        download_url = out["downloadUrl"]
+        revision = record.get("revision") or 0
+        out["spec"]["source"]["url"] = f"{download_url}?r={revision}" if revision > 0 else download_url
     return out
 
 
@@ -608,7 +630,7 @@ def save_captions(clip_id: str, body: CaptionsBody = Body(...), member: Member =
     record = _clip_for_style(clip_id, member)
     spec = record["spec"]
     try:
-        words = captions.validate_words(body.words, spec["end"] - spec["start"])
+        words = captions.validate_words(body.words, window_duration(spec) or (spec["end"] - spec["start"]))
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
     words_original = record["wordsOriginal"] if record.get("wordsOriginal") is not None else spec["words"]
@@ -638,6 +660,80 @@ def reset_captions(clip_id: str, member: Member = Depends(current_member)) -> di
     return _captions_reply(record)
 
 
+class BoundsBody(BaseModel):
+    start: float
+    end: float
+
+
+def _bounds_reply(record: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "start": record["spec"]["start"],
+        "end": record["spec"]["end"],
+        "boundsEdited": record.get("boundsOriginal") is not None,
+    }
+
+
+def _apply_bounds(record: dict[str, Any], new_start: float, new_end: float, bounds_original: dict[str, float] | None) -> None:
+    """Move the spec's window to new_start/new_end, shifting the record's
+    source-time start/end by the same deltas, and persist. Shared by the
+    PATCH and reset handlers, which differ only in what they pass here."""
+    spec = record["spec"]
+    old_start, old_end = spec["start"], spec["end"]
+    new_spec = {**spec, "start": new_start, "end": new_end}
+    new_record_start = record["start"] + (new_start - old_start)
+    new_record_end = record["end"] + (new_end - old_end)
+    fields = {
+        "spec": new_spec,
+        "bounds_original": bounds_original,
+        "start_s": new_record_start,
+        "end_s": new_record_end,
+    }
+    try:
+        db.update_clip_checked(record["id"], fields)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(503, "Couldn't save the trim. Try again.") from e
+    record["spec"] = new_spec
+    record["boundsOriginal"] = bounds_original
+    record["boundsEdited"] = bounds_original is not None
+    record["start"] = new_record_start
+    record["end"] = new_record_end
+    record["startLabel"] = ingest.duration_label(new_record_start)
+    record["endLabel"] = ingest.duration_label(new_record_end)
+    record["durationLabel"] = ingest.duration_label(new_record_end - new_record_start)
+
+
+@app.patch("/api/clips/{clip_id}/bounds")
+def update_bounds(clip_id: str, body: BoundsBody = Body(...), member: Member = Depends(current_member)) -> dict[str, Any]:
+    record = _clip_for_style(clip_id, member)
+    spec = record["spec"]
+    window = window_duration(spec)
+    if window is None:
+        raise HTTPException(409, "Re-run the video to trim this clip.")
+    if record.get("pendingAction"):
+        raise HTTPException(409, "This clip is being replaced. Wait for it to finish.")
+    start, end = body.start, body.end
+    if not (math.isfinite(start) and math.isfinite(end)) or not (0 <= start < end <= window + 1e-6):
+        raise HTTPException(422, "That is outside the spare video.")
+    length = end - start
+    if length < MIN_CLIP_S:
+        raise HTTPException(422, "Clips must be at least 8 s.")
+    if length > MAX_CLIP_S:
+        raise HTTPException(422, "Clips can be at most 60 s.")
+    start, end = round(start, 3), round(end, 3)
+    bounds_original = record.get("boundsOriginal") or {"start": spec["start"], "end": spec["end"]}
+    _apply_bounds(record, start, end, bounds_original)
+    return _bounds_reply(record)
+
+
+@app.post("/api/clips/{clip_id}/bounds/reset")
+def reset_bounds(clip_id: str, member: Member = Depends(current_member)) -> dict[str, Any]:
+    record = _clip_for_style(clip_id, member)
+    original = record.get("boundsOriginal")
+    if original is not None:
+        _apply_bounds(record, original["start"], original["end"], None)
+    return _bounds_reply(record)
+
+
 @app.post("/api/clips/{clip_id}/render")
 def start_render(clip_id: str, style: ClipStyle = Body(...), member: Member = Depends(current_member)) -> dict[str, Any]:
     record = _clip_for_style(clip_id, member)
@@ -650,7 +746,8 @@ def start_render(clip_id: str, style: ClipStyle = Body(...), member: Member = De
         words = [Word.model_validate(w) for w in record["spec"]["words"]]
     except (KeyError, TypeError, ValidationError):
         raise HTTPException(409, "This clip's captions can't be read. Re-run the video.")
-    return RENDER_SERVICE.request(clip_id, style, words).to_api()
+    spec = record["spec"]
+    return RENDER_SERVICE.request(clip_id, style, words, bounds=(spec["start"], spec["end"])).to_api()
 
 
 def _get_render(render_id: str, member: Member) -> render.Render:
@@ -679,6 +776,9 @@ def renders_zip(ids: str = Query(...), member: Member = Depends(current_member))
             with zf.open(f"highlyte-{r.clip_id}.mp4", "w") as dest, contextlib.closing(storage.open_object(r.storage_key)) as src:
                 for chunk in iter(lambda: src.read(1024 * 1024), b""):
                     dest.write(chunk)
+            clip_record = _find_clip(r.clip_id)
+            if clip_record is not None and clip_record.get("spec"):
+                zf.writestr(f"highlyte-{r.clip_id}.srt", srt.build_srt(clip_record["spec"]))
     buf.seek(0)
 
     def stream():
