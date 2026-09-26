@@ -5,7 +5,7 @@ import pytest
 from backend.pipeline import ranker, segments
 from backend.pipeline.groq_llm import BadAnswer, ChatResult, DailyLimit, SelectionFailed
 from backend.pipeline.utterances import ThoughtUnit, Utterance
-from tests.llm_fakes import FakeChat, RateLimitError
+from tests.llm_fakes import AuthenticationError, FakeChat, RateLimitError
 
 
 def utt(n, start, end, text="baat chal rahi hai"):
@@ -118,4 +118,10 @@ def test_rank_all_windows_daily_limited_raises_clear_message():
 def test_rank_rate_limit_error_is_labelled():
     chat = FakeChat([RateLimitError("429 tokens per minute"), RateLimitError("429 tokens per minute")])
     with pytest.raises(SelectionFailed):
+        ranker.rank(chat, units_of(1))
+
+
+def test_rank_auth_failure_is_reported_clearly():
+    chat = FakeChat([AuthenticationError("Error code: 401 - invalid api key")])
+    with pytest.raises(SelectionFailed, match="API key was rejected"):
         ranker.rank(chat, units_of(1))

@@ -7,7 +7,7 @@ import json
 import re
 from dataclasses import dataclass, field
 
-from .groq_llm import CHARS_PER_TOKEN, BadAnswer, DailyLimit, SelectionFailed, is_rate_limit
+from .groq_llm import CHARS_PER_TOKEN, BadAnswer, DailyLimit, SelectionFailed, is_auth_failure, is_rate_limit
 from .utterances import ThoughtUnit
 
 WINDOW_TOKENS = 4500
@@ -146,6 +146,7 @@ def rank(chat, units: list[ThoughtUnit]) -> RankResult:
     skipped: list[Skipped] = []
     daily_wait: str | None = None
     daily = False
+    last_error: Exception | None = None
     for n, idxs in enumerate(wins):
         start, end = units[idxs[0]].start, units[idxs[-1]].end
         try:
@@ -157,6 +158,7 @@ def rank(chat, units: list[ThoughtUnit]) -> RankResult:
             break
         except Exception as e:  # noqa: BLE001
             print(f"[ranker] window {start:.0f}-{end:.0f}s skipped: {e}")
+            last_error = e
             skipped.append(Skipped(start, end, "rate limit" if is_rate_limit(e) else "error"))
 
     if wins and len(skipped) == len(wins):
@@ -165,5 +167,7 @@ def rank(chat, units: list[ThoughtUnit]) -> RankResult:
                 "Clip selection hit Groq's daily limit."
                 + (f" Try again in {daily_wait}." if daily_wait else " Try again later.")
             )
+        if last_error is not None and is_auth_failure(last_error):
+            raise SelectionFailed("Clip selection couldn't reach Groq: the API key was rejected. Check GROQ_KEY.")
         raise SelectionFailed("Clip selection failed for this video. Try again.")
     return RankResult(picks, skipped)
