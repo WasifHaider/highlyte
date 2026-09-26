@@ -135,5 +135,7 @@ B-roll, custom Roman-Urdu Whisper.
 
 ## Start
 
-Steps 0 and 1 are done. Next is piece 1 (Step 2), built on the current
-transcription path as the spike decided.
+Steps 0–2 are done, and piece 2 (Step 3, clip selection) is built: see
+`2026-09-26-clip-selection-design.md` and
+`../plans/2026-09-26-clip-selection.md`. Tune its thresholds on real
+episodes with `scripts/select_dry_run.py <job_id>`. Next is piece 3 (Step 4).
