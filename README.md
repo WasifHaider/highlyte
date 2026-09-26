@@ -91,6 +91,12 @@ and nothing is ever re-run by hand.
 - The first migration, `20260924000000_baseline.sql`, is the old
   `schema.sql`. Every statement in it is idempotent, so it applies safely to
   the existing production database.
+- The deploy workflow always applies new migrations before the new backend
+  starts (see "Production" above), so a caption-editing column like
+  `words_original` is there before the code that reads it runs. Locally,
+  apply migrations the same way before starting the backend:
+  `npx supabase db push --db-url "$DBURL"` (caption editing needs the
+  `words_original` column).
 
 ## Team accounts
 
@@ -122,6 +128,10 @@ wide two-person shots; close-ups show one person full-frame. Clips made
 before this change keep their old behaviour until the video is re-run.
 After changing anything in `renderer/src`, re-run `npm run deploy:site`
 so Lambda exports use the same layout as the preview.
+
+The render cache key now includes the caption words, so the first export
+of each existing clip after this change renders once more even if nothing
+else about it changed.
 
 - `renderer/` — the Remotion composition (layouts, caption presets, hook
   title). The same code runs in the browser preview and on Lambda.
