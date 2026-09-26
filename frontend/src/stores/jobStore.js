@@ -14,6 +14,21 @@ const RENDER_POLL_MS = 2000
 const STYLE_SAVE_DELAY_MS = 500
 const BOUNDS_SAVE_DELAY_MS = 500
 
+// Debounced saves waiting to go out, and saves already in flight, per clip.
+// Kept outside Pinia state: they are bookkeeping, not something to render.
+const queuedStyles = new Map() // clipId -> style to save when the timer fires
+const queuedBounds = new Map() // clipId -> {start, end} to save when the timer fires
+const styleSaves = new Map() // clipId -> Promise<void> of the save in flight
+const boundsSaves = new Map() // clipId -> Promise<string|null> (error message or null)
+
+function track(saves, clipId, promise) {
+  const p = promise.finally(() => {
+    if (saves.get(clipId) === p) saves.delete(clipId)
+  })
+  saves.set(clipId, p)
+  return p
+}
+
 export const useJobStore = defineStore('job', {
   state: () => ({
     currentJobId: null,
@@ -134,11 +149,39 @@ export const useJobStore = defineStore('job', {
       clip.style = { ...clip.style, ...patch }
       // Saving is debounced so typing in the hook title isn't a request per key.
       clearTimeout(this._styleTimers[clipId])
-      this._styleTimers[clipId] = setTimeout(() => {
-        saveClipStyle(clipId, clip.style).catch(e => {
-          this.error = e?.response?.data?.detail || 'Failed to save clip style'
-        })
-      }, STYLE_SAVE_DELAY_MS)
+      queuedStyles.set(clipId, clip.style)
+      this._styleTimers[clipId] = setTimeout(() => this._saveStyleNow(clipId), STYLE_SAVE_DELAY_MS)
+    },
+    // Sends a queued style save right away (if any) and waits for it and for
+    // any style save already in flight, so a following request sees it.
+    _saveStyleNow(clipId) {
+      clearTimeout(this._styleTimers[clipId])
+      delete this._styleTimers[clipId]
+      const style = queuedStyles.get(clipId)
+      if (style === undefined) return styleSaves.get(clipId) || Promise.resolve()
+      queuedStyles.delete(clipId)
+      return track(styleSaves, clipId, saveClipStyle(clipId, style).then(() => {}, e => {
+        this.error = e?.response?.data?.detail || 'Failed to save clip style'
+      }))
+    },
+    // Same for the trim; resolves to an error message, or null once saved.
+    _saveBoundsNow(clipId) {
+      clearTimeout(this._boundsTimers[clipId])
+      delete this._boundsTimers[clipId]
+      const bounds = queuedBounds.get(clipId)
+      if (bounds === undefined) return boundsSaves.get(clipId) || Promise.resolve(null)
+      queuedBounds.delete(clipId)
+      return track(boundsSaves, clipId, apiSaveBounds(clipId, bounds).then(() => null, e => {
+        const message = apiErrorMessage(e, 'Failed to save the trim')
+        this.error = message
+        return message
+      }))
+    },
+    // Drops a queued trim save without sending it.
+    _cancelBounds(clipId) {
+      clearTimeout(this._boundsTimers[clipId])
+      delete this._boundsTimers[clipId]
+      queuedBounds.delete(clipId)
     },
     // Applies one style to every clip that has a vertical preview. A layout
     // a clip can't use (a face layout with no faces found) falls back to
@@ -184,15 +227,17 @@ export const useJobStore = defineStore('job', {
       clip.actionError = null
       delete this.renders[clipId]
       clearTimeout(this._boundsTimers[clipId])
-      this._boundsTimers[clipId] = setTimeout(() => {
-        apiSaveBounds(clipId, bounds).catch(e => {
-          this.error = apiErrorMessage(e, 'Failed to save the trim')
-        })
-      }, BOUNDS_SAVE_DELAY_MS)
+      queuedBounds.set(clipId, bounds)
+      this._boundsTimers[clipId] = setTimeout(() => this._saveBoundsNow(clipId), BOUNDS_SAVE_DELAY_MS)
     },
     async resetBounds(clipId) {
       const clip = this.clips.find(c => c.id === clipId)
       if (!clip) return
+      // A nudge still waiting to be saved would otherwise land after the
+      // reset and trim the clip again; one already in flight must finish
+      // first for the same reason.
+      this._cancelBounds(clipId)
+      await boundsSaves.get(clipId)
       try {
         const res = await apiResetBounds(clipId)
         clip.spec = { ...clip.spec, start: res.start, end: res.end }
@@ -206,9 +251,7 @@ export const useJobStore = defineStore('job', {
       const clip = this.clips.find(c => c.id === clipId)
       if (!clip) return
       clip.actionError = null
-      // The clip is about to be replaced, so a still-queued trim save is moot.
-      clearTimeout(this._boundsTimers[clipId])
-      delete this._boundsTimers[clipId]
+      await this._beforeReplace(clipId)
       try {
         const res = await apiSwapClip(clipId)
         clip.pendingAction = res.pendingAction
@@ -221,9 +264,7 @@ export const useJobStore = defineStore('job', {
       const clip = this.clips.find(c => c.id === clipId)
       if (!clip) return
       clip.actionError = null
-      // The clip is about to be replaced, so a still-queued trim save is moot.
-      clearTimeout(this._boundsTimers[clipId])
-      delete this._boundsTimers[clipId]
+      await this._beforeReplace(clipId)
       try {
         const res = await apiRegenerateClip(clipId)
         clip.pendingAction = res.pendingAction
@@ -232,8 +273,18 @@ export const useJobStore = defineStore('job', {
         clip.actionError = apiErrorMessage(e, 'Failed to regenerate this clip')
       }
     },
+    // Before Swap/Regenerate: the clip is about to be replaced, so a queued
+    // trim save is moot (cancel it), but a queued style change carries over
+    // (preset, accent, caption position), so send it now rather than let it
+    // hit the server mid-action and get a 409.
+    async _beforeReplace(clipId) {
+      this._cancelBounds(clipId)
+      await this._saveStyleNow(clipId)
+    },
     async exportSelected() {
-      const clips = this.clips.filter(c => this.selected[c.id] && c.spec)
+      // A clip being replaced can't be rendered (the server says 409); it is
+      // left out rather than shown as a failed render.
+      const clips = this.clips.filter(c => this.selected[c.id] && c.spec && !c.pendingAction)
       for (const c of clips) await this._render(c)
       this._pollRenders()
     },
@@ -244,8 +295,19 @@ export const useJobStore = defineStore('job', {
       this._pollRenders()
     },
     async _render(clip) {
+      // The server renders the bounds it has saved, so a nudge still waiting
+      // in the debounce (or in flight) must land first, or Export made just
+      // after a nudge would render the old trim.
+      await this._saveStyleNow(clip.id)
+      const boundsError = await this._saveBoundsNow(clip.id)
+      if (boundsError) {
+        this.renders[clip.id] = { status: 'error', error: boundsError }
+        return
+      }
+      // A status poll may have replaced the clip object while we waited.
+      const current = this.clips.find(c => c.id === clip.id) || clip
       try {
-        this.renders[clip.id] = await startRender(clip.id, clip.style)
+        this.renders[clip.id] = await startRender(clip.id, current.style)
       } catch (e) {
         this.renders[clip.id] = { status: 'error', error: e?.response?.data?.detail || e.message }
       }

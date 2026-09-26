@@ -66,6 +66,7 @@
         <div :class="{ 'controls-disabled': clip.pendingAction }">
           <CaptionEditor :clip-id="clip.id" :words="clip.spec.words" :edited="!!clip.captionsEdited"
             :start="clip.spec.version === 2 ? clip.spec.start : null" :end="clip.spec.version === 2 ? clip.spec.end : null"
+            :revision="clip.revision || 0" :pending="!!clip.pendingAction"
             @draft="draftWords = $event" />
         </div>
       </template>
@@ -202,8 +203,9 @@ function set(patch) {
 .action-link { font-size: 12.5px; font-weight: 600; color: var(--accent); }
 .pending-note { font-size: 12.5px; color: var(--ink-soft); }
 .action-error { color: #9C3B14; font-size: 12.5px; }
-/* CSS-only disable: CaptionEditor has no `disabled` prop, so a pending
-   swap/regenerate is blocked here by dimming and swallowing clicks. */
+/* CSS-only disable: a pending swap/regenerate is blocked here by dimming and
+   swallowing clicks. CaptionEditor also closes itself when the action starts
+   (its `pending` prop), so it is never left open and unreachable. */
 .controls-disabled { opacity: .6; pointer-events: none; }
 .render-status { font-size: 13px; color: var(--ink-soft); }
 .render-status.error { color: #9C3B14; }
