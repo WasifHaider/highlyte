@@ -138,3 +138,30 @@ def test_retry_selection_other_team_is_not_found(monkeypatch):
     _start_inline(monkeypatch)
     monkeypatch.setattr(main.db, "get_job", lambda job_id: _failed_row(team_id="someone-else"))
     assert client.post("/api/jobs/feed00000001/select").status_code == 404
+
+
+def test_status_reports_alternates_left_in_memory():
+    main.JOBS.pop("feed00000001", None)
+    job = main.Job(id="feed00000001", url="https://youtu.be/x", status="done", team_id=TEST_TEAM_ID)
+    job.alternates = [{"start": 1.0, "end": 2.0}]
+    main.JOBS["feed00000001"] = job
+    body = client.get("/api/status/feed00000001").json()
+    main.JOBS.pop("feed00000001", None)
+    assert body["alternatesLeft"] == 1
+
+
+def test_status_db_fallback_reports_alternates_left(monkeypatch):
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: {**_job_row(), "alternates": [{"start": 1.0, "end": 2.0}]})
+    monkeypatch.setattr(main.db, "list_clips_for_job", lambda job_id: [])
+    body = client.get("/api/status/feed00000001").json()
+    assert body["alternatesLeft"] == 1
+
+
+def test_status_db_fallback_reports_orphaned_pending_action_as_interrupted(monkeypatch):
+    row = {**_clip_row(), "pending_action": "swap", "action_error": None}
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: _job_row())
+    monkeypatch.setattr(main.db, "list_clips_for_job", lambda job_id: [row])
+    body = client.get("/api/status/feed00000001").json()
+    clip = body["clips"][0]
+    assert clip["pendingAction"] is None
+    assert clip["actionError"] == "Interrupted by a server restart. Try again."

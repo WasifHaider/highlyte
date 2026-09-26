@@ -21,7 +21,7 @@ from pydantic import BaseModel, ValidationError
 
 from . import accounts, captions, db, projects, render, srt, storage
 from .accounts import Member, current_member
-from .pipeline import clipprep, cut, ingest, selection, transcript
+from .pipeline import clipprep, cut, groq_llm, ingest, scoring, selection, transcript
 from .pipeline.segments import Segment
 from .pipeline.segments import from_dict as segment_from_dict
 from .spec import ClipStyle, Word, default_style, window_duration
@@ -87,6 +87,7 @@ class Job:
     language_used: str | None = None
     language_note: str | None = None
     selection_note: str | None = None
+    alternates: list[dict[str, Any]] = field(default_factory=list)
     _last_persist: float = field(default=0.0, repr=False)
 
 
@@ -136,6 +137,7 @@ def _persist_job(job: Job, *, throttle: bool = False) -> None:
         "selection_note": job.selection_note,
         "team_id": job.team_id,
         "created_by": job.created_by,
+        "alternates": job.alternates,
     }
     if job.video_meta:
         row["video_title"] = job.video_meta.get("title")
@@ -175,6 +177,7 @@ def _job_from_row(row: dict[str, Any]) -> Job:
         language_requested=row.get("language_requested") or "hinglish",
         language_used=row.get("language_used"), language_note=row.get("language_note"),
         selection_note=row.get("selection_note"),
+        alternates=row.get("alternates") or [],
         created_at=row.get("created_at") or datetime.now(timezone.utc).isoformat(),
     )
 
@@ -349,6 +352,7 @@ def _select_and_prepare(job: Job, meta: ingest.VideoMeta, segs: list[Segment], l
         _persist_job(job)
         return
     job.selection_note = result.note
+    job.alternates = result.alternates
     clips = result.clips
     word_segments = transcript.word_segments(segs)
 
@@ -526,6 +530,7 @@ def status(job_id: str, member: Member = Depends(current_member)) -> dict[str, A
             "selectionNote": job.selection_note,
             "clips": [_with_source_url(c) for c in job.clips],
             "progress": job.progress,
+            "alternatesLeft": len(job.alternates),
         }
 
     # Not in memory (e.g. the backend restarted): rebuild it from Supabase.
@@ -537,6 +542,16 @@ def status(job_id: str, member: Member = Depends(current_member)) -> dict[str, A
         # Its worker thread died with the old process; it will never finish.
         status_value, error = "error", projects.INTERRUPTED_ERROR
     video_meta = _video_meta_from_row(row)
+    clips = []
+    for r in db.list_clips_for_job(job_id):
+        c = _clip_row_to_api(r)
+        if r.get("pending_action"):
+            # Its action thread died with the old process too, but unlike
+            # the job status above this doesn't fail the whole job — just
+            # that one clip, which is safe to retry.
+            c["pendingAction"] = None
+            c["actionError"] = "Interrupted by a server restart. Try again."
+        clips.append(c)
     return {
         "id": row["id"],
         "status": status_value,
@@ -546,8 +561,9 @@ def status(job_id: str, member: Member = Depends(current_member)) -> dict[str, A
         "language": row.get("language_used"),
         "languageNote": row.get("language_note"),
         "selectionNote": row.get("selection_note"),
-        "clips": [_with_source_url(_clip_row_to_api(r)) for r in db.list_clips_for_job(job_id)],
+        "clips": [_with_source_url(c) for c in clips],
         "progress": {},
+        "alternatesLeft": len(row.get("alternates") or []),
     }
 
 
@@ -740,10 +756,147 @@ def update_bounds(clip_id: str, body: BoundsBody = Body(...), member: Member = D
 @app.post("/api/clips/{clip_id}/bounds/reset")
 def reset_bounds(clip_id: str, member: Member = Depends(current_member)) -> dict[str, Any]:
     record = _clip_for_style(clip_id, member)
+    if record.get("pendingAction"):
+        raise HTTPException(409, "This clip is being replaced. Wait for it to finish.")
     original = record.get("boundsOriginal")
     if original is not None:
         _apply_bounds(record, original["start"], original["end"], None)
     return _bounds_reply(record)
+
+
+def pick_alternate(
+    alternates: list[dict[str, Any]], current: tuple[float, float], others: list[tuple[float, float]],
+) -> int | None:
+    """Index of the best saved runner-up (list is best first) that isn't
+    substantially the clip it would replace, and doesn't clash with any of
+    the job's other clips."""
+    for i, a in enumerate(alternates):
+        span = (a["start"], a["end"])
+        if scoring.span_overlap(span, current) >= selection.SAME_MOMENT_OVERLAP:
+            continue
+        if any(scoring.span_overlap(span, o) >= scoring.MAX_OVERLAP for o in others):
+            continue
+        return i
+    return None
+
+
+def _start_clip_action(clip_id: str, kind: str, member: Member) -> dict[str, Any]:
+    check_id(clip_id, "clip id")
+    job_id = _job_id_of_clip(clip_id)
+    _require_job(member, job_id)
+    with _SELECTION_LOCK:
+        job = JOBS.get(job_id)
+        if job is None:
+            row = db.get_job(job_id)
+            if row is None:
+                raise HTTPException(404, "job not found")
+            job = JOBS.setdefault(job_id, _job_from_row(row))
+            job.clips = [_clip_row_to_api(r) for r in db.list_clips_for_job(job_id)]
+        if job.status != "done":
+            raise HTTPException(409, "Clips can be changed once the video is done.")
+        record = next((c for c in job.clips if c["id"] == clip_id), None)
+        if record is None:
+            raise HTTPException(404, "clip not found")
+        if not record.get("spec"):
+            raise HTTPException(409, "This clip has no vertical version. Re-run the video.")
+        if record.get("pendingAction"):
+            raise HTTPException(409, "This clip is already being replaced.")
+        if kind == "swap":
+            current = (record["start"], record["end"])
+            others = [(c["start"], c["end"]) for c in job.clips if c["id"] != clip_id]
+            if pick_alternate(job.alternates, current, others) is None:
+                raise HTTPException(409, "No other moments left to swap in.")
+        else:
+            if groq_llm.build_chat() is None:
+                raise HTTPException(409, "Regenerate needs GROQ_KEY.")
+        record["pendingAction"] = kind
+        record["actionError"] = None
+    db.update_clip(clip_id, {"pending_action": kind, "action_error": None})
+    _start_thread(_run_clip_action, job, clip_id, kind)
+    return {"clipId": clip_id, "pendingAction": kind}
+
+
+def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:
+    record = next((c for c in job.clips if c["id"] == clip_id), None)
+    idx = int(clip_id.rsplit("-", 1)[1])
+
+    def fail(message: str) -> None:
+        if record is not None:
+            record["pendingAction"] = None
+            record["actionError"] = message
+        db.update_clip(clip_id, {"pending_action": None, "action_error": message})
+
+    alt_idx: int | None = None
+    new_record: dict[str, Any] | None = None
+    try:
+        stored = db.get_transcript(job.id)
+        if stored is None:
+            fail("This video's transcript wasn't saved. Submit the video again.")
+            return
+        segs = [segment_from_dict(d) for d in stored["segments"]]
+        current = (record["start"], record["end"])
+        others = [(c["start"], c["end"]) for c in job.clips if c["id"] != clip_id]
+
+        if kind == "swap":
+            alt_idx = pick_alternate(job.alternates, current, others)
+            if alt_idx is None:
+                fail("No other moments left to swap in.")
+                return
+            new_clip = selection.alternate_to_clip(job.alternates[alt_idx])
+        else:
+            try:
+                new_clip = selection.regenerate(segs, stored.get("loudness") or [], current, others)
+            except selection.SelectionFailed as e:
+                fail(str(e))
+                return
+            if new_clip is None:
+                fail("No better take found around this moment.")
+                return
+
+        try:
+            meta = ingest.ingest(job.url, CACHE_DIR)
+        except Exception as e:  # noqa: BLE001
+            fail(f"Couldn't fetch the video again: {e}.")
+            return
+
+        prepared = clipprep.prepare_clip(
+            job_id=job.id, idx=idx, clip=new_clip, video_path=meta.video_path,
+            video_duration=meta.duration, segments=transcript.word_segments(segs),
+            clips_dir=CLIPS_DIR, models_dir=MODELS_DIR, on_step=lambda s: None,
+        )
+        new_record = _clip_record(job.id, idx, new_clip, prepared)
+        old_style = record["style"]
+        new_record["style"] = {
+            **new_record["style"],
+            "captionPreset": old_style["captionPreset"],
+            "accent": old_style["accent"],
+            "captionPosition": old_style["captionPosition"],
+        }
+        new_record["revision"] = (record.get("revision") or 0) + 1
+        fields = {k: v for k, v in _clip_row(job.id, idx, new_record).items() if k != "id"}
+        fields |= {"words_original": None, "bounds_original": None, "pending_action": None, "action_error": None}
+        db.update_clip_checked(clip_id, fields)
+    except Exception as e:  # noqa: BLE001
+        fail(f"Couldn't {'swap' if kind == 'swap' else 'regenerate'} this clip: {e}")
+        return
+
+    for pos, c in enumerate(job.clips):
+        if c["id"] == clip_id:
+            job.clips[pos] = new_record
+            break
+    if kind == "swap":
+        job.alternates.pop(alt_idx)
+        _persist_job(job)
+
+
+@app.post("/api/clips/{clip_id}/swap")
+def swap_clip(clip_id: str, member: Member = Depends(current_member)) -> dict[str, Any]:
+    return _start_clip_action(clip_id, "swap", member)
+
+
+@app.post("/api/clips/{clip_id}/regenerate")
+def regenerate_clip(clip_id: str, member: Member = Depends(current_member)) -> dict[str, Any]:
+    return _start_clip_action(clip_id, "regenerate", member)
 
 
 @app.post("/api/clips/{clip_id}/render")

@@ -183,3 +183,16 @@ def test_qa_flags_add_no_face_start_only_when_known():
     assert main._qa_flags(["weak_pick"], False) == ["weak_pick", "no_face_start"]
     assert main._qa_flags([], True) == []
     assert main._qa_flags([], None) == []
+
+
+def test_run_pipeline_stores_alternates_on_the_job_and_persists_them(monkeypatch):
+    rows = []
+    _patch_common(monkeypatch, rows)
+    alt = {"start": 1.0, "end": 2.0, "text": "t", "score": 5.0, "tag": "Key insight",
+           "flags": [], "reason": "r", "emphasis": []}
+    monkeypatch.setattr(main.selection, "select", lambda segs, loudness: selection.Selection([], None, alternates=[alt]))
+    job = _job()
+    main._run_pipeline(job)
+    assert job.status == "done"
+    assert job.alternates == [alt]
+    assert rows[-1]["alternates"] == [alt]
