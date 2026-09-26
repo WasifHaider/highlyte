@@ -1,4 +1,4 @@
-"""Everything that happens to one highlight after it's picked: cut its
+"""Everything that happens to one clip after it's picked: cut its
 padded 16:9 segment, time its words, analyse faces, upload the segment,
 and describe the result as a ClipSpec. The renderer (Remotion) draws the
 final 9:16 short from that spec; no finished video is made here.
@@ -12,18 +12,23 @@ from typing import Callable
 from .. import storage
 from ..spec import ClipSpec, Source
 from . import cut, face_detect, reframe, shots, words
-from .highlight import Clip
+from .selection import Clip
 from .transcript import TranscriptSegment
 
 # Extra source video kept either side of the clip, so the renderer and
 # any later trim editing have a little room without re-cutting.
 SEGMENT_PAD_S = 1.0
 
+# A face must show within this long of the clip start, or the clip gets a
+# "No face at start" QA flag.
+FACE_START_S = 1.0
+
 
 @dataclass
 class PreparedClip:
     spec: ClipSpec
     storage_key: str | None
+    face_at_start: bool | None = None
 
 
 def segment_bounds(clip_start: float, clip_end: float, video_duration: float) -> tuple[float, float]:
@@ -61,11 +66,14 @@ def prepare_clip(
     clip_word_list = words.clip_words(segments, clip.start, clip.end, clip.emphasis)
 
     on_step("framing")
+    face_at_start: bool | None = None
     try:
         frames, times, thumbs = face_detect.sample_detections(local_path, face_detect.ensure_model(models_dir))
         # Keep only samples inside the clip itself, re-based to its start.
         kept = [(round(t - offset, 3), f, th) for t, f, th in zip(times, frames, thumbs)
                 if offset <= t <= offset + duration]
+        opening = [f for t, f, _ in kept if t <= FACE_START_S]
+        face_at_start = any(len(f) > 0 for f in opening) if opening else None
         kept_times = [t for t, _, _ in kept]
         cuts = shots.cut_times([th for _, _, th in kept], kept_times)
         reframe_result = reframe.analyze([f for _, f, _ in kept], kept_times, cuts)
@@ -95,4 +103,4 @@ def prepare_clip(
         viralityScore=max(0.0, min(10.0, round(clip.score, 1))),
         reframe=reframe_result,
     )
-    return PreparedClip(spec=spec, storage_key=storage_key)
+    return PreparedClip(spec=spec, storage_key=storage_key, face_at_start=face_at_start)

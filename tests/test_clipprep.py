@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 from backend.pipeline import clipprep, cut, face_detect
-from backend.pipeline.highlight import Clip
+from backend.pipeline.selection import Clip
 from backend.pipeline.reframe import Detection
 from backend.pipeline.transcript import TranscriptSegment as Seg
 
@@ -80,3 +80,28 @@ def test_prepare_clip_survives_face_detection_failure(tmp_path, monkeypatch):
 
     _patch_media(monkeypatch, boom)
     assert _prepare(tmp_path).spec.reframe.auto == "fit"
+
+
+def test_prepare_clip_reports_a_face_at_the_start(tmp_path, monkeypatch):
+    times = [round(i / 5, 3) for i in range(80)]
+    frames = [[Detection(0.5, 0.4, 0.2, 0.3, 0.1)] for _ in times]
+    thumbs = [np.zeros((18, 32), dtype=np.float32) for _ in times]
+    _patch_media(monkeypatch, lambda path, model, sample_fps=5.0: (frames, times, thumbs))
+    assert _prepare(tmp_path).face_at_start is True
+
+
+def test_prepare_clip_reports_no_face_at_the_start(tmp_path, monkeypatch):
+    # segment time 1.0 is the clip start; no face until segment time 3.0
+    times = [round(i / 5, 3) for i in range(80)]
+    frames = [[] if t < 3.0 else [Detection(0.5, 0.4, 0.2, 0.3, 0.1)] for t in times]
+    thumbs = [np.zeros((18, 32), dtype=np.float32) for _ in times]
+    _patch_media(monkeypatch, lambda path, model, sample_fps=5.0: (frames, times, thumbs))
+    assert _prepare(tmp_path).face_at_start is False
+
+
+def test_prepare_clip_face_unknown_when_detection_fails(tmp_path, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("no mediapipe")
+
+    _patch_media(monkeypatch, boom)
+    assert _prepare(tmp_path).face_at_start is None

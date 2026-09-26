@@ -56,15 +56,6 @@ def test_to_word_segments_uses_fixed_text(fake_audio):
     assert [(s.start, s.end, s.text) for s in segs] == [(1.0, 1.3, "yaar"), (1.3, 1.6, "sun")]
 
 
-def test_adapter_output_feeds_the_highlight_scorer(fake_audio):
-    from backend.pipeline import highlight
-
-    words = [AsrWord(f"baat{i}.", i * 0.5, i * 0.5 + 0.4, 0.9) for i in range(200)]
-    asr_ = FakeAsr(words)
-    t = transcript.transcribe("a.m4a", "hinglish", detect=lambda p: "hindi", primary=asr_, fallback=asr_)
-    highlight.detect_highlights(transcript.to_word_segments(t))  # must not raise
-
-
 def test_transcribe_returns_loudness(fake_audio):
     asr_ = FakeAsr([AsrWord("hello", 0.0, 0.5, 0.9)])
     t = transcript.transcribe("a.m4a", "english", detect=lambda p: "english", primary=asr_, fallback=asr_)
