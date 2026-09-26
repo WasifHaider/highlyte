@@ -115,3 +115,14 @@ def style_hash(style: ClipStyle) -> str:
     instead of paying for an identical one again."""
     payload = json.dumps(style.model_dump(), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def render_hash(style: ClipStyle, words: list[Word]) -> str:
+    """Fingerprint of everything an export depends on that a user can
+    change: the style and the caption words. Editing captions must not
+    reuse the mp4 rendered with the old text."""
+    payload = json.dumps(
+        {"style": style.model_dump(), "words": [w.model_dump() for w in words]},
+        sort_keys=True, separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]

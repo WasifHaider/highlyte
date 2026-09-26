@@ -4,7 +4,7 @@ import json
 import pytest
 
 from backend import render
-from backend.spec import ClipStyle
+from backend.spec import ClipStyle, Word
 
 
 class FakeRenderer:
@@ -174,6 +174,15 @@ def test_other_start_errors_fail(setup):
     fake.start_error = RuntimeError("clip source is not in R2")
     r = svc.request("job1-0", ClipStyle(layout="fit"))
     assert r.status == "error" and "not in R2" in r.error
+
+
+def test_request_rerenders_when_words_change(setup):
+    svc = setup[0] if isinstance(setup, tuple) else setup
+    words = [Word(text="hum", start=0.0, end=0.3)]
+    a = svc.request("job1-9", ClipStyle(layout="fit"), words)
+    b = svc.request("job1-9", ClipStyle(layout="fit"), words)
+    c = svc.request("job1-9", ClipStyle(layout="fit"), [Word(text="ham", start=0.0, end=0.3)])
+    assert a.id == b.id and c.id != a.id
 
 
 def test_lambda_config_requires_all_values(monkeypatch):

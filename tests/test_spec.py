@@ -83,6 +83,16 @@ def test_fixture_is_a_valid_spec():
     assert len(spec.reframe.faces) == 2
 
 
+def test_render_hash_depends_on_words_and_style():
+    from backend.spec import ClipStyle, Word, render_hash
+
+    s = ClipStyle(layout="fit")
+    w1 = [Word(text="a", start=0.0, end=0.1)]
+    assert render_hash(s, w1) == render_hash(s, list(w1))
+    assert render_hash(s, w1) != render_hash(s, [Word(text="b", start=0.0, end=0.1)])
+    assert render_hash(s, w1) != render_hash(ClipStyle(layout="follow"), w1)
+
+
 def test_reframe_shots_default_and_round_trip():
     from backend.spec import Reframe
 

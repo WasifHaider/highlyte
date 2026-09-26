@@ -20,7 +20,7 @@ from pydantic import BaseModel
 from . import accounts, db, projects, render, storage
 from .accounts import Member, current_member
 from .pipeline import clipprep, cut, highlight, ingest, transcript
-from .spec import ClipStyle, default_style
+from .spec import ClipStyle, Word, default_style
 from .validation import check_clip_filename, check_id
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -485,7 +485,8 @@ def start_render(clip_id: str, style: ClipStyle = Body(...), member: Member = De
     if not record.get("storageKey"):
         raise HTTPException(409, "This clip's source isn't in R2, which Lambda rendering needs.")
     _save_style(record, style)
-    return RENDER_SERVICE.request(clip_id, style).to_api()
+    words = [Word.model_validate(w) for w in record["spec"]["words"]]
+    return RENDER_SERVICE.request(clip_id, style, words).to_api()
 
 
 def _get_render(render_id: str, member: Member) -> render.Render:

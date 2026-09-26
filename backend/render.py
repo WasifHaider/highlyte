@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from . import db, storage
-from .spec import ClipStyle, style_hash
+from .spec import ClipStyle, Word, render_hash, style_hash
 
 FPS = 30
 MAX_ACTIVE = 2
@@ -146,8 +146,8 @@ class RenderService:
         self.now = now
         self._lock = threading.Lock()
 
-    def request(self, clip_id: str, style: ClipStyle) -> Render:
-        hash_value = style_hash(style)
+    def request(self, clip_id: str, style: ClipStyle, words: list[Word] | None = None) -> Render:
+        hash_value = style_hash(style) if words is None else render_hash(style, words)
         with self._lock:
             existing = self.store.find(clip_id, hash_value)
             if existing is not None:
