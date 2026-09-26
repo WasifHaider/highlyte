@@ -35,6 +35,10 @@ export function getJobStatus(jobId) {
   return api.get(`/api/status/${jobId}`).then(r => r.data)
 }
 
+export function retrySelection(jobId) {
+  return api.post(`/api/jobs/${jobId}/select`).then(r => r.data)
+}
+
 export function listProjects(params = {}) {
   return api.get('/api/jobs', { params }).then(r => r.data)
 }

@@ -11,6 +11,17 @@
     <ProcessingSteps v-if="jobStore.isProcessing" :status="jobStore.job.status" :progress="jobStore.progress" />
     <p v-if="jobStore.job?.languageNote" class="lang-note">{{ jobStore.job.languageNote }}</p>
 
+    <div v-if="jobStore.selectionFailed" class="selection-failed">
+      <p class="sf-title">Clip selection didn't finish</p>
+      <p class="sf-msg">{{ jobStore.job.error }}</p>
+      <p class="sf-sub">The transcript is saved, so a retry skips the download and transcription.</p>
+      <button class="sf-retry" :disabled="retrying" @click="onRetry">
+        {{ retrying ? 'Retrying…' : 'Retry selection' }}
+      </button>
+    </div>
+
+    <p v-if="jobStore.isDone && jobStore.job?.selectionNote" class="selection-note">{{ jobStore.job.selectionNote }}</p>
+
     <ClipList v-if="jobStore.isDone" />
   </div>
 
@@ -18,7 +29,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import VideoCard from '../components/VideoCard.vue'
 import ProcessingSteps from '../components/ProcessingSteps.vue'
@@ -35,6 +46,7 @@ const STATUS_NOTES = {
   preparing: 'Preparing clips…',
   done: null,
   error: 'Something went wrong',
+  selection_failed: 'Clip selection needs a retry',
 }
 
 const statusNote = computed(() => {
@@ -42,6 +54,16 @@ const statusNote = computed(() => {
   if (status === 'done') return `Processed · ${jobStore.clips.length} highlights found`
   return STATUS_NOTES[status] || ''
 })
+
+const retrying = ref(false)
+async function onRetry() {
+  retrying.value = true
+  try {
+    await jobStore.retrySelection()
+  } finally {
+    retrying.value = false
+  }
+}
 
 function startForId(id) {
   jobStore.currentJobId = id
@@ -78,4 +100,20 @@ watch(() => props.id, (newId) => startForId(newId))
   font-size: 13.5px;
 }
 .lang-note { margin: 12px 0 0; font-size: 13px; color: var(--ink-soft); }
+.selection-failed {
+  margin-top: 24px; padding: 20px; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+}
+.sf-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
+.sf-msg { margin: 0; font-size: 14px; color: var(--ink); }
+.sf-sub { margin: 0 0 8px; font-size: 13px; color: var(--ink-soft); }
+.sf-retry {
+  border: none; border-radius: 8px; padding: 9px 16px; font-size: 14px; font-weight: 600;
+  font-family: var(--font-sans); color: #fff; background: var(--accent); cursor: pointer;
+}
+.sf-retry:disabled { opacity: .6; cursor: default; }
+.selection-note {
+  margin: 16px 0 0; padding: 10px 14px; border-radius: 8px; font-size: 13px;
+  color: var(--ink-soft); background: var(--accent-soft);
+}
 </style>

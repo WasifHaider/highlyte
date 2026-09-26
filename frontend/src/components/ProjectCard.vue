@@ -16,7 +16,7 @@
         <span v-else-if="project.status === 'done'" class="badge done">
           Done · {{ project.clipCount }} clip{{ project.clipCount === 1 ? '' : 's' }}
         </span>
-        <span v-else class="badge failed" :title="project.error || ''">Failed</span>
+        <span v-else class="badge failed" :title="project.error || ''">{{ project.status === 'selection_failed' ? 'Needs retry' : 'Failed' }}</span>
         <span class="time">{{ relativeTime(project.createdAt) }}</span>
       </div>
       <div v-if="processing && project.progress?.percent != null" class="progress-bar">

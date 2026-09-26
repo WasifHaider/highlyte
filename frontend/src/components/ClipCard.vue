@@ -15,6 +15,9 @@
         <span class="clip-tag">{{ clip.tag }}</span>
         <span v-if="clip.viralityScore != null" class="virality" title="Virality score">{{ Number(clip.viralityScore).toFixed(1) }}/10</span>
       </div>
+      <div v-if="clip.qaFlags?.length" class="qa-flags">
+        <span v-for="f in clip.qaFlags" :key="f" class="qa-chip">{{ QA_LABELS[f] || f }}</span>
+      </div>
 
       <template v-if="clip.spec">
         <label class="field">
@@ -88,6 +91,12 @@ import RemotionPreview from './RemotionPreview.vue'
 import CaptionEditor from './CaptionEditor.vue'
 import { LAYOUTS, PRESETS, layoutAllowed } from '../utils/clipStyle'
 
+const QA_LABELS = {
+  low_confidence: 'Low confidence — check captions',
+  weak_pick: 'Weaker pick',
+  no_face_start: 'No face at start',
+}
+
 const props = defineProps({
   clip: { type: Object, required: true },
   isSelected: { type: Boolean, default: false },
@@ -131,6 +140,11 @@ function set(patch) {
 .clip-tag, .virality {
   background: var(--accent-soft); color: var(--accent-text); font-size: 11.5px; font-weight: 600;
   padding: 3px 10px; border-radius: 999px;
+}
+.qa-flags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.qa-chip {
+  font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+  background: #FFFAEB; color: #B54708;
 }
 .field-row { display: flex; gap: 12px; flex-wrap: wrap; }
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-soft); flex: 1; min-width: 140px; }

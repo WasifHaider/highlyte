@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import {
-  clipDownloadUrl, createJob, getHealth, getJobStatus, getRender,
+  apiErrorMessage, clipDownloadUrl, createJob, getHealth, getJobStatus, getRender,
   saveCaptions as apiSaveCaptions, resetCaptions as apiResetCaptions,
-  saveClipStyle, startRender,
+  retrySelection as apiRetrySelection, saveClipStyle, startRender,
 } from '../services/highlyteApi'
 import { layoutAllowed } from '../utils/clipStyle'
 
@@ -30,8 +30,9 @@ export const useJobStore = defineStore('job', {
       const clips = state.job?.clips || []
       return clips.length > 0 && clips.every(c => state.selected[c.id])
     },
-    isProcessing: (state) => !!state.job && !['done', 'error'].includes(state.job.status),
+    isProcessing: (state) => !!state.job && !['done', 'error', 'selection_failed'].includes(state.job.status),
     isDone: (state) => state.job?.status === 'done',
+    selectionFailed: (state) => state.job?.status === 'selection_failed',
     progress: (state) => state.job?.progress || {},
     selectedRenders: (state) => (state.job?.clips || [])
       .filter(c => state.selected[c.id])
@@ -66,6 +67,8 @@ export const useJobStore = defineStore('job', {
         if (data.status === 'error') {
           this.error = data.error
           this.stopPolling()
+        } else if (data.status === 'selection_failed') {
+          this.stopPolling()
         } else if (data.status === 'done') {
           for (const c of data.clips) {
             if (!(c.id in this.selected)) this.selected[c.id] = true
@@ -88,6 +91,16 @@ export const useJobStore = defineStore('job', {
       if (this._timer) {
         clearInterval(this._timer)
         this._timer = null
+      }
+    },
+    async retrySelection() {
+      if (!this.currentJobId) return
+      this.error = null
+      try {
+        await apiRetrySelection(this.currentJobId)
+        this.startPolling()
+      } catch (e) {
+        this.error = apiErrorMessage(e, 'Could not retry clip selection.')
       }
     },
     toggleClip(clipId) {
