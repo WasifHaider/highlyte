@@ -189,8 +189,10 @@ The clip card offers fast edits without re-running the whole video.
   and the renders zip includes `highlyte-<clipId>.srt` beside each mp4.
 
 Both swap and regenerate run one at a time per video; a clip being replaced
-cannot be edited until it finishes. A swapped or regenerated clip resets
-caption edits and trim, but keeps its style.
+cannot be edited or exported until it finishes. A swapped or regenerated clip
+resets caption edits and trim. It keeps the caption preset, accent colour and
+caption position; its layout and hook title come from the new moment. If the
+action fails, the old clip is left exactly as it was.
 
 Clips made before this change (spec v1) cannot be trimmed. Re-run the video
 to make new v2 clips that support trimming.

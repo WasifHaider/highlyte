@@ -141,8 +141,8 @@ Steps 0–3 are done. Piece 2 (Step 3, clip selection) is built: see
 episodes with `scripts/select_dry_run.py <job_id>`.
 
 Piece 3a (Step 4, fix in place) is built: see
-`docs/superpowers/specs/2026-09-27-fix-in-place-design.md` and
-`docs/superpowers/plans/2026-09-27-fix-in-place.md`. Deploy the migration
+`2026-09-27-fix-in-place-design.md` and
+`../plans/2026-09-27-fix-in-place.md`. Deploy the migration
 `supabase/migrations/20260927120000_fix_in_place.sql` and run
 `npm run deploy:site` in `renderer/` before exports can draw spec v2.
 
