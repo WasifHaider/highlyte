@@ -20,6 +20,8 @@ def test_validate_words_accepts_and_trims():
     ([_w("a", -0.1, 1)], "time"),
     ([_w("a", 1.0, 0.5)], "time"),
     ([_w("a", 0, 10.6)], "time"),
+    ([_w("a", float("nan"), 1.0)], "time"),
+    ([_w("a", 0, float("inf"))], "time"),
     ([_w("a", 1.0, 1.2), _w("b", 0.5, 0.7)], "order"),
 ])
 def test_validate_words_rejects(words, message):

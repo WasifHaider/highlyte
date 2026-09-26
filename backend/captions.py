@@ -6,6 +6,7 @@ clip's spec.words, which both the preview and the Lambda export read.
 """
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from .spec import Word
@@ -32,6 +33,8 @@ def validate_words(raw: list[dict[str, Any]], clip_length: float) -> list[Word]:
             raise ValueError(f"Word {i} contains a line break.")
         if len(text) > MAX_WORD_CHARS:
             raise ValueError(f"Word {i} is too long (max {MAX_WORD_CHARS} characters).")
+        if not (math.isfinite(word.start) and math.isfinite(word.end)):
+            raise ValueError(f"Word {i} has a time outside the clip.")
         if word.start < 0 or word.end < word.start or word.end > clip_length + END_SLACK_S:
             raise ValueError(f"Word {i} has a time outside the clip.")
         if word.start < prev_start:

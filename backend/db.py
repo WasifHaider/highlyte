@@ -143,6 +143,16 @@ def update_clip(clip_id: str, fields: dict[str, Any]) -> None:
         print(f"[supabase] update_clip failed: {e}")
 
 
+def update_clip_checked(clip_id: str, fields: dict[str, Any]) -> None:
+    """Like update_clip, but raises on a Supabase error instead of logging
+    and carrying on: used where silently losing the write (e.g. a caption
+    edit) is worse than telling the caller to try again."""
+    client = get_client()
+    if client is None:
+        return
+    client.table("clips").update(fields).eq("id", clip_id).execute()
+
+
 def list_clips(team_id: str, limit: int = 100) -> list[dict[str, Any]]:
     """All clips across the team's jobs, newest first, each with its parent
     job's video info embedded (PostgREST foreign-key embed via the

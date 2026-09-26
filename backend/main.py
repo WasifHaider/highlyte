@@ -205,6 +205,7 @@ def _with_source_url(record: dict[str, Any]) -> dict[str, Any]:
     get_clip), so no expiring presigned URL ever reaches the client
     or the database."""
     out = dict(record)
+    out.pop("wordsOriginal", None)
     if out.get("spec"):
         out["spec"] = copy.deepcopy(out["spec"])
         out["spec"]["source"]["url"] = out["downloadUrl"]
@@ -495,11 +496,15 @@ def save_captions(clip_id: str, body: CaptionsBody = Body(...), member: Member =
         words = captions.validate_words(body.words, spec["end"] - spec["start"])
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
-    if record.get("wordsOriginal") is None:
-        record["wordsOriginal"] = spec["words"]  # kept from the first edit, for Reset
-    record["spec"] = {**spec, "words": [w.model_dump() for w in words]}
+    words_original = record["wordsOriginal"] if record.get("wordsOriginal") is not None else spec["words"]
+    new_spec = {**spec, "words": [w.model_dump() for w in words]}
+    try:
+        db.update_clip_checked(record["id"], {"spec": new_spec, "words_original": words_original})
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(503, "Couldn't save captions. Try again.") from e
+    record["wordsOriginal"] = words_original  # kept from the first edit, for Reset
+    record["spec"] = new_spec
     record["captionsEdited"] = record.get("wordsOriginal") is not None
-    db.update_clip(record["id"], {"spec": record["spec"], "words_original": record["wordsOriginal"]})
     return _captions_reply(record)
 
 
@@ -507,10 +512,14 @@ def save_captions(clip_id: str, body: CaptionsBody = Body(...), member: Member =
 def reset_captions(clip_id: str, member: Member = Depends(current_member)) -> dict[str, Any]:
     record = _clip_for_style(clip_id, member)
     if record.get("wordsOriginal") is not None:
-        record["spec"] = {**record["spec"], "words": record["wordsOriginal"]}
+        new_spec = {**record["spec"], "words": record["wordsOriginal"]}
+        try:
+            db.update_clip_checked(record["id"], {"spec": new_spec, "words_original": None})
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(503, "Couldn't save captions. Try again.") from e
+        record["spec"] = new_spec
         record["wordsOriginal"] = None
         record["captionsEdited"] = record.get("wordsOriginal") is not None
-        db.update_clip(record["id"], {"spec": record["spec"], "words_original": None})
     return _captions_reply(record)
 
 

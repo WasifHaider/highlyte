@@ -21,7 +21,7 @@ def env(monkeypatch):
               "downloadUrl": f"/api/clips/{JOB_ID}/clip_0.mp4"}
     main.JOBS[JOB_ID] = main.Job(id=JOB_ID, url="u", status="done", clips=[record], team_id=TEST_TEAM_ID)
     updates = []
-    monkeypatch.setattr(main.db, "update_clip", lambda clip_id, fields: updates.append((clip_id, fields)))
+    monkeypatch.setattr(main.db, "update_clip_checked", lambda clip_id, fields: updates.append((clip_id, fields)))
     yield record, updates
     main.JOBS.pop(JOB_ID, None)
 
@@ -54,6 +54,33 @@ def test_reset_restores_original(env):
     assert r.json() == {"words": original, "captionsEdited": False}
     assert record["spec"]["words"] == original
     assert updates[-1][1] == {"spec": record["spec"], "words_original": None}
+
+
+def test_save_captions_503_when_db_write_fails(env, monkeypatch):
+    record, _ = env
+    original = [dict(w) for w in record["spec"]["words"]]
+
+    def boom(clip_id, fields):
+        raise RuntimeError("supabase down")
+
+    monkeypatch.setattr(main.db, "update_clip_checked", boom)
+    r = client.put(f"/api/clips/{CLIP_ID}/captions", json={"words": _edited(record)})
+    assert r.status_code == 503
+    assert record["spec"]["words"] == original
+
+
+def test_reset_503_when_db_write_fails(env, monkeypatch):
+    record, _ = env
+    client.put(f"/api/clips/{CLIP_ID}/captions", json={"words": _edited(record)})
+    edited = [dict(w) for w in record["spec"]["words"]]
+
+    def boom(clip_id, fields):
+        raise RuntimeError("supabase down")
+
+    monkeypatch.setattr(main.db, "update_clip_checked", boom)
+    r = client.post(f"/api/clips/{CLIP_ID}/captions/reset")
+    assert r.status_code == 503
+    assert record["spec"]["words"] == edited
 
 
 def test_save_captions_validates(env):
@@ -93,3 +120,11 @@ def test_status_reports_captions_edited_for_in_memory_clip(env):
     r = client.get(f"/api/status/{JOB_ID}")
     clip = next(c for c in r.json()["clips"] if c["id"] == CLIP_ID)
     assert clip["captionsEdited"] is False
+
+
+def test_status_does_not_send_words_original(env):
+    record, _ = env
+    client.put(f"/api/clips/{CLIP_ID}/captions", json={"words": _edited(record)})
+    r = client.get(f"/api/status/{JOB_ID}")
+    clip = next(c for c in r.json()["clips"] if c["id"] == CLIP_ID)
+    assert "wordsOriginal" not in clip
