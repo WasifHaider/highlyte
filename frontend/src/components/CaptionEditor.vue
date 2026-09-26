@@ -6,7 +6,7 @@
     </div>
     <div v-if="open" class="lines">
       <label v-for="(line, i) in lines" :key="line.index" class="line">
-        <span class="time">{{ clock(line.start) }}</span>
+        <span class="time">{{ clock(line.start - (props.start ?? 0)) }}</span>
         <input v-model="texts[i]" type="text" />
       </label>
       <div class="row">
@@ -27,6 +27,8 @@ const props = defineProps({
   clipId: { type: String, required: true },
   words: { type: Array, required: true },
   edited: { type: Boolean, default: false },
+  start: { type: Number, default: null },
+  end: { type: Number, default: null },
 })
 const emit = defineEmits(['draft'])
 const jobStore = useJobStore()
@@ -39,7 +41,14 @@ const open = ref(false)
 const busy = ref(false)
 const error = ref('')
 const texts = ref([])
-const lines = computed(() => captionLines(props.words))
+// When start/end are set (v2 spec, trimmed clip), only the lines inside the
+// clip's bounds are shown/edited — each line keeps its global `from` so
+// editLine still applies to the full, untrimmed word list.
+const lines = computed(() => {
+  const all = captionLines(props.words)
+  if (props.start == null || props.end == null) return all
+  return all.filter(line => line.end > props.start && line.start < props.end)
+})
 
 // Applied last line first, so each line's word index stays valid.
 const draft = computed(() => {
@@ -77,7 +86,7 @@ function cancel() {
 async function save() {
   const overlong = overlongWordLine()
   if (overlong) {
-    error.value = `The line at ${clock(overlong.start)} has a word over ${MAX_WORD_CHARS} characters.`
+    error.value = `The line at ${clock(overlong.start - (props.start ?? 0))} has a word over ${MAX_WORD_CHARS} characters.`
     return
   }
   busy.value = true

@@ -3,12 +3,16 @@ import {
   apiErrorMessage, clipDownloadUrl, createJob, getHealth, getJobStatus, getRender,
   saveCaptions as apiSaveCaptions, resetCaptions as apiResetCaptions,
   retrySelection as apiRetrySelection, saveClipStyle, startRender,
+  saveBounds as apiSaveBounds, resetBounds as apiResetBounds,
+  swapClip as apiSwapClip, regenerateClip as apiRegenerateClip,
 } from '../services/highlyteApi'
 import { layoutAllowed } from '../utils/clipStyle'
+import { toClipTime } from '@renderer/lib/timeline'
 
 const POLL_INTERVAL_MS = 1000
 const RENDER_POLL_MS = 2000
 const STYLE_SAVE_DELAY_MS = 500
+const BOUNDS_SAVE_DELAY_MS = 500
 
 export const useJobStore = defineStore('job', {
   state: () => ({
@@ -22,6 +26,8 @@ export const useJobStore = defineStore('job', {
     renderingEnabled: false,
     _renderTimer: null,
     _styleTimers: {},
+    _boundsTimers: {},
+    _revisions: {},
   }),
   getters: {
     clips: (state) => state.job?.clips || [],
@@ -47,6 +53,7 @@ export const useJobStore = defineStore('job', {
       this.job = null
       this.selected = {}
       this.renders = {}
+      this._revisions = {}
       this.startPolling()
       return job_id
     },
@@ -72,8 +79,12 @@ export const useJobStore = defineStore('job', {
         } else if (data.status === 'done') {
           for (const c of data.clips) {
             if (!(c.id in this.selected)) this.selected[c.id] = true
+            if (this._revisions[c.id] !== undefined && this._revisions[c.id] !== c.revision) {
+              delete this.renders[c.id]
+            }
+            this._revisions[c.id] = c.revision
           }
-          this.stopPolling()
+          if (!data.clips.some(c => c.pendingAction)) this.stopPolling()
         }
       } catch (e) {
         this.error = e?.message || 'Failed to fetch job status'
@@ -137,7 +148,7 @@ export const useJobStore = defineStore('job', {
       for (const clip of this.clips) {
         if (!clip.spec) continue
         const clipPatch = { ...patch }
-        if ('layout' in clipPatch && !layoutAllowed(clipPatch.layout, clip.spec.reframe)) {
+        if ('layout' in clipPatch && !layoutAllowed(clipPatch.layout, toClipTime(clip.spec).reframe)) {
           clipPatch.layout = clip.spec.reframe.auto
         }
         this.updateStyle(clip.id, clipPatch)
@@ -161,6 +172,53 @@ export const useJobStore = defineStore('job', {
       clip.spec = { ...clip.spec, words: res.words }
       clip.captionsEdited = res.captionsEdited
       delete this.renders[clipId]
+    },
+    updateBounds(clipId, bounds) {
+      const clip = this.clips.find(c => c.id === clipId)
+      if (!clip) return
+      clip.spec = { ...clip.spec, ...bounds }
+      clip.boundsEdited = true
+      delete this.renders[clipId]
+      clearTimeout(this._boundsTimers[clipId])
+      this._boundsTimers[clipId] = setTimeout(() => {
+        apiSaveBounds(clipId, bounds).catch(e => {
+          this.error = apiErrorMessage(e, 'Failed to save the trim')
+        })
+      }, BOUNDS_SAVE_DELAY_MS)
+    },
+    async resetBounds(clipId) {
+      const clip = this.clips.find(c => c.id === clipId)
+      if (!clip) return
+      try {
+        const res = await apiResetBounds(clipId)
+        clip.spec = { ...clip.spec, start: res.start, end: res.end }
+        clip.boundsEdited = res.boundsEdited
+        delete this.renders[clipId]
+      } catch (e) {
+        this.error = apiErrorMessage(e, 'Failed to reset the trim')
+      }
+    },
+    async swapClip(clipId) {
+      const clip = this.clips.find(c => c.id === clipId)
+      if (!clip) return
+      try {
+        const res = await apiSwapClip(clipId)
+        clip.pendingAction = res.pendingAction
+        this.startPolling()
+      } catch (e) {
+        clip.actionError = apiErrorMessage(e, 'Failed to swap this clip')
+      }
+    },
+    async regenerateClip(clipId) {
+      const clip = this.clips.find(c => c.id === clipId)
+      if (!clip) return
+      try {
+        const res = await apiRegenerateClip(clipId)
+        clip.pendingAction = res.pendingAction
+        this.startPolling()
+      } catch (e) {
+        clip.actionError = apiErrorMessage(e, 'Failed to regenerate this clip')
+      }
     },
     async exportSelected() {
       const clips = this.clips.filter(c => this.selected[c.id] && c.spec)

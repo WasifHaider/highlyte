@@ -63,6 +63,26 @@ export function resetCaptions(clipId) {
   return api.post(`/api/clips/${clipId}/captions/reset`).then(r => r.data)
 }
 
+export function saveBounds(clipId, bounds) {
+  return api.patch(`/api/clips/${clipId}/bounds`, bounds).then(r => r.data)
+}
+
+export function resetBounds(clipId) {
+  return api.post(`/api/clips/${clipId}/bounds/reset`).then(r => r.data)
+}
+
+export function swapClip(clipId) {
+  return api.post(`/api/clips/${clipId}/swap`).then(r => r.data)
+}
+
+export function regenerateClip(clipId) {
+  return api.post(`/api/clips/${clipId}/regenerate`).then(r => r.data)
+}
+
+export function clipSrtUrl(clipId) {
+  return `${baseURL}/api/clips/${clipId}/captions.srt`
+}
+
 export function startRender(clipId, style) {
   return api.post(`/api/clips/${clipId}/render`, style).then(r => r.data)
 }

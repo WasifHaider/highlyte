@@ -3,6 +3,7 @@
     <div class="preview">
       <RemotionPreview v-if="clip.spec" :spec="previewSpec" :clip-style="clip.style" />
       <div v-else class="no-preview">No vertical preview for this clip. Re-run the video to generate one.</div>
+      <TrimControls v-if="clip.spec" :clip="clip" />
     </div>
 
     <div class="details">
@@ -18,29 +19,31 @@
       <div v-if="clip.qaFlags?.length" class="qa-flags">
         <span v-for="f in clip.qaFlags" :key="f" class="qa-chip">{{ QA_LABELS[f] || f }}</span>
       </div>
+      <div v-if="firstCaptionLine" class="caption-preview">"{{ firstCaptionLine }}"</div>
+      <div v-if="clip.reason" class="reason">{{ clip.reason }}</div>
 
       <template v-if="clip.spec">
         <label class="field">
           <span>Hook title</span>
-          <input type="text" :value="clip.style.hookTitle || ''" maxlength="80"
+          <input type="text" :value="clip.style.hookTitle || ''" maxlength="80" :disabled="!!clip.pendingAction"
             @input="set({ hookTitle: $event.target.value || null })" />
         </label>
         <label class="check">
-          <input type="checkbox" :checked="clip.style.showHook" @change="set({ showHook: $event.target.checked })" />
+          <input type="checkbox" :checked="clip.style.showHook" :disabled="!!clip.pendingAction" @change="set({ showHook: $event.target.checked })" />
           Show hook title
         </label>
         <div class="field-row">
           <label class="field">
             <span>Layout</span>
-            <select :value="clip.style.layout" @change="set({ layout: $event.target.value })">
-              <option v-for="l in LAYOUTS" :key="l.value" :value="l.value" :disabled="!layoutAllowed(l.value, clip.spec.reframe)">
-                {{ l.label }}{{ l.value === clip.spec.reframe.auto ? ' (auto)' : '' }}
+            <select :value="clip.style.layout" :disabled="!!clip.pendingAction" @change="set({ layout: $event.target.value })">
+              <option v-for="l in LAYOUTS" :key="l.value" :value="l.value" :disabled="!layoutAllowed(l.value, clipTime.reframe)">
+                {{ l.label }}{{ l.value === clipTime.reframe.auto ? ' (auto)' : '' }}
               </option>
             </select>
           </label>
           <label class="field">
             <span>Captions</span>
-            <select :value="clip.style.captionPreset" @change="set({ captionPreset: $event.target.value })">
+            <select :value="clip.style.captionPreset" :disabled="!!clip.pendingAction" @change="set({ captionPreset: $event.target.value })">
               <option v-for="p in PRESETS" :key="p.value" :value="p.value">{{ p.label }}</option>
             </select>
           </label>
@@ -48,7 +51,7 @@
         <div class="field-row">
           <label class="field">
             <span>Caption position</span>
-            <select :value="clip.style.captionPosition" :disabled="clip.style.layout === 'split'"
+            <select :value="clip.style.captionPosition" :disabled="clip.style.layout === 'split' || !!clip.pendingAction"
               @change="set({ captionPosition: $event.target.value })">
               <option value="lower">Lower third</option>
               <option value="middle">Middle</option>
@@ -56,14 +59,28 @@
           </label>
           <label class="field">
             <span>Accent colour</span>
-            <input type="color" :value="clip.style.accent" @input="set({ accent: $event.target.value })" />
+            <input type="color" :value="clip.style.accent" :disabled="!!clip.pendingAction" @input="set({ accent: $event.target.value })" />
           </label>
         </div>
         <div v-if="clip.spec.wordsApprox" class="note">Approximate caption sync</div>
-        <CaptionEditor :clip-id="clip.id" :words="clip.spec.words" :edited="!!clip.captionsEdited" @draft="draftWords = $event" />
+        <div :class="{ 'controls-disabled': clip.pendingAction }">
+          <CaptionEditor :clip-id="clip.id" :words="clip.spec.words" :edited="!!clip.captionsEdited"
+            :start="clip.spec.version === 2 ? clip.spec.start : null" :end="clip.spec.version === 2 ? clip.spec.end : null"
+            @draft="draftWords = $event" />
+        </div>
       </template>
 
       <div class="clip-snippet">"{{ snippet }}"</div>
+
+      <div class="actions-row">
+        <button class="action-btn" :disabled="swapDisabled" :title="swapTitle" @click="jobStore.swapClip(clip.id)">Swap scene</button>
+        <button class="action-btn" :disabled="regenerateDisabled" :title="regenerateTitle" @click="jobStore.regenerateClip(clip.id)">Regenerate</button>
+        <a class="action-link" :href="clipSrtUrl(clip.id)" download>Download SRT</a>
+      </div>
+      <div v-if="clip.pendingAction" class="pending-note">
+        {{ clip.pendingAction === 'swap' ? 'Swapping in another moment…' : 'Regenerating this clip…' }}
+      </div>
+      <div v-if="clip.actionError" class="action-error">{{ clip.actionError }}</div>
 
       <div v-if="render" class="render-status" :class="render.status">
         <template v-if="render.status === 'queued'">Waiting to render…</template>
@@ -86,10 +103,13 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useJobStore } from '../stores/jobStore'
-import { clipDownloadUrl } from '../services/highlyteApi'
+import { clipDownloadUrl, clipSrtUrl } from '../services/highlyteApi'
 import RemotionPreview from './RemotionPreview.vue'
 import CaptionEditor from './CaptionEditor.vue'
+import TrimControls from './TrimControls.vue'
 import { LAYOUTS, PRESETS, layoutAllowed } from '../utils/clipStyle'
+import { captionLines, lineText } from '@renderer/captions/edit'
+import { toClipTime } from '@renderer/lib/timeline'
 
 const QA_LABELS = {
   low_confidence: 'Low confidence — check captions',
@@ -111,6 +131,21 @@ const snippet = computed(() => {
   const t = props.clip.text || ''
   return t.length > 220 ? t.slice(0, 217) + '…' : t
 })
+const clipTime = computed(() => toClipTime(props.clip.spec))
+const firstCaptionLine = computed(() => {
+  if (!props.clip.spec) return ''
+  const lines = captionLines(clipTime.value.words)
+  return lines[0] ? lineText(lines[0]) : ''
+})
+const anyPending = computed(() => jobStore.clips.some(c => c.pendingAction))
+const swapDisabled = computed(() => anyPending.value || jobStore.job?.alternatesLeft === 0)
+const swapTitle = computed(() => {
+  if (anyPending.value) return 'Another clip is being replaced. Wait for it to finish.'
+  if (jobStore.job?.alternatesLeft === 0) return 'No other moments left to swap in.'
+  return ''
+})
+const regenerateDisabled = computed(() => anyPending.value)
+const regenerateTitle = computed(() => anyPending.value ? 'Another clip is being replaced. Wait for it to finish.' : '')
 
 function set(patch) {
   jobStore.updateStyle(props.clip.id, patch)
@@ -155,7 +190,19 @@ function set(patch) {
 .field input[type="color"] { width: 48px; height: 32px; border: 1px solid var(--border); border-radius: 8px; padding: 2px; background: #fff; }
 .check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); }
 .note { font-size: 12px; color: var(--ink-faint); }
+.caption-preview { font-family: var(--font-serif); font-style: italic; font-size: 13.5px; line-height: 1.4; color: var(--ink-soft); }
+.reason { font-size: 12px; color: var(--ink-faint); }
 .clip-snippet { font-family: var(--font-serif); font-style: italic; font-size: 14.5px; line-height: 1.5; }
+.actions-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.action-btn {
+  border: 1px solid var(--border); background: var(--accent-soft); color: var(--accent-text);
+  border-radius: 6px; padding: 4px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.action-btn:disabled { opacity: .6; cursor: default; }
+.action-link { font-size: 12.5px; font-weight: 600; color: var(--accent); }
+.pending-note { font-size: 12.5px; color: var(--ink-soft); }
+.action-error { color: #9C3B14; font-size: 12.5px; }
+.controls-disabled { opacity: .6; pointer-events: none; }
 .render-status { font-size: 13px; color: var(--ink-soft); }
 .render-status.error { color: #9C3B14; }
 .render-status a { color: var(--accent); font-weight: 600; }
