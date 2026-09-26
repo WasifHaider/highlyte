@@ -122,11 +122,17 @@ def qa_flags(c: Candidate) -> list[str]:
     return []
 
 
-def overlap_ratio(a: Candidate, b: Candidate) -> float:
-    shared = min(a.end, b.end) - max(a.start, b.start)
-    if shared <= 0:
+def span_overlap(a: tuple[float, float], b: tuple[float, float]) -> float:
+    """Shared length of two time spans as a share of the shorter one."""
+    shortest = min(a[1] - a[0], b[1] - b[0])
+    shared = min(a[1], b[1]) - max(a[0], b[0])
+    if shortest <= 0 or shared <= 0:
         return 0.0
-    return shared / min(a.duration, b.duration)
+    return shared / shortest
+
+
+def overlap_ratio(a: Candidate, b: Candidate) -> float:
+    return span_overlap((a.start, a.end), (b.start, b.end))
 
 
 def _fits(c: Candidate, kept: list[Candidate]) -> bool:

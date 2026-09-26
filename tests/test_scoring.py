@@ -74,6 +74,13 @@ def test_overlap_ratio_uses_shorter_clip():
     assert scoring.overlap_ratio(cand(0, 20), cand(30, 50)) == 0.0
 
 
+def test_span_overlap():
+    assert scoring.span_overlap((0, 20), (10, 20)) == 1.0
+    assert scoring.span_overlap((0, 20), (15, 35)) == 0.25
+    assert scoring.span_overlap((0, 20), (30, 50)) == 0.0
+    assert scoring.span_overlap((0, 0), (0, 10)) == 0.0
+
+
 def test_pack_keeps_best_non_overlapping_up_to_eight():
     cands = [cand(i * 25.0, i * 25.0 + 20, total=0.5 + i / 100) for i in range(10)]
     kept = scoring.pack(cands)

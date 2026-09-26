@@ -97,6 +97,59 @@ def test_select_notes_zero_clips_after_skipped_note(monkeypatch):
     assert result.note.endswith("No moment passed the clip checks. Try another video, or re-run later.")
 
 
+def test_select_keeps_reason_and_runner_ups():
+    from tests.llm_fakes import FakeChat
+
+    # 6 thoughts, all picked: packing keeps them all (max 8), so no runner-ups;
+    # then a duplicate pick of u1 is the only runner-up candidate and is
+    # dropped because it overlaps a kept clip.
+    ranked = json.dumps([pick(f"u{i}", f"u{i}") for i in range(1, 7)] + [pick("u1", "u1", hook=0.6)])
+    result = selection.select(transcript(6), [], chat=FakeChat([ranked, "[]"]))
+    assert len(result.clips) == 6
+    assert result.clips[0].reason == "r"
+    assert result.alternates == []
+
+
+def test_select_stores_runner_ups_best_first():
+    from tests.llm_fakes import FakeChat
+
+    ranked = json.dumps([pick(f"u{i}", f"u{i}", payoff=0.1 * i) for i in range(1, 11)])
+    result = selection.select(transcript(10), [], chat=FakeChat([ranked, "[]"]))
+    assert len(result.clips) == 8
+    assert [round(a["start"]) for a in result.alternates] == [25, 0]
+    alt = result.alternates[0]
+    assert set(alt) == {"start", "end", "text", "score", "tag", "flags", "reason", "emphasis"}
+    assert alt["reason"] == "r" and alt["emphasis"] == ["baat"]
+    clip = selection.alternate_to_clip(alt)
+    assert (clip.start, clip.end, clip.reason) == (alt["start"], alt["end"], "r")
+
+
+def test_regenerate_picks_a_different_nearby_moment():
+    from tests.llm_fakes import FakeChat
+
+    segs = transcript(6)                        # thoughts at 0, 25, 50, 75, 100, 125 s
+    ranked = json.dumps([pick("u3", "u3"), pick("u4", "u4", hook=0.9)])
+    chat = FakeChat([ranked, json.dumps([{"id": "c1", "hook_title": "Naya", "emphasis": [], "tag": "Key insight"}])])
+    clip = selection.regenerate(segs, [], current=(49.78, 70.35), avoid=[(99.78, 120.35)], chat=chat)
+    assert clip is not None
+    assert round(clip.start) == 75 and clip.hook_title == "Naya"   # u3 is the current moment
+    # only units within 120 s of the clip are shown to the ranker
+    assert "u1:" in chat.prompts[0] and "u6:" in chat.prompts[0]
+
+
+def test_regenerate_returns_none_when_nothing_new():
+    from tests.llm_fakes import FakeChat
+
+    chat = FakeChat([json.dumps([pick("u3", "u3")])])
+    assert selection.regenerate(transcript(6), [], current=(49.78, 70.35), avoid=[], chat=chat) is None
+
+
+def test_regenerate_without_key(monkeypatch):
+    monkeypatch.setenv("GROQ_KEY", "")
+    with pytest.raises(selection.SelectionFailed):
+        selection.regenerate(transcript(3), [], current=(0, 20), avoid=[])
+
+
 def test_skipped_note_merges_ranges():
     note = selection.skipped_note([
         ranker.Skipped(750.0, 900.0, "rate limit"),
