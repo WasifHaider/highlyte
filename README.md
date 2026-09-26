@@ -174,6 +174,31 @@ MISMATCH line at startup if they differ.
 cd renderer && npm test
 ```
 
+## Fixing a clip
+
+The clip card offers fast edits without re-running the whole video.
+
+- **Trim:** ±0.5 s nudges per edge, or step to the previous/next sentence.
+  Reset to undo. Clips stay 8–60 s and cannot trim further than 8 s either
+  side of the original cut.
+- **Swap scene:** replaces the clip with a saved runner-up moment from clip
+  selection. Uses no Groq tokens; runs in the background.
+- **Regenerate:** re-ranks about 120 s either side of the clip with one small
+  Groq call (needs `GROQ_KEY`). Runs in the background.
+- **SRT:** download captions for the clip via `GET /api/clips/{id}/captions.srt`,
+  and the renders zip includes `highlyte-<clipId>.srt` beside each mp4.
+
+Both swap and regenerate run one at a time per video; a clip being replaced
+cannot be edited until it finishes. A swapped or regenerated clip resets
+caption edits and trim, but keeps its style.
+
+Clips made before this change (spec v1) cannot be trimmed. Re-run the video
+to make new v2 clips that support trimming.
+
+Exports follow trims: the render cache key includes the bounds, so existing
+cache entries miss once. After deploying `supabase/migrations/20260927120000_fix_in_place.sql`,
+run `npm run deploy:site` in `renderer/` so Lambda exports can draw spec v2.
+
 ## How it works
 
 1. **Ingest** — pull the audio via `yt-dlp`, cached by video ID.

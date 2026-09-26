@@ -135,7 +135,15 @@ B-roll, custom Roman-Urdu Whisper.
 
 ## Start
 
-Steps 0–2 are done, and piece 2 (Step 3, clip selection) is built: see
+Steps 0–3 are done. Piece 2 (Step 3, clip selection) is built: see
 `2026-09-26-clip-selection-design.md` and
 `../plans/2026-09-26-clip-selection.md`. Tune its thresholds on real
-episodes with `scripts/select_dry_run.py <job_id>`. Next is piece 3 (Step 4).
+episodes with `scripts/select_dry_run.py <job_id>`.
+
+Piece 3a (Step 4, fix in place) is built: see
+`docs/superpowers/specs/2026-09-27-fix-in-place-design.md` and
+`docs/superpowers/plans/2026-09-27-fix-in-place.md`. Deploy the migration
+`supabase/migrations/20260927120000_fix_in_place.sql` and run
+`npm run deploy:site` in `renderer/` before exports can draw spec v2.
+
+Next are piece 3b (video upload) and the UI redesign.
