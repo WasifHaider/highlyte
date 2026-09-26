@@ -16,6 +16,7 @@ from .utterances import build_thought_units, build_utterances, flat_words
 __all__ = ["Clip", "Selection", "SelectionFailed", "select", "skipped_note"]
 
 TITLES_FAILED_NOTE = "Hook titles could not be written this time."
+ZERO_CLIPS_NOTE = "No moment passed the clip checks. Try another video, or re-run later."
 
 
 @dataclass
@@ -99,6 +100,8 @@ def select(segments: list[Segment], loudness: list[float], *, chat=None) -> Sele
     ]
 
     notes = [skipped_note(ranked.skipped)]
-    if kept and not titles_ok:
+    if not kept:
+        notes.append(ZERO_CLIPS_NOTE)
+    elif not titles_ok:
         notes.append(TITLES_FAILED_NOTE)
     return Selection(clips, " ".join(n for n in notes if n) or None)

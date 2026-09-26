@@ -76,6 +76,27 @@ def test_select_empty_transcript():
     assert selection.select([], [], chat=FakeChat([])).clips == []
 
 
+def test_select_notes_when_nothing_survives_packing():
+    from tests.llm_fakes import FakeChat
+
+    chat = FakeChat([json.dumps([])])
+    result = selection.select(transcript(), [], chat=chat)
+    assert result.clips == []
+    assert result.note == "No moment passed the clip checks. Try another video, or re-run later."
+
+
+def test_select_notes_zero_clips_after_skipped_note(monkeypatch):
+    from tests.llm_fakes import FakeChat
+
+    monkeypatch.setattr(ranker, "WINDOW_TOKENS", 30)
+    chat = FakeChat([RuntimeError("boom"), json.dumps([])])
+    result = selection.select(transcript(10), [], chat=chat)
+    assert result.clips == []
+    assert result.note is not None
+    assert result.note.startswith("Skipped ") and "Some moments may be missing." in result.note
+    assert result.note.endswith("No moment passed the clip checks. Try another video, or re-run later.")
+
+
 def test_skipped_note_merges_ranges():
     note = selection.skipped_note([
         ranker.Skipped(750.0, 900.0, "rate limit"),
