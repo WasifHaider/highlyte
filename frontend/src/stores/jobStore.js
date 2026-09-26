@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import {
-  clipDownloadUrl, createJob, getHealth, getJobStatus, getRender, saveClipStyle, startRender,
+  clipDownloadUrl, createJob, getHealth, getJobStatus, getRender,
+  saveCaptions as apiSaveCaptions, resetCaptions as apiResetCaptions,
+  saveClipStyle, startRender,
 } from '../services/highlyteApi'
 import { layoutAllowed } from '../utils/clipStyle'
 
@@ -129,6 +131,20 @@ export const useJobStore = defineStore('job', {
         changed++
       }
       return changed
+    },
+    async saveCaptions(clipId, words) {
+      const clip = this.clips.find(c => c.id === clipId)
+      if (!clip) return
+      const res = await apiSaveCaptions(clipId, words)
+      clip.spec = { ...clip.spec, words: res.words }
+      clip.captionsEdited = res.captionsEdited
+    },
+    async resetCaptions(clipId) {
+      const clip = this.clips.find(c => c.id === clipId)
+      if (!clip) return
+      const res = await apiResetCaptions(clipId)
+      clip.spec = { ...clip.spec, words: res.words }
+      clip.captionsEdited = res.captionsEdited
     },
     async exportSelected() {
       const clips = this.clips.filter(c => this.selected[c.id] && c.spec)

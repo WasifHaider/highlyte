@@ -1,7 +1,7 @@
 <template>
   <div class="clip-card">
     <div class="preview">
-      <RemotionPreview v-if="clip.spec" :spec="clip.spec" :clip-style="clip.style" />
+      <RemotionPreview v-if="clip.spec" :spec="previewSpec" :clip-style="clip.style" />
       <div v-else class="no-preview">No vertical preview for this clip. Re-run the video to generate one.</div>
     </div>
 
@@ -57,6 +57,7 @@
           </label>
         </div>
         <div v-if="clip.spec.wordsApprox" class="note">Approximate caption sync</div>
+        <CaptionEditor :clip-id="clip.id" :words="clip.spec.words" :edited="!!clip.captionsEdited" @draft="draftWords = $event" />
       </template>
 
       <div class="clip-snippet">"{{ snippet }}"</div>
@@ -80,10 +81,11 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import { clipDownloadUrl } from '../services/highlyteApi'
 import RemotionPreview from './RemotionPreview.vue'
+import CaptionEditor from './CaptionEditor.vue'
 import { LAYOUTS, PRESETS, layoutAllowed } from '../utils/clipStyle'
 
 const props = defineProps({
@@ -94,6 +96,8 @@ defineEmits(['toggle'])
 
 const jobStore = useJobStore()
 const render = computed(() => jobStore.renders[props.clip.id])
+const draftWords = ref(null)
+const previewSpec = computed(() => draftWords.value ? { ...props.clip.spec, words: draftWords.value } : props.clip.spec)
 const snippet = computed(() => {
   const t = props.clip.text || ''
   return t.length > 220 ? t.slice(0, 217) + '…' : t

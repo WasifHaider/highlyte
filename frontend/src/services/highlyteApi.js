@@ -51,6 +51,14 @@ export function saveClipStyle(clipId, style) {
   return api.patch(`/api/clips/${clipId}/style`, style).then(r => r.data)
 }
 
+export function saveCaptions(clipId, words) {
+  return api.put(`/api/clips/${clipId}/captions`, { words }).then(r => r.data)
+}
+
+export function resetCaptions(clipId) {
+  return api.post(`/api/clips/${clipId}/captions/reset`).then(r => r.data)
+}
+
 export function startRender(clipId, style) {
   return api.post(`/api/clips/${clipId}/render`, style).then(r => r.data)
 }
