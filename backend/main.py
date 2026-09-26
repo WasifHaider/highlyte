@@ -15,7 +15,7 @@ from typing import Any, Literal
 from fastapi import Body, Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from . import accounts, db, projects, render, storage
 from .accounts import Member, current_member
@@ -485,7 +485,10 @@ def start_render(clip_id: str, style: ClipStyle = Body(...), member: Member = De
     if not record.get("storageKey"):
         raise HTTPException(409, "This clip's source isn't in R2, which Lambda rendering needs.")
     _save_style(record, style)
-    words = [Word.model_validate(w) for w in record["spec"]["words"]]
+    try:
+        words = [Word.model_validate(w) for w in record["spec"]["words"]]
+    except (KeyError, TypeError, ValidationError):
+        raise HTTPException(409, "This clip's captions can't be read. Re-run the video.")
     return RENDER_SERVICE.request(clip_id, style, words).to_api()
 
 

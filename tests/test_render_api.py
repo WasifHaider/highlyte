@@ -107,6 +107,14 @@ def test_render_requires_r2_source(env):
     assert client.post(f"/api/clips/{CLIP_ID}/render", json=STYLE).status_code == 409
 
 
+def test_render_rejects_unreadable_captions(env):
+    record, _ = env
+    record["spec"]["words"] = [{"text": "a"}]
+    r = client.post(f"/api/clips/{CLIP_ID}/render", json=STYLE)
+    assert r.status_code == 409
+    assert r.json()["detail"] == "This clip's captions can't be read. Re-run the video."
+
+
 def test_render_unknown_clip(env):
     assert client.post("/api/clips/abc123def456-9/render", json=STYLE).status_code == 404
 
