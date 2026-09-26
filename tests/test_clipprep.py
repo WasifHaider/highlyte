@@ -106,3 +106,31 @@ def test_prepare_clip_face_unknown_when_detection_fails(tmp_path, monkeypatch):
 
     _patch_media(monkeypatch, boom)
     assert _prepare(tmp_path).face_at_start is None
+
+
+def test_clip_filename_keeps_revision_zero_names():
+    assert clipprep.clip_filename(3) == "clip_3.mp4"
+    assert clipprep.clip_filename(3, 0) == "clip_3.mp4"
+    assert clipprep.clip_filename(3, 2) == "clip_3_r2.mp4"
+
+
+def test_prepare_clip_revision_writes_its_own_file_and_key(tmp_path, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("no mediapipe")
+
+    _patch_media(monkeypatch, boom)
+    uploads = []
+    monkeypatch.setattr(clipprep.storage, "is_enabled", lambda: True)
+    monkeypatch.setattr(clipprep.storage, "upload_clip", lambda path, key: uploads.append((os.path.basename(path), key)))
+    old = os.path.join(tmp_path, "abc123def456", "clip_0.mp4")
+    os.makedirs(os.path.dirname(old))
+    open(old, "wb").write(b"old")
+    clip = Clip(start=11.0, end=25.0, text="t", score=5.0, tag="Key insight")
+    prepared = clipprep.prepare_clip(
+        job_id="abc123def456", idx=0, clip=clip, video_path="v.mp4", video_duration=100.0,
+        segments=[], clips_dir=str(tmp_path), models_dir=str(tmp_path), on_step=lambda s: None, revision=2,
+    )
+    assert prepared.filename == "clip_0_r2.mp4"
+    assert prepared.storage_key == "abc123def456/clip_0_r2.mp4"
+    assert uploads == [("clip_0_r2.mp4", "abc123def456/clip_0_r2.mp4")]
+    assert open(old, "rb").read() == b"old"  # the current clip's file is untouched

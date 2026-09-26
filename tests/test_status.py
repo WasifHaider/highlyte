@@ -165,3 +165,11 @@ def test_status_db_fallback_reports_orphaned_pending_action_as_interrupted(monke
     clip = body["clips"][0]
     assert clip["pendingAction"] is None
     assert clip["actionError"] == "Interrupted by a server restart. Try again."
+
+
+def test_retry_selection_refused_does_not_install_the_job(monkeypatch):
+    main.JOBS.pop("feed00000001", None)
+    _start_inline(monkeypatch)
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: _job_row(status="done"))
+    assert client.post("/api/jobs/feed00000001/select").status_code == 409
+    assert "feed00000001" not in main.JOBS

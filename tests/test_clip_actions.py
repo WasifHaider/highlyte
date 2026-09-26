@@ -205,3 +205,107 @@ def test_swap_recovers_a_job_rebuilt_with_an_orphaned_pending_action(monkeypatch
     # comes before the final "swap done" write in the recorded updates.
     assert (f"{JOB}-0", {"pending_action": None, "action_error": "Interrupted by a server restart. Try again."}) in updates
     main.JOBS.pop(JOB, None)
+
+
+def _media_env(monkeypatch, tmp_path, job):
+    """Old clip 0 lives at clip_0.mp4 (local file and R2 key); the fake
+    prepare_clip writes its replacement where the real one would."""
+    monkeypatch.setattr(main, "CLIPS_DIR", str(tmp_path))
+    job_dir = tmp_path / JOB
+    job_dir.mkdir()
+    (job_dir / "clip_0.mp4").write_bytes(b"old")
+    rec = job.clips[0]
+    rec["storageProvider"], rec["storageKey"] = "r2", f"{JOB}/clip_0.mp4"
+    seen, deleted = {}, []
+
+    def fake_prepare(**kw):
+        seen.update(kw)
+        name = clipprep.clip_filename(kw["idx"], kw["revision"])
+        (job_dir / name).write_bytes(b"new")
+        with open(FIXTURE_V2, encoding="utf-8") as f:
+            spec = json.load(f)
+        spec["clipId"] = f"{JOB}-{kw['idx']}"
+        return clipprep.PreparedClip(spec=ClipSpec.model_validate(spec), storage_key=f"{JOB}/{name}",
+                                     face_at_start=True, filename=name)
+
+    monkeypatch.setattr(main.clipprep, "prepare_clip", fake_prepare)
+    monkeypatch.setattr(main.storage, "delete_clip", lambda key: deleted.append(key))
+    return job_dir, seen, deleted
+
+
+def test_swap_writes_a_new_revision_and_drops_the_old_media(env, monkeypatch, tmp_path):
+    job, writes, _ = env
+    job_dir, seen, deleted = _media_env(monkeypatch, tmp_path, job)
+    assert client.post(f"/api/clips/{JOB}-0/swap").status_code == 200
+    assert seen["revision"] == 1
+    new = job.clips[0]
+    assert new["downloadUrl"] == f"/api/clips/{JOB}/clip_0_r1.mp4"
+    assert new["storageKey"] == f"{JOB}/clip_0_r1.mp4" and new["revision"] == 1
+    fields = writes[-1][1]
+    assert fields["download_path"] == new["downloadUrl"] and fields["storage_key"] == new["storageKey"]
+    assert fields["revision"] == 1
+    assert (job_dir / "clip_0_r1.mp4").exists()
+    assert not (job_dir / "clip_0.mp4").exists()
+    assert deleted == [f"{JOB}/clip_0.mp4"]
+    # The new name is served by the clip route.
+    r = client.get(f"/api/clips/{JOB}/clip_0_r1.mp4")
+    assert r.status_code == 200 and r.content == b"new"
+
+
+def test_second_swap_replaces_revision_one_with_revision_two(env, monkeypatch, tmp_path):
+    job, _, _ = env
+    job_dir, seen, deleted = _media_env(monkeypatch, tmp_path, job)
+    job.alternates.append({"start": 700.0, "end": 720.0, "text": "more", "score": 7.0, "tag": "Key insight",
+                           "flags": [], "reason": "r3", "emphasis": []})
+    assert client.post(f"/api/clips/{JOB}-0/swap").status_code == 200
+    assert client.post(f"/api/clips/{JOB}-0/swap").status_code == 200
+    assert seen["revision"] == 2
+    assert job.clips[0]["downloadUrl"] == f"/api/clips/{JOB}/clip_0_r2.mp4"
+    assert sorted(p.name for p in job_dir.iterdir()) == ["clip_0_r2.mp4"]
+    assert deleted == [f"{JOB}/clip_0.mp4", f"{JOB}/clip_0_r1.mp4"]
+
+
+def test_failure_after_prepare_keeps_the_old_media(env, monkeypatch, tmp_path):
+    job, _, _ = env
+    job_dir, _, deleted = _media_env(monkeypatch, tmp_path, job)
+
+    def boom(cid, fields):
+        raise RuntimeError("supabase down")
+
+    monkeypatch.setattr(main.db, "update_clip_checked", boom)
+    client.post(f"/api/clips/{JOB}-0/swap")
+    rec = job.clips[0]
+    assert rec["revision"] == 0 and rec["text"] == "old" and rec["pendingAction"] is None
+    assert rec["downloadUrl"] == f"/api/clips/{JOB}/clip_0.mp4"
+    assert rec["storageKey"] == f"{JOB}/clip_0.mp4"
+    assert rec["actionError"] == "Couldn't swap this clip: supabase down"
+    assert (job_dir / "clip_0.mp4").read_bytes() == b"old"
+    # The half-made replacement is cleaned up; the old object is not touched.
+    assert not (job_dir / "clip_0_r1.mp4").exists()
+    assert deleted == [f"{JOB}/clip_0_r1.mp4"]
+    assert [a["reason"] for a in job.alternates] == ["r1", "r2"]
+
+
+def test_old_media_delete_failure_does_not_fail_the_action(env, monkeypatch, tmp_path):
+    job, _, _ = env
+    _media_env(monkeypatch, tmp_path, job)
+
+    def boom(key):
+        raise RuntimeError("r2 down")
+
+    monkeypatch.setattr(main.storage, "delete_clip", boom)
+    assert client.post(f"/api/clips/{JOB}-0/swap").status_code == 200
+    assert job.clips[0]["revision"] == 1 and job.clips[0]["actionError"] is None
+
+
+def test_action_on_an_unfinished_rebuilt_job_does_not_install_it(monkeypatch):
+    main.JOBS.pop(JOB, None)
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: {
+        "id": JOB, "url": "https://youtu.be/x", "status": "transcribing", "team_id": TEST_TEAM_ID,
+    })
+    monkeypatch.setattr(main.db, "list_clips_for_job", lambda job_id: [])
+    r = client.post(f"/api/clips/{JOB}-0/swap")
+    assert r.status_code == 409 and r.json()["detail"] == "Clips can be changed once the video is done."
+    assert JOB not in main.JOBS
+    # The status fallback still reports it as interrupted.
+    assert client.get(f"/api/status/{JOB}").json()["status"] == "error"

@@ -31,6 +31,15 @@ class PreparedClip:
     spec: ClipSpec
     storage_key: str | None
     face_at_start: bool | None = None
+    filename: str | None = None
+
+
+def clip_filename(idx: int, revision: int = 0) -> str:
+    """The segment's file name (and R2 key suffix). Revision 0 keeps the
+    original clip_{idx}.mp4, so clips made before Swap/Regenerate existed
+    still resolve; a replacement gets its own name, so preparing it never
+    touches the file or object the current clip still points at."""
+    return f"clip_{idx}.mp4" if revision <= 0 else f"clip_{idx}_r{revision}.mp4"
 
 
 def segment_bounds(clip_start: float, clip_end: float, video_duration: float) -> tuple[float, float]:
@@ -52,9 +61,10 @@ def prepare_clip(
     clips_dir: str,
     models_dir: str,
     on_step: Callable[[str], None],
+    revision: int = 0,
 ) -> PreparedClip:
     clip_id = f"{job_id}-{idx}"
-    filename = f"clip_{idx}.mp4"
+    filename = clip_filename(idx, revision)
     local_path = os.path.join(clips_dir, job_id, filename)
     seg_start, seg_end = segment_bounds(clip.start, clip.end, video_duration)
     offset = clip.start - seg_start
@@ -102,4 +112,4 @@ def prepare_clip(
         viralityScore=max(0.0, min(10.0, round(clip.score, 1))),
         reframe=reframe_result,
     )
-    return PreparedClip(spec=spec, storage_key=storage_key, face_at_start=face_at_start)
+    return PreparedClip(spec=spec, storage_key=storage_key, face_at_start=face_at_start, filename=filename)

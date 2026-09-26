@@ -144,3 +144,13 @@ def test_render_not_configured(env, monkeypatch):
 def test_zip_rejects_unfinished_and_bad_ids(env):
     assert client.get("/api/renders/zip?ids=../x").status_code == 400
     assert client.get("/api/renders/zip?ids=nope00000000").status_code == 404
+
+
+def test_render_refused_while_clip_is_being_replaced(env):
+    record, fake = env
+    record["pendingAction"] = "swap"
+    old_style = dict(record["style"])
+    r = client.post(f"/api/clips/{CLIP_ID}/render", json=STYLE)
+    assert r.status_code == 409
+    assert r.json()["detail"] == "This clip is being replaced. Wait for it to finish."
+    assert record["style"] == old_style and fake.props is None

@@ -12,7 +12,9 @@ import re
 from fastapi import HTTPException
 
 ID_RE = re.compile(r"^[a-z0-9-]{1,64}$")
-CLIP_FILENAME_RE = re.compile(r"^clip_\d{1,3}\.mp4$")
+# clip_{idx}.mp4 for a clip as first prepared (revision 0);
+# clip_{idx}_r{revision}.mp4 for one replaced by Swap or Regenerate.
+CLIP_FILENAME_RE = re.compile(r"^clip_\d{1,3}(_r\d{1,6})?\.mp4$")
 
 
 def check_id(value: str, what: str = "id") -> str:

@@ -54,3 +54,14 @@ def test_generate_accepts_language_and_defaults_to_hinglish(monkeypatch):
     assert [j.language_requested for j in started] == ["hinglish", "english"]
     for j in started:
         main.JOBS.pop(j.id, None)
+
+
+@pytest.mark.parametrize("value", ["clip_0_r1.mp4", "clip_12_r345.mp4"])
+def test_check_clip_filename_accepts_revisions(value):
+    assert check_clip_filename(value) == value
+
+
+@pytest.mark.parametrize("value", ["clip_0_r.mp4", "clip_0_rx.mp4", "clip_0_r1.mp4/..", "clip_0-r1.mp4"])
+def test_check_clip_filename_rejects_bad_revisions(value):
+    with pytest.raises(HTTPException):
+        check_clip_filename(value)

@@ -25,6 +25,7 @@ from .pipeline import clipprep, cut, groq_llm, ingest, scoring, selection, trans
 from .pipeline.segments import Segment
 from .pipeline.segments import from_dict as segment_from_dict
 from .spec import ClipStyle, Word, default_style, window_duration
+from . import validation
 from .validation import check_clip_filename, check_id
 
 MIN_CLIP_S = 8.0
@@ -186,8 +187,11 @@ def _start_thread(target, *args) -> None:
     threading.Thread(target=target, args=args, daemon=True).start()
 
 
-def _clip_record(job_id: str, idx: int, clip: selection.Clip, prepared: clipprep.PreparedClip) -> dict[str, Any]:
+def _clip_record(
+    job_id: str, idx: int, clip: selection.Clip, prepared: clipprep.PreparedClip, revision: int = 0,
+) -> dict[str, Any]:
     spec = prepared.spec
+    filename = prepared.filename or clipprep.clip_filename(idx, revision)
     return {
         "id": spec.clipId,
         "start": clip.start,
@@ -200,7 +204,7 @@ def _clip_record(job_id: str, idx: int, clip: selection.Clip, prepared: clipprep
         "score": clip.score,
         "hookTitle": spec.hookTitle,
         "viralityScore": spec.viralityScore,
-        "downloadUrl": f"/api/clips/{job_id}/clip_{idx}.mp4",
+        "downloadUrl": f"/api/clips/{job_id}/{filename}",
         "storageProvider": "r2" if prepared.storage_key else "local",
         "storageKey": prepared.storage_key,
         "spec": spec.model_dump(),
@@ -211,7 +215,7 @@ def _clip_record(job_id: str, idx: int, clip: selection.Clip, prepared: clipprep
         "actionError": None,
         "boundsOriginal": None,
         "boundsEdited": False,
-        "revision": 0,
+        "revision": revision,
     }
 
 
@@ -505,10 +509,12 @@ def retry_selection(job_id: str, member: Member = Depends(current_member)) -> di
             row = db.get_job(job_id)
             if row is None:
                 raise HTTPException(404, "job not found")
-            # setdefault, not JOBS[job_id] = ..., so a second request that
-            # raced here shares the same Job another request just installed
-            # rather than building its own and re-passing the status check.
-            job = JOBS.setdefault(job_id, _job_from_row(row))
+            # Built locally and only installed into JOBS (below, still under
+            # the lock) once the status check passes: installing first would
+            # leave e.g. a done job in memory with no clips, or an
+            # interrupted one reported as still processing. The lock is what
+            # stops a racing second request from re-passing the check.
+            job = _job_from_row(row)
         if job.status != "selection_failed":
             raise HTTPException(409, "Clip selection can only be retried after it failed.")
         previous_error = job.error
@@ -811,13 +817,20 @@ def _start_clip_action(clip_id: str, kind: str, member: Member) -> dict[str, Any
             row = db.get_job(job_id)
             if row is None:
                 raise HTTPException(404, "job not found")
-            job = JOBS.setdefault(job_id, _job_from_row(row))
+            # Only installed into JOBS once it is known to be done, with its
+            # clips loaded: a job whose worker died with the old process
+            # must keep being reported by the status fallback as
+            # interrupted, not as still processing.
+            if row.get("status") != "done":
+                raise HTTPException(409, "Clips can be changed once the video is done.")
+            job = _job_from_row(row)
             new_clips = []
             for r in db.list_clips_for_job(job_id):
                 c = _clip_row_to_api(r)
                 _clear_orphaned_pending_action(r, c)
                 new_clips.append(c)
             job.clips = new_clips
+            JOBS[job_id] = job
         if job.status != "done":
             raise HTTPException(409, "Clips can be changed once the video is done.")
         record = next((c for c in job.clips if c["id"] == clip_id), None)
@@ -848,6 +861,24 @@ def _start_clip_action(clip_id: str, kind: str, member: Member) -> dict[str, Any
     return {"clipId": clip_id, "pendingAction": kind}
 
 
+def _delete_clip_media(job_id: str, filename: str, storage_key: str | None) -> None:
+    """Best-effort removal of a clip segment's local file and R2 object.
+    Never raises: a leftover file only costs space, while raising here
+    would fail an action whose result is already saved."""
+    try:
+        if validation.CLIP_FILENAME_RE.fullmatch(filename or ""):
+            path = os.path.join(CLIPS_DIR, job_id, filename)
+            if os.path.exists(path):
+                os.remove(path)
+    except Exception as e:  # noqa: BLE001
+        print(f"[clips] couldn't delete {job_id}/{filename}: {e}")
+    if storage_key:
+        try:
+            storage.delete_clip(storage_key)
+        except Exception as e:  # noqa: BLE001
+            print(f"[r2] couldn't delete {storage_key}: {e}")
+
+
 def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:
     record = next((c for c in job.clips if c["id"] == clip_id), None)
     idx = int(clip_id.rsplit("-", 1)[1])
@@ -860,6 +891,12 @@ def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:
 
     picked_alt: dict[str, Any] | None = None
     new_record: dict[str, Any] | None = None
+    prepared: clipprep.PreparedClip | None = None
+    # The replacement is cut to its own file name / R2 key, so the current
+    # clip keeps playing (and rendering) from untouched media until the new
+    # one is committed, and a failure leaves it exactly as it was.
+    new_revision = ((record.get("revision") or 0) if record is not None else 0) + 1
+    new_filename = clipprep.clip_filename(idx, new_revision)
     try:
         stored = db.get_transcript(job.id)
         if stored is None:
@@ -901,8 +938,9 @@ def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:
             job_id=job.id, idx=idx, clip=new_clip, video_path=meta.video_path,
             video_duration=meta.duration, segments=transcript.word_segments(segs),
             clips_dir=CLIPS_DIR, models_dir=MODELS_DIR, on_step=lambda s: None,
+            revision=new_revision,
         )
-        new_record = _clip_record(job.id, idx, new_clip, prepared)
+        new_record = _clip_record(job.id, idx, new_clip, prepared, revision=new_revision)
         old_style = record["style"]
         new_record["style"] = {
             **new_record["style"],
@@ -910,11 +948,13 @@ def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:
             "accent": old_style["accent"],
             "captionPosition": old_style["captionPosition"],
         }
-        new_record["revision"] = (record.get("revision") or 0) + 1
         fields = {k: v for k, v in _clip_row(job.id, idx, new_record).items() if k != "id"}
         fields |= {"words_original": None, "bounds_original": None, "pending_action": None, "action_error": None}
         db.update_clip_checked(clip_id, fields)
     except Exception as e:  # noqa: BLE001
+        # Never committed: drop the half-made replacement; the old clip's
+        # own file and object were never touched.
+        _delete_clip_media(job.id, new_filename, prepared.storage_key if prepared is not None else None)
         fail(f"Couldn't {'swap' if kind == 'swap' else 'regenerate'} this clip: {e}")
         return
 
@@ -922,6 +962,11 @@ def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:
         if c["id"] == clip_id:
             job.clips[pos] = new_record
             break
+    # Saved and swapped in, so nothing points at the old media any more.
+    old_filename = (record.get("downloadUrl") or "").rsplit("/", 1)[-1]
+    old_key = record.get("storageKey")
+    if old_filename != new_filename:
+        _delete_clip_media(job.id, old_filename, old_key if old_key != new_record["storageKey"] else None)
     if kind == "swap":
         try:
             job.alternates.remove(picked_alt)
@@ -943,6 +988,8 @@ def regenerate_clip(clip_id: str, member: Member = Depends(current_member)) -> d
 @app.post("/api/clips/{clip_id}/render")
 def start_render(clip_id: str, style: ClipStyle = Body(...), member: Member = Depends(current_member)) -> dict[str, Any]:
     record = _clip_for_style(clip_id, member)
+    if record.get("pendingAction"):
+        raise HTTPException(409, "This clip is being replaced. Wait for it to finish.")
     if RENDER_SERVICE is None:
         raise HTTPException(503, "Rendering not configured")
     if not record.get("storageKey"):
