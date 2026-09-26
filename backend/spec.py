@@ -6,9 +6,11 @@ A style holds what the team chose for it and changes freely. Remotion
 receives both as {spec, style} input props, so the browser preview and
 the Lambda render draw exactly the same thing.
 
-All times are seconds. `start`/`end` are positions inside the padded
-source segment; word and face-track times are relative to the clip's
-own start (i.e. to `start`).
+All times are seconds. start/end are positions inside the padded source
+segment (the cut file). In version 2, word, face-track, speaker and shot
+times are also positions inside the cut file and cover the whole file;
+in version 1 they covered only the clip and were relative to start. The
+renderer converts both to clip time (renderer/src/lib/timeline.ts).
 """
 from __future__ import annotations
 
@@ -36,6 +38,7 @@ class Source(BaseModel):
     width: int = Field(gt=0)
     height: int = Field(gt=0)
     fps: float = Field(gt=0)
+    duration: float | None = Field(None, gt=0)  # seconds of the cut file; v2 only
 
 
 class TrackPoint(BaseModel):
@@ -80,7 +83,7 @@ class Reframe(BaseModel):
 
 
 class ClipSpec(BaseModel):
-    version: Literal[1] = 1
+    version: Literal[1, 2] = 2
     clipId: str
     source: Source
     start: float = Field(ge=0)
@@ -90,6 +93,15 @@ class ClipSpec(BaseModel):
     hookTitle: str | None
     viralityScore: float = Field(ge=0, le=10)
     reframe: Reframe
+
+
+def window_duration(spec: dict) -> float | None:
+    """Length of a v2 clip's cut file, which bounds nudges and caption
+    times. None for v1 clips, which cannot be trimmed."""
+    if spec.get("version") != 2:
+        return None
+    duration = (spec.get("source") or {}).get("duration")
+    return float(duration) if duration else None
 
 
 class ClipStyle(BaseModel):
@@ -117,12 +129,12 @@ def style_hash(style: ClipStyle) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
-def render_hash(style: ClipStyle, words: list[Word]) -> str:
+def render_hash(style: ClipStyle, words: list[Word], bounds: tuple[float, float] | None = None) -> str:
     """Fingerprint of everything an export depends on that a user can
-    change: the style and the caption words. Editing captions must not
-    reuse the mp4 rendered with the old text."""
-    payload = json.dumps(
-        {"style": style.model_dump(), "words": [w.model_dump() for w in words]},
-        sort_keys=True, separators=(",", ":"),
-    )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    change: the style, the caption words and (once clips can be trimmed)
+    the clip's bounds. Editing any of them must not reuse the old mp4."""
+    payload: dict = {"style": style.model_dump(), "words": [w.model_dump() for w in words]}
+    if bounds is not None:
+        payload["bounds"] = [round(bounds[0], 3), round(bounds[1], 3)]
+    data = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(data.encode("utf-8")).hexdigest()[:16]

@@ -9,9 +9,9 @@ from backend.pipeline.transcript import TranscriptSegment as Seg
 
 
 def test_segment_bounds_pads_and_clamps():
-    assert clipprep.segment_bounds(11.0, 40.0, 100.0) == (10.0, 41.0)
+    assert clipprep.segment_bounds(11.0, 40.0, 100.0) == (3.0, 48.0)
     assert clipprep.segment_bounds(0.4, 20.0, 20.5) == (0.0, 20.5)
-    assert clipprep.segment_bounds(5.0, 20.0, 0.0) == (4.0, 21.0)  # unknown duration: no clamp
+    assert clipprep.segment_bounds(5.0, 20.0, 0.0) == (0.0, 28.0)  # unknown duration: no clamp
 
 
 def _patch_media(monkeypatch, detect):
@@ -38,7 +38,7 @@ def _prepare(tmp_path):
 
 
 def test_prepare_clip_builds_spec(tmp_path, monkeypatch):
-    # segment starts at 10.0, so the clip starts 1.0 s into it
+    # segment starts at 3.0, so the clip starts 8.0 s into it
     times = [round(i / 5, 3) for i in range(80)]  # 0-16 s of the segment
     frames = [[Detection(0.5, 0.4, 0.2, 0.3, 0.1)] for _ in times]
     thumbs = [np.zeros((18, 32), dtype=np.float32) for _ in times]
@@ -47,15 +47,17 @@ def test_prepare_clip_builds_spec(tmp_path, monkeypatch):
     prepared = _prepare(tmp_path)
     spec = prepared.spec
     assert spec.clipId == "abc123def456-0"
-    assert (spec.start, spec.end) == (1.0, 15.0)
+    assert spec.version == 2
+    assert (spec.start, spec.end) == (8.0, 22.0)
+    assert spec.source.duration == 30.0          # segment 3.0-33.0
     assert spec.source.width == 1920 and spec.source.url == ""
-    assert [(w.text, w.start, w.emphasis) for w in spec.words] == [("hey", 0.2, True), ("there", 0.5, False)]
+    assert [(w.text, w.start, w.emphasis) for w in spec.words] == [("hey", 8.2, True), ("there", 8.5, False)]
     assert spec.wordsApprox is False
     assert spec.hookTitle == "Hook"
     assert spec.viralityScore == 10.0  # clamped
     assert spec.reframe.auto == "follow"
     track = spec.reframe.faces[0].track
-    assert track[0].t == 0.0 and track[-1].t <= 14.0  # re-based to the clip start, trimmed to the clip
+    assert track[0].t == 0.0 and track[-1].t > 14.0  # whole window, file time (no longer trimmed to the clip)
     assert prepared.storage_key is None  # R2 disabled in tests
     assert os.path.exists(os.path.join(tmp_path, "abc123def456", "clip_0.mp4"))
     assert [s.kind for s in spec.reframe.shots] == ["one"]
@@ -69,9 +71,8 @@ def test_prepare_clip_detects_a_camera_cut(tmp_path, monkeypatch):
     _patch_media(monkeypatch, lambda path, model, sample_fps=5.0: (frames, times, thumbs))
     shots = _prepare(tmp_path).spec.reframe.shots
     assert [s.kind for s in shots] == ["two", "one"]
-    # cut sample at segment time 9.0, previous sample at 8.8 -> midpoint 8.9,
-    # minus the 1.0 s offset
-    assert shots[1].start == 7.9
+    # cut sample at segment time 9.0, previous sample at 8.8 -> midpoint 8.9 (file time)
+    assert shots[1].start == 8.9
 
 
 def test_prepare_clip_survives_face_detection_failure(tmp_path, monkeypatch):
@@ -91,9 +92,9 @@ def test_prepare_clip_reports_a_face_at_the_start(tmp_path, monkeypatch):
 
 
 def test_prepare_clip_reports_no_face_at_the_start(tmp_path, monkeypatch):
-    # segment time 1.0 is the clip start; no face until segment time 3.0
+    # clip starts at segment time 8.0; no face until segment time 10.0
     times = [round(i / 5, 3) for i in range(80)]
-    frames = [[] if t < 3.0 else [Detection(0.5, 0.4, 0.2, 0.3, 0.1)] for t in times]
+    frames = [[] if t < 10.0 else [Detection(0.5, 0.4, 0.2, 0.3, 0.1)] for t in times]
     thumbs = [np.zeros((18, 32), dtype=np.float32) for _ in times]
     _patch_media(monkeypatch, lambda path, model, sample_fps=5.0: (frames, times, thumbs))
     assert _prepare(tmp_path).face_at_start is False

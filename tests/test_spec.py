@@ -27,7 +27,7 @@ def _spec(**overrides) -> ClipSpec:
 
 def test_spec_defaults_version_and_emphasis():
     spec = _spec()
-    assert spec.version == 1
+    assert spec.version == 2
     assert spec.words[0].emphasis is False
 
 
@@ -103,3 +103,24 @@ def test_reframe_shots_default_and_round_trip():
         "shots": [{"start": 0.0, "end": 4.0, "kind": "two", "faceIds": [0, 1]}],
     })
     assert new.model_dump()["shots"][0] == {"start": 0.0, "end": 4.0, "kind": "two", "faceIds": [0, 1]}
+
+
+def test_v2_fixture_round_trips_and_has_window():
+    import json, os
+    from backend.spec import ClipSpec, window_duration
+
+    path = os.path.join(os.path.dirname(__file__), "..", "renderer", "src", "__fixtures__", "clip-spec-v2.json")
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    spec = ClipSpec.model_validate(data)
+    assert spec.version == 2 and spec.source.duration == 12.0
+    assert window_duration(data) == 12.0
+    assert window_duration({**data, "version": 1}) is None
+
+
+def test_render_hash_changes_with_bounds():
+    from backend.spec import ClipStyle, Word, render_hash
+
+    style, words = ClipStyle(layout="fit"), [Word(text="a", start=0, end=1)]
+    assert render_hash(style, words) == render_hash(style, words, None)
+    assert render_hash(style, words, (1.0, 9.0)) != render_hash(style, words, (1.5, 9.0))

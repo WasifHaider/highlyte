@@ -1,7 +1,9 @@
 """Everything that happens to one clip after it's picked: cut its
 padded 16:9 segment, time its words, analyse faces, upload the segment,
 and describe the result as a ClipSpec. The renderer (Remotion) draws the
-final 9:16 short from that spec; no finished video is made here.
+final 9:16 short from that spec; no finished video is made here. The
+segment carries an 8 s spare window either side of the clip, so a later
+nudge or "include the next sentence" edit never needs a re-cut.
 """
 from __future__ import annotations
 
@@ -15,9 +17,9 @@ from . import cut, face_detect, reframe, shots, words
 from .selection import Clip
 from .transcript import TranscriptSegment
 
-# Extra source video kept either side of the clip, so the renderer and
-# any later trim editing have a little room without re-cutting.
-SEGMENT_PAD_S = 1.0
+# Spare source video either side of the clip: nudges and "include the
+# next sentence" stay inside it, so they never need a re-cut.
+SEGMENT_PAD_S = 8.0
 
 # A face must show within this long of the clip start, or the clip gets a
 # "No face at start" QA flag.
@@ -63,20 +65,16 @@ def prepare_clip(
     width, height, fps = cut.probe_video(local_path)
 
     on_step("timing captions")
-    clip_word_list = words.clip_words(segments, clip.start, clip.end, clip.emphasis)
+    clip_word_list = words.clip_words(segments, seg_start, seg_end, clip.emphasis)
 
     on_step("framing")
     face_at_start: bool | None = None
     try:
         frames, times, thumbs = face_detect.sample_detections(local_path, face_detect.ensure_model(models_dir))
-        # Keep only samples inside the clip itself, re-based to its start.
-        kept = [(round(t - offset, 3), f, th) for t, f, th in zip(times, frames, thumbs)
-                if offset <= t <= offset + duration]
-        opening = [f for t, f, _ in kept if t <= FACE_START_S]
+        opening = [f for t, f in zip(times, frames) if offset <= t <= offset + FACE_START_S]
         face_at_start = any(len(f) > 0 for f in opening) if opening else None
-        kept_times = [t for t, _, _ in kept]
-        cuts = shots.cut_times([th for _, _, th in kept], kept_times)
-        reframe_result = reframe.analyze([f for _, f, _ in kept], kept_times, cuts)
+        cuts = shots.cut_times(thumbs, times)
+        reframe_result = reframe.analyze(frames, times, cuts)
     except Exception as e:  # noqa: BLE001
         print(f"[reframe] face analysis failed for {clip_id}, using fit: {e}")
         reframe_result = reframe.fallback()
@@ -93,8 +91,9 @@ def prepare_clip(
             print(f"[r2] upload failed for {job_id}/{filename}, keeping local copy: {e}")
 
     spec = ClipSpec(
+        version=2,
         clipId=clip_id,
-        source=Source(url="", width=width, height=height, fps=fps),
+        source=Source(url="", width=width, height=height, fps=fps, duration=round(seg_end - seg_start, 3)),
         start=round(offset, 3),
         end=round(offset + duration, 3),
         words=clip_word_list,
