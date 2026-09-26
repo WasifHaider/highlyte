@@ -202,6 +202,8 @@ function set(patch) {
 .action-link { font-size: 12.5px; font-weight: 600; color: var(--accent); }
 .pending-note { font-size: 12.5px; color: var(--ink-soft); }
 .action-error { color: #9C3B14; font-size: 12.5px; }
+/* CSS-only disable: CaptionEditor has no `disabled` prop, so a pending
+   swap/regenerate is blocked here by dimming and swallowing clicks. */
 .controls-disabled { opacity: .6; pointer-events: none; }
 .render-status { font-size: 13px; color: var(--ink-soft); }
 .render-status.error { color: #9C3B14; }

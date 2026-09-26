@@ -148,8 +148,9 @@ export const useJobStore = defineStore('job', {
       for (const clip of this.clips) {
         if (!clip.spec) continue
         const clipPatch = { ...patch }
-        if ('layout' in clipPatch && !layoutAllowed(clipPatch.layout, toClipTime(clip.spec).reframe)) {
-          clipPatch.layout = clip.spec.reframe.auto
+        const clipTimeReframe = toClipTime(clip.spec).reframe
+        if ('layout' in clipPatch && !layoutAllowed(clipPatch.layout, clipTimeReframe)) {
+          clipPatch.layout = clipTimeReframe.auto
         }
         this.updateStyle(clip.id, clipPatch)
         changed++
@@ -162,6 +163,7 @@ export const useJobStore = defineStore('job', {
       const res = await apiSaveCaptions(clipId, words)
       clip.spec = { ...clip.spec, words: res.words }
       clip.captionsEdited = res.captionsEdited
+      clip.actionError = null
       // Any existing render was made with the old text; don't offer it.
       delete this.renders[clipId]
     },
@@ -171,6 +173,7 @@ export const useJobStore = defineStore('job', {
       const res = await apiResetCaptions(clipId)
       clip.spec = { ...clip.spec, words: res.words }
       clip.captionsEdited = res.captionsEdited
+      clip.actionError = null
       delete this.renders[clipId]
     },
     updateBounds(clipId, bounds) {
@@ -178,6 +181,7 @@ export const useJobStore = defineStore('job', {
       if (!clip) return
       clip.spec = { ...clip.spec, ...bounds }
       clip.boundsEdited = true
+      clip.actionError = null
       delete this.renders[clipId]
       clearTimeout(this._boundsTimers[clipId])
       this._boundsTimers[clipId] = setTimeout(() => {
@@ -201,6 +205,10 @@ export const useJobStore = defineStore('job', {
     async swapClip(clipId) {
       const clip = this.clips.find(c => c.id === clipId)
       if (!clip) return
+      clip.actionError = null
+      // The clip is about to be replaced, so a still-queued trim save is moot.
+      clearTimeout(this._boundsTimers[clipId])
+      delete this._boundsTimers[clipId]
       try {
         const res = await apiSwapClip(clipId)
         clip.pendingAction = res.pendingAction
@@ -212,6 +220,10 @@ export const useJobStore = defineStore('job', {
     async regenerateClip(clipId) {
       const clip = this.clips.find(c => c.id === clipId)
       if (!clip) return
+      clip.actionError = null
+      // The clip is about to be replaced, so a still-queued trim save is moot.
+      clearTimeout(this._boundsTimers[clipId])
+      delete this._boundsTimers[clipId]
       try {
         const res = await apiRegenerateClip(clipId)
         clip.pendingAction = res.pendingAction
