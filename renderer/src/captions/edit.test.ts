@@ -52,4 +52,19 @@ describe('editLine', () => {
     const out = editLine(words, first, '   ')
     expect(out).toEqual(words.slice(4))
   })
+
+  it('clamps retimed starts to not land after the next line (overlapping Whisper words)', () => {
+    // The next line's first word starts before this line's own end -
+    // Whisper sometimes emits overlapping word times. Starts must stay
+    // non-decreasing across the boundary into the next (unedited) line.
+    const overlapping: Word[] = [
+      w('hum', 0.0, 0.3), w('YouTube', 0.3, 0.8, true), w('pe', 0.8, 1.0), w('hain.', 1.0, 1.4),
+      w('bohat', 0.5, 1.9), w('acha', 1.9, 2.3), w('laga.', 2.3, 2.8),
+    ]
+    const [firstLine] = captionLines(overlapping)
+    const out = editLine(overlapping, firstLine, 'hum YouTube par sab hain.')
+    const boundary = [...out.slice(0, 5), overlapping[4]]
+    for (let i = 1; i < boundary.length; i++) expect(boundary[i].start).toBeGreaterThanOrEqual(boundary[i - 1].start)
+    for (const word of out.slice(0, 5)) expect(word.end).toBeGreaterThanOrEqual(word.start)
+  })
 })

@@ -39,12 +39,17 @@ export function editLine(words: Word[], line: Line, text: string): Word[] {
     const weights = tokens.map(t => t.length + 1)
     const total = weights.reduce((a, b) => a + b, 0)
     const span = line.end - line.start
+    // Whisper word times occasionally overlap across our own line
+    // boundaries; without this, a retimed word's start could land after
+    // the very next (unedited) line's first word already started.
+    const nextStart = after[0]?.start
     let acc = 0
     replaced = tokens.map((t, i) => {
-      const start = line.start + (span * acc) / total
+      let start = line.start + (span * acc) / total
       acc += weights[i]
       const end = i === tokens.length - 1 ? line.end : line.start + (span * acc) / total
-      return { text: t, start: round3(start), end: round3(end), emphasis: emphasised.has(norm(t)) }
+      if (nextStart !== undefined) start = Math.min(start, nextStart)
+      return { text: t, start: round3(start), end: round3(Math.max(end, start)), emphasis: emphasised.has(norm(t)) }
     })
   }
   return [...before, ...replaced, ...after]
