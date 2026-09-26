@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, ValidationError
 
-from . import accounts, db, projects, render, storage
+from . import accounts, captions, db, projects, render, storage
 from .accounts import Member, current_member
 from .pipeline import clipprep, cut, highlight, ingest, transcript
 from .spec import ClipStyle, Word, default_style
@@ -194,6 +194,8 @@ def _clip_row_to_api(r: dict[str, Any]) -> dict[str, Any]:
         "createdAt": r.get("created_at"),
         "spec": r.get("spec"),
         "style": r.get("style"),
+        "wordsOriginal": r.get("words_original"),
+        "captionsEdited": r.get("words_original") is not None,
     }
 
 
@@ -475,6 +477,39 @@ def get_clip(job_id: str, filename: str, member: Member = Depends(current_member
 @app.patch("/api/clips/{clip_id}/style")
 def update_style(clip_id: str, style: ClipStyle = Body(...), member: Member = Depends(current_member)) -> dict[str, Any]:
     return _save_style(_clip_for_style(clip_id, member), style)
+
+
+class CaptionsBody(BaseModel):
+    words: list[dict[str, Any]]
+
+
+def _captions_reply(record: dict[str, Any]) -> dict[str, Any]:
+    return {"words": record["spec"]["words"], "captionsEdited": record.get("wordsOriginal") is not None}
+
+
+@app.put("/api/clips/{clip_id}/captions")
+def save_captions(clip_id: str, body: CaptionsBody = Body(...), member: Member = Depends(current_member)) -> dict[str, Any]:
+    record = _clip_for_style(clip_id, member)
+    spec = record["spec"]
+    try:
+        words = captions.validate_words(body.words, spec["end"] - spec["start"])
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    if record.get("wordsOriginal") is None:
+        record["wordsOriginal"] = spec["words"]  # kept from the first edit, for Reset
+    record["spec"] = {**spec, "words": [w.model_dump() for w in words]}
+    db.update_clip(record["id"], {"spec": record["spec"], "words_original": record["wordsOriginal"]})
+    return _captions_reply(record)
+
+
+@app.post("/api/clips/{clip_id}/captions/reset")
+def reset_captions(clip_id: str, member: Member = Depends(current_member)) -> dict[str, Any]:
+    record = _clip_for_style(clip_id, member)
+    if record.get("wordsOriginal") is not None:
+        record["spec"] = {**record["spec"], "words": record["wordsOriginal"]}
+        record["wordsOriginal"] = None
+        db.update_clip(record["id"], {"spec": record["spec"], "words_original": None})
+    return _captions_reply(record)
 
 
 @app.post("/api/clips/{clip_id}/render")
