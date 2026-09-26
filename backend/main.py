@@ -591,15 +591,9 @@ def list_all_clips(limit: int = 100, member: Member = Depends(current_member)) -
 # matches whichever route was registered first).
 @app.get("/api/clips/{clip_id}/captions.srt")
 def get_captions_srt(clip_id: str, member: Member = Depends(current_member)) -> Response:
-    check_id(clip_id, "clip id")
-    _require_job(member, _job_id_of_clip(clip_id))
-    record = _find_clip(clip_id)
-    if record is None:
-        raise HTTPException(404, "clip not found")
-    if not record.get("spec"):
-        raise HTTPException(409, "This clip was made before vertical clips existed. Re-run the video to get one.")
+    spec = _clip_for_style(clip_id, member)["spec"]
     return Response(
-        srt.build_srt(record["spec"]), media_type="text/plain; charset=utf-8",
+        srt.build_srt(spec), media_type="text/plain; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="highlyte-{clip_id}.srt"'},
     )
 
