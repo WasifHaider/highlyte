@@ -56,6 +56,23 @@ def load(path: str) -> np.ndarray:
     return decode_audio(path, sampling_rate=SR)
 
 
+LOUDNESS_STEP_S = 0.5
+# Floor for silence, so log10 never sees zero.
+_SILENCE_DB = -100.0
+
+
+def loudness_db(samples: np.ndarray, step_s: float = LOUDNESS_STEP_S) -> list[float]:
+    """RMS loudness in dB for each step_s block, rounded to 0.1 dB. Clip
+    selection compares a clip's loudness with the episode's median."""
+    n = max(1, int(SR * step_s))
+    out: list[float] = []
+    for i in range(0, len(samples), n):
+        block = samples[i:i + n].astype(np.float64)
+        rms = float(np.sqrt(np.mean(block * block)))
+        out.append(round(20 * np.log10(rms), 1) if rms > 1e-5 else _SILENCE_DB)
+    return out
+
+
 def write_wav(samples: np.ndarray, path: str) -> None:
     pcm = (np.clip(samples, -1.0, 1.0) * 32767).astype("<i2")
     with wave.open(path, "wb") as w:

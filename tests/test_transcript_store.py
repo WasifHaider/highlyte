@@ -60,3 +60,10 @@ def test_transcript_functions_without_supabase(monkeypatch):
     monkeypatch.setattr(db, "get_client", lambda: None)
     db.save_transcript("job1", "english", "groq", [])  # no-op
     assert db.get_transcript("job1") is None
+
+
+def test_save_transcript_stores_loudness(monkeypatch):
+    fake = FakeClient()
+    monkeypatch.setattr(db, "get_client", lambda: fake)
+    db.save_transcript("job1", "hinglish", "groq", [], [-20.0, -18.5])
+    assert db.get_transcript("job1")["loudness"] == [-20.0, -18.5]

@@ -31,7 +31,7 @@ os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 import shutil
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable
 
 from . import asr, audio, hinglish, langcheck, segments
@@ -63,6 +63,7 @@ class Transcript:
     language: str        # "hinglish" | "english", the path actually used
     note: str | None     # set when detection overrode the user's choice
     source: str          # "groq" | "whisper" | "mixed"
+    loudness: list[float] = field(default_factory=list)  # dB per 0.5 s
 
 
 class NoSpeechError(RuntimeError):
@@ -89,6 +90,7 @@ def transcribe(
         wav = os.path.join(tmp_dir, "audio.wav")
         audio.normalize(audio_path, wav)
         samples = audio.load(wav)
+        loudness = audio.loudness_db(samples)
 
         if detect is None:
             key = os.environ.get("GROQ_KEY")
@@ -115,10 +117,17 @@ def transcribe(
         return Transcript(
             segments=segments.build(fixed, LANGUAGE_CODES[decision.used]),
             language=decision.used, note=decision.note, source=source,
+            loudness=loudness,
         )
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
+def word_segments(segs: list[segments.Segment]) -> list[TranscriptSegment]:
+    """One TranscriptSegment per word, the shape clip prep's caption
+    timing reads."""
+    return [TranscriptSegment(w.start, w.end, w.t) for s in segs for w in s.words]
+
+
 def to_word_segments(t: Transcript) -> list[TranscriptSegment]:
-    return [TranscriptSegment(w.start, w.end, w.t) for s in t.segments for w in s.words]
+    return word_segments(t.segments)

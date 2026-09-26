@@ -78,3 +78,18 @@ def build(words: list[SegWord], language_code: str) -> list[Segment]:
     if current:
         out.append(_segment(len(out) + 1, current, language_code))
     return out
+
+
+def from_dict(d: dict) -> Segment:
+    """Inverse of Segment.to_dict, for transcripts read back from the
+    database (a retried clip selection)."""
+    words = [
+        SegWord(t=w["t"], raw=w.get("raw", w["t"]), start=float(w["start"]), end=float(w["end"]),
+                kind=w.get("kind", ""), prob=float(w.get("prob", 0.0)))
+        for w in d.get("words") or []
+    ]
+    return Segment(
+        id=d["id"], start=float(d["start"]), end=float(d["end"]), speaker=d.get("speaker", "A"),
+        language=d.get("language", ""), raw=d.get("raw", ""), hinglish=d.get("hinglish", ""),
+        words=words, confidence=float(d.get("confidence", 0.0)),
+    )

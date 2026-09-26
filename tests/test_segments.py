@@ -37,3 +37,15 @@ def test_segment_fields():
 
 def test_build_empty():
     assert segments.build([], "en") == []
+
+
+def test_from_dict_round_trips_to_dict():
+    seg = segments.build([w("yaar", 1.0, 1.5, prob=0.8, raw="yar"), w("sun.", 1.5, 1.8, prob=0.6)], "hi-Latn-EN")[0]
+    back = segments.from_dict(seg.to_dict())
+    assert back == seg
+
+
+def test_from_dict_tolerates_missing_optional_fields():
+    back = segments.from_dict({"id": "seg_0001", "start": 0.0, "end": 0.5,
+                               "words": [{"t": "hi", "start": 0.0, "end": 0.5}]})
+    assert back.speaker == "A" and back.words[0].raw == "hi" and back.words[0].prob == 0.0

@@ -133,3 +133,15 @@ def test_normalize_produces_16k_mono(tmp_path):
     audio.normalize(str(src), str(dst))
     with wave.open(str(dst)) as w:
         assert w.getframerate() == 16000 and w.getnchannels() == 1
+
+
+def test_loudness_db_one_value_per_half_second():
+    import numpy as np
+    from backend.pipeline import audio
+
+    sr = audio.SR
+    loud = np.full(sr // 2, 0.1, dtype=np.float32)     # RMS 0.1 -> -20 dB
+    quiet = np.zeros(sr // 2, dtype=np.float32)        # silence -> floor
+    tail = np.full(sr // 4, 0.1, dtype=np.float32)     # partial last block
+    values = audio.loudness_db(np.concatenate([loud, quiet, tail]))
+    assert values == [-20.0, -100.0, -20.0]
