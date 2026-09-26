@@ -101,6 +101,23 @@ def test_render_flow(env):
     assert names == [f"highlyte-{CLIP_ID}.mp4"]
 
 
+def test_render_reflects_edited_captions(env):
+    record, fake = env
+    first = client.post(f"/api/clips/{CLIP_ID}/render", json=STYLE).json()
+    assert first["status"] == "rendering"
+    first_words = fake.props["spec"]["words"]
+
+    edited = [dict(w) for w in record["spec"]["words"]]
+    edited[0]["text"] = "Edited"
+    put = client.put(f"/api/clips/{CLIP_ID}/captions", json={"words": edited})
+    assert put.status_code == 200
+
+    second = client.post(f"/api/clips/{CLIP_ID}/render", json=STYLE).json()
+    assert second["id"] != first["id"]
+    assert fake.props["spec"]["words"][0]["text"] == "Edited"
+    assert fake.props["spec"]["words"] != first_words
+
+
 def test_render_requires_r2_source(env):
     record, _ = env
     record["storageKey"] = None

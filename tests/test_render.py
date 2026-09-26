@@ -177,12 +177,36 @@ def test_other_start_errors_fail(setup):
 
 
 def test_request_rerenders_when_words_change(setup):
-    svc = setup[0] if isinstance(setup, tuple) else setup
-    words = [Word(text="hum", start=0.0, end=0.3)]
-    a = svc.request("job1-9", ClipStyle(layout="fit"), words)
-    b = svc.request("job1-9", ClipStyle(layout="fit"), words)
-    c = svc.request("job1-9", ClipStyle(layout="fit"), [Word(text="ham", start=0.0, end=0.3)])
+    svc, _, _, _ = setup
+    # build_props stands in for the live clip: it must reflect whatever
+    # words were most recently "saved" (here, just whatever was requested),
+    # the same way the real _build_props re-reads spec.words.
+    live_words = [Word(text="hum", start=0.0, end=0.3)]
+    svc.build_props = lambda clip_id, style: (
+        {"spec": {"clipId": clip_id, "words": [w.model_dump() for w in live_words]}, "style": style}, 12.0,
+    )
+    a = svc.request("job1-9", ClipStyle(layout="fit"), live_words)
+    b = svc.request("job1-9", ClipStyle(layout="fit"), live_words)
+    live_words = [Word(text="ham", start=0.0, end=0.3)]
+    c = svc.request("job1-9", ClipStyle(layout="fit"), live_words)
     assert a.id == b.id and c.id != a.id
+
+
+def test_queued_render_fails_if_words_changed_before_it_starts(setup):
+    svc, fake, _, _ = setup
+    words = [Word(text="hum", start=0.0, end=0.3)]
+    # build_props always returns the *live* words (word B), simulating a
+    # caption save that lands while the render sits in the queue behind
+    # MAX_ACTIVE other renders. The render was requested with word A, so its
+    # style_hash was computed from A and no longer matches B.
+    svc.build_props = lambda clip_id, style: (
+        {"spec": {"clipId": clip_id, "words": [{"text": "ham", "start": 0.0, "end": 0.3, "emphasis": False}]}, "style": style},
+        12.0,
+    )
+    r = svc.request("job1-9", ClipStyle(layout="fit"), words)
+    assert r.status == "error"
+    assert r.error == "Captions changed after this export was requested. Export again."
+    assert fake.started == []
 
 
 def test_lambda_config_requires_all_values(monkeypatch):

@@ -183,6 +183,17 @@ class RenderService:
     def _start(self, r: Render) -> bool:
         try:
             props, duration_s = self.build_props(r.clip_id, r.style)
+            style = ClipStyle(**r.style)
+            if r.style_hash != style_hash(style):
+                # This render was requested with words (render_hash), so if
+                # the live spec.words no longer match, captions were saved
+                # while it sat in the queue: the mp4 would show new text but
+                # be cached under the old hash. Fail instead of rendering it.
+                words = [Word(**w) for w in props["spec"]["words"]]
+                if render_hash(style, words) != r.style_hash:
+                    r.status, r.error = "error", "Captions changed after this export was requested. Export again."
+                    self.store.put(r)
+                    return False
             lambda_id, bucket = self.renderer.start(props, duration_s)
         except Exception as e:  # noqa: BLE001
             msg = str(e)
