@@ -138,6 +138,8 @@ export const useJobStore = defineStore('job', {
       const res = await apiSaveCaptions(clipId, words)
       clip.spec = { ...clip.spec, words: res.words }
       clip.captionsEdited = res.captionsEdited
+      // Any existing render was made with the old text; don't offer it.
+      delete this.renders[clipId]
     },
     async resetCaptions(clipId) {
       const clip = this.clips.find(c => c.id === clipId)
@@ -145,6 +147,7 @@ export const useJobStore = defineStore('job', {
       const res = await apiResetCaptions(clipId)
       clip.spec = { ...clip.spec, words: res.words }
       clip.captionsEdited = res.captionsEdited
+      delete this.renders[clipId]
     },
     async exportSelected() {
       const clips = this.clips.filter(c => this.selected[c.id] && c.spec)

@@ -10,7 +10,7 @@
         <input v-model="texts[i]" type="text" />
       </label>
       <div class="row">
-        <button class="btn" :disabled="busy" @click="save">{{ busy ? 'Saving…' : 'Save captions' }}</button>
+        <button class="btn" :disabled="busy || saveDisabled" @click="save">{{ busy ? 'Saving…' : 'Save captions' }}</button>
         <button class="btn ghost" :disabled="busy" @click="cancel">Cancel</button>
       </div>
     </div>
@@ -30,6 +30,10 @@ const props = defineProps({
 })
 const emit = defineEmits(['draft'])
 const jobStore = useJobStore()
+
+// Mirrors backend.captions.MAX_WORD_CHARS: catch the same limit here so
+// a bad edit gets a clear message instead of a 422 after Save.
+const MAX_WORD_CHARS = 40
 
 const open = ref(false)
 const busy = ref(false)
@@ -51,6 +55,17 @@ watch(draft, d => emit('draft', d))
 
 const clock = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
+// Nothing to save once every line has been cleared out.
+const saveDisabled = computed(() => open.value && (draft.value?.length ?? 0) === 0)
+
+function overlongWordLine() {
+  for (let i = 0; i < lines.value.length; i++) {
+    const hasOverlong = (texts.value[i] || '').split(/\s+/).some(t => t.length > MAX_WORD_CHARS)
+    if (hasOverlong) return lines.value[i]
+  }
+  return null
+}
+
 function start() {
   texts.value = lines.value.map(lineText)
   error.value = ''
@@ -60,6 +75,11 @@ function cancel() {
   open.value = false
 }
 async function save() {
+  const overlong = overlongWordLine()
+  if (overlong) {
+    error.value = `The line at ${clock(overlong.start)} has a word over ${MAX_WORD_CHARS} characters.`
+    return
+  }
   busy.value = true
   error.value = ''
   try {
