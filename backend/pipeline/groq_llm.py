@@ -6,6 +6,7 @@ from __future__ import annotations
 import math
 import os
 import re
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -87,6 +88,11 @@ def is_daily_limit(exc: Exception) -> bool:
     return is_rate_limit(exc) and ("per day" in text or "(tpd)" in text or "(rpd)" in text)
 
 
+def is_auth_failure(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return type(exc).__name__ == "AuthenticationError" or "401" in text or "invalid api key" in text
+
+
 class GroqChat:
     def __init__(
         self, client: Any, *, sleep: Callable[[float], None] = time.sleep,
@@ -98,33 +104,42 @@ class GroqChat:
         self._tpm = tokens_per_minute
         self._remaining = tokens_per_minute
         self._reset_at = 0.0
+        # Guards pacing state plus the call itself: two jobs racing here
+        # could otherwise both see a full minute's budget and both spend it.
+        self._lock = threading.Lock()
 
     def complete(self, prompt: str, *, max_tokens: int) -> ChatResult:
         need = estimate_tokens(prompt) + max_tokens
-        for attempt in range(RATE_LIMIT_RETRIES + 1):
-            self._wait_for(need)
-            try:
-                raw = self._client.chat.completions.with_raw_response.create(
-                    model=GROQ_MODEL,
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=max_tokens,
-                    # Sent via extra_body because the pinned openai client
-                    # predates the field. Without it gpt-oss-20b spends the
-                    # whole budget on hidden reasoning.
-                    extra_body={"reasoning_effort": "low"},
-                )
-            except Exception as e:
-                if is_daily_limit(e):
-                    raise DailyLimit(wait_label(e)) from e
-                if not is_rate_limit(e) or attempt == RATE_LIMIT_RETRIES:
-                    raise
-                self._sleep(min(retry_after(e) or DEFAULT_RETRY_S, MAX_RETRY_WAIT_S))
-                self._remaining = self._tpm
-                continue
-            self._note_usage(raw.headers, need)
-            choice = raw.parse().choices[0]
-            return ChatResult(choice.message.content or "", getattr(choice, "finish_reason", None))
-        raise AssertionError("unreachable")
+        with self._lock:
+            for attempt in range(RATE_LIMIT_RETRIES + 1):
+                self._wait_for(need)
+                try:
+                    raw = self._client.chat.completions.with_raw_response.create(
+                        model=GROQ_MODEL,
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=max_tokens,
+                        # Sent via extra_body because the pinned openai client
+                        # predates the field. Without it gpt-oss-20b spends the
+                        # whole budget on hidden reasoning.
+                        extra_body={"reasoning_effort": "low"},
+                    )
+                except Exception as e:
+                    if is_daily_limit(e):
+                        raise DailyLimit(wait_label(e)) from e
+                    if not is_rate_limit(e) or attempt == RATE_LIMIT_RETRIES:
+                        raise
+                    self._sleep(min(retry_after(e) or DEFAULT_RETRY_S, MAX_RETRY_WAIT_S))
+                    self._remaining = self._tpm
+                    continue
+                self._note_usage(raw.headers, need)
+                resp = raw.parse()
+                usage = getattr(resp, "usage", None)
+                if usage:
+                    print(f"[groq] prompt_tokens={getattr(usage, 'prompt_tokens', None)} "
+                          f"completion_tokens={getattr(usage, 'completion_tokens', None)}")
+                choice = resp.choices[0]
+                return ChatResult(choice.message.content or "", getattr(choice, "finish_reason", None))
+            raise AssertionError("unreachable")
 
     def _wait_for(self, need: int) -> None:
         if self._remaining >= need:
@@ -145,12 +160,23 @@ class GroqChat:
         self._reset_at = self._clock() + (wait if wait is not None else DEFAULT_WINDOW_S)
 
 
+_chat: GroqChat | None = None
+_chat_lock = threading.Lock()
+
+
 def build_chat() -> GroqChat | None:
+    """One GroqChat per process, shared by every job so they pace calls
+    against the same per-minute budget (spec section 1)."""
+    global _chat
     key = os.environ.get("GROQ_KEY")
     if not key:
         return None
-    from openai import OpenAI
+    if _chat is None:
+        with _chat_lock:
+            if _chat is None:
+                from openai import OpenAI
 
-    # max_retries=0: GroqChat handles 429s itself, and retrying a daily
-    # limit only burns requests.
-    return GroqChat(OpenAI(api_key=key, base_url=GROQ_BASE_URL, max_retries=0))
+                # max_retries=0: GroqChat handles 429s itself, and retrying
+                # a daily limit only burns requests.
+                _chat = GroqChat(OpenAI(api_key=key, base_url=GROQ_BASE_URL, max_retries=0))
+    return _chat

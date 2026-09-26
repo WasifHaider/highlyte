@@ -11,13 +11,21 @@ class RateLimitError(Exception):
     groq_llm.is_rate_limit checks."""
 
 
+class AuthenticationError(Exception):
+    """Same class name as openai.AuthenticationError, which is what
+    groq_llm.is_auth_failure checks."""
+
+
 class FakeRaw:
-    def __init__(self, content: str = "[]", finish: str = "stop", headers: dict | None = None):
-        self.content, self.finish, self.headers = content, finish, headers or {}
+    def __init__(self, content: str = "[]", finish: str = "stop", headers: dict | None = None, usage=None):
+        self.content, self.finish, self.headers, self.usage = content, finish, headers or {}, usage
 
     def parse(self):
         message = SimpleNamespace(content=self.content)
-        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason=self.finish)])
+        resp = SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason=self.finish)])
+        if self.usage is not None:
+            resp.usage = self.usage
+        return resp
 
 
 class FakeOpenAI:

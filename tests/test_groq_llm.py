@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 
 from backend.pipeline import groq_llm
@@ -76,6 +78,28 @@ def test_wait_label_under_a_minute():
 def test_build_chat_without_key(monkeypatch):
     monkeypatch.setenv("GROQ_KEY", "")
     assert groq_llm.build_chat() is None
+
+
+def test_build_chat_returns_the_same_shared_client(monkeypatch):
+    monkeypatch.setenv("GROQ_KEY", "test-key")
+    monkeypatch.setattr(groq_llm, "_chat", None)
+    first = groq_llm.build_chat()
+    second = groq_llm.build_chat()
+    assert first is not None
+    assert first is second
+
+
+def test_complete_logs_token_usage(capsys):
+    usage = SimpleNamespace(prompt_tokens=12, completion_tokens=3)
+    chat, _, _ = make([FakeRaw('[]', usage=usage)])
+    chat.complete("x", max_tokens=100)
+    assert "[groq] prompt_tokens=12 completion_tokens=3" in capsys.readouterr().out
+
+
+def test_complete_without_usage_does_not_log(capsys):
+    chat, _, _ = make([FakeRaw('[]')])
+    chat.complete("x", max_tokens=100)
+    assert "[groq]" not in capsys.readouterr().out
 
 
 def test_estimate_tokens():
