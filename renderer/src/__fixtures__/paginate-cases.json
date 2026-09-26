@@ -1,0 +1,36 @@
+[
+  {
+    "name": "sentence end breaks a page",
+    "maxWords": 14, "maxChars": 84,
+    "words": [
+      {"text": "hum", "start": 0.0, "end": 0.3}, {"text": "chalein.", "start": 0.3, "end": 0.7},
+      {"text": "phir", "start": 0.75, "end": 1.0}, {"text": "dekho", "start": 1.0, "end": 1.3}
+    ],
+    "pages": [[0, 1], [2, 3]]
+  },
+  {
+    "name": "pause breaks a page",
+    "maxWords": 14, "maxChars": 84,
+    "words": [
+      {"text": "ek", "start": 0.0, "end": 0.3}, {"text": "do", "start": 1.0, "end": 1.3}
+    ],
+    "pages": [[0], [1]]
+  },
+  {
+    "name": "word limit",
+    "maxWords": 2, "maxChars": 84,
+    "words": [
+      {"text": "a", "start": 0.0, "end": 0.1}, {"text": "b", "start": 0.1, "end": 0.2},
+      {"text": "c", "start": 0.2, "end": 0.3}
+    ],
+    "pages": [[0, 1], [2]]
+  },
+  {
+    "name": "character limit",
+    "maxWords": 14, "maxChars": 10,
+    "words": [
+      {"text": "abcdef", "start": 0.0, "end": 0.1}, {"text": "ghijk", "start": 0.1, "end": 0.2}
+    ],
+    "pages": [[0], [1]]
+  }
+]
