@@ -98,7 +98,7 @@ def test_render_flow(env):
     z = client.get(f"/api/renders/zip?ids={body['id']}")
     assert z.status_code == 200
     names = zipfile.ZipFile(io.BytesIO(z.content)).namelist()
-    assert names == [f"highlyte-{CLIP_ID}.mp4"]
+    assert names == [f"highlyte-{CLIP_ID}.mp4", f"highlyte-{CLIP_ID}.srt"]
 
 
 def test_render_reflects_edited_captions(env):
