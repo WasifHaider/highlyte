@@ -7,7 +7,8 @@ Handles episodes that mix English with Roman-script Hindi/Urdu.
 
 - `backend/` — FastAPI app. Pipeline: yt-dlp ingest -> transcript (language
   check, VAD chunks, Whisper via Groq else local faster-whisper, then glossary
-  and spelling fixes) -> heuristic/LLM highlight scoring -> ffmpeg cuts.
+  and spelling fixes) -> LLM clip selection (needs `GROQ_KEY`; a job without
+  it ends in "selection failed" with a Retry button) -> ffmpeg cuts.
   Job/clip metadata persisted to Supabase Postgres, and logins go through
   Supabase Auth (required, see below). Clip files stay on local disk under
   `data/clips/` unless R2 is configured.
@@ -178,9 +179,12 @@ cd renderer && npm test
 1. **Ingest** — pull the audio via `yt-dlp`, cached by video ID.
 2. **Transcript** — language check, VAD chunks, Whisper (Groq, else local
    faster-whisper), then glossary and spelling fixes in code.
-3. **Highlight detection** — chunk the transcript into ~45s windows, score
-   each for "meaningful" content (heuristic scorer by default; optional
-   LLM scorer if `GROQ_KEY` is set), keep the top ones.
+3. **Clip selection** — an LLM (Groq, needs `GROQ_KEY`) picks candidate
+   ranges from the transcript's thought units; cut points are then snapped
+   in code, hard-rejected, scored and packed. Without `GROQ_KEY` the job
+   ends in "selection failed" with a Retry button once one is set.
+   `scripts/select_dry_run.py` runs this against a stored transcript and
+   prints what it picks, without preparing clips.
 4. **Cutting** — `ffmpeg -c copy` (fast path) or re-encode fallback.
 5. **Frontend** — poll job status, render clip list with play/select/export.
 
@@ -188,5 +192,5 @@ cd renderer && npm test
 
 - [x] Output format: vertical 9:16 shorts (Phase 1)
 - [x] Caption quality check before trusting auto-captions over Whisper (dropped: every job now uses Whisper)
-- [ ] LLM highlight scoring model choice, if/when the heuristic scorer isn't
-      good enough
+- [x] LLM highlight scoring model choice (settled: Groq's `openai/gpt-oss-20b`,
+      the old heuristic scorer retired — see clip-selection design)
