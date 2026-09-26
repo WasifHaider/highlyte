@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "/jobs/:id": {
+      "targetKind": "existing-ui",
+      "projectId": "523c7f65-d20e-437f-80fb-a027bcfcef62",
+      "baselineDraftId": "6863c4df-b4ce-4ef5-ab7f-3cded03c4a13",
+      "activeDraftId": "696230d6-bad4-476c-9d43-94113fc86bbe",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "frontend-public-logo-mark.svg"
+      ],
+      "brandAssets": {
+        "logo": {
+          "assetKey": "frontend-public-logo-mark.svg",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/523c7f65-d20e-437f-80fb-a027bcfcef62/brand-assets/frontend-public-logo-mark.svg/logo-mark.svg",
+          "sourcePath": "frontend/public/logo-mark.svg"
+        }
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "frontend/src/style.css",
+        "frontend/src/components/TopBar.vue",
+        "frontend/src/views/JobView.vue",
+        "frontend/src/components/ClipList.vue",
+        "frontend/src/components/ClipCard.vue",
+        "frontend/src/components/CaptionEditor.vue",
+        "frontend/src/components/ExportBar.vue",
+        "frontend/src/components/StyleAllBar.vue"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "2576546e4c8ac3f635e345bb6f0589bb66e2c109b7ce176c50c94e44429814fd",
+        "frontend/src/style.css": "a3588bfe055b8baf16bddc31d519c12db179a1631c42d5ea1f8b5a6c08365f01",
+        "frontend/src/components/TopBar.vue": "d3488168f0d53c631b9593123421e32829c0d5b53a9d11ba78baa892eb8d3f2d",
+        "frontend/src/views/JobView.vue": "72ee04a23465b89731f4a8db0fc081705165a820aa0c87ab55396b514afe2bf2",
+        "frontend/src/components/ClipList.vue": "023df9237eb737befa77249898f3c902b25e46f8cb3f7bedd79d49e48d711e54",
+        "frontend/src/components/ClipCard.vue": "a676a627ab79ee992f146945f8ba8547aeb2884f264150fa314ddf360e8903d6",
+        "frontend/src/components/CaptionEditor.vue": "44d822fbcfff7dedce02073d9f311f483638165dbe2be61e6d43204e72c7bf43",
+        "frontend/src/components/ExportBar.vue": "471a30214d95c64439d6db7e564b5f0f5bab19f538e38a3f61e53cf3fe237475",
+        "frontend/src/components/StyleAllBar.vue": "c9ceae8c228decfd369100a645835735a0a6fc03aca1ad9d2a19b3775fe8e6d9"
+      },
+      "components": [
+        {
+          "name": "TopBar",
+          "id": "b0414feb-e36f-49bb-bc48-1fc0311ae8fd",
+          "sourcePath": "frontend/src/components/TopBar.vue",
+          "logoAssetKey": "frontend-public-logo-mark.svg"
+        }
+      ],
+      "drafts": {
+        "6863c4df-b4ce-4ef5-ab7f-3cded03c4a13": {
+          "description": "Pixel-perfect reproduction of current clips page"
+        },
+        "696230d6-bad4-476c-9d43-94113fc86bbe": {
+          "description": "Minimal redesign (keep teal brand), incl. QA chips, skipped-range note, Edit side panel"
+        }
+      }
+    }
+  }
+}

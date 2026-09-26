@@ -21,3 +21,4 @@ renderer/public/fixture.mp4
 
 # Spike audio, transcripts and reports (throwaway)
 data/spike/
+.superdesign/tmp/
