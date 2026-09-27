@@ -161,7 +161,8 @@ watch(clip, (newClip, oldClip) => {
 
 <style scoped>
 .edit-panel {
-  width: 320px; flex-shrink: 0; border-left: 1px solid var(--border); background: #fff;
+  /* Wide enough that two-column selects and caption lines aren't truncated. */
+  width: clamp(380px, 34vw, 460px); flex-shrink: 0; border-left: 1px solid var(--border); background: #fff;
   position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto;
 }
 .panel-inner { padding: 24px; }
