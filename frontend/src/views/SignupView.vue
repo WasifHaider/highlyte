@@ -1,26 +1,29 @@
 <template>
   <div class="auth-page">
     <form class="auth-card" @submit.prevent="submit">
-      <img src="/logo-mark.svg" alt="" width="36" height="36" class="logo" />
+      <div class="brand">
+        <img src="/logo-mark.svg" alt="" width="28" height="28" class="logo" />
+        <span class="wordmark">Highlyte</span>
+      </div>
       <h1>Create your team</h1>
       <label class="field">
-        <span>Team name</span>
-        <input v-model="teamName" type="text" maxlength="80" required />
+        <span class="field-label">Team name</span>
+        <input v-model="teamName" type="text" class="input" maxlength="80" required />
       </label>
       <label class="field">
-        <span>Your email (team admin)</span>
-        <input v-model.trim="email" type="email" autocomplete="username" required />
+        <span class="field-label">Your email (team admin)</span>
+        <input v-model.trim="email" type="email" class="input" autocomplete="username" required />
       </label>
       <label class="field">
-        <span>Password (at least {{ MIN_PASSWORD }} characters)</span>
-        <input v-model="password" type="password" autocomplete="new-password" required />
+        <span class="field-label">Password (at least {{ MIN_PASSWORD }} characters)</span>
+        <input v-model="password" type="password" class="input" autocomplete="new-password" required />
       </label>
       <label class="field">
-        <span>Confirm password</span>
-        <input v-model="confirm" type="password" autocomplete="new-password" required />
+        <span class="field-label">Confirm password</span>
+        <input v-model="confirm" type="password" class="input" autocomplete="new-password" required />
       </label>
-      <div v-if="error" class="error" role="alert">{{ error }}</div>
-      <button type="submit" :disabled="busy">{{ busy ? 'Creating…' : 'Create team' }}</button>
+      <div v-if="error" class="danger-note" role="alert">{{ error }}</div>
+      <button type="submit" class="btn btn-primary" :disabled="busy">{{ busy ? 'Creating…' : 'Create team' }}</button>
       <p class="note">Only the team admin signs up. You'll add your users from the Team page.</p>
       <p class="switch">Already have a login? <router-link to="/login">Log in</router-link></p>
     </form>
