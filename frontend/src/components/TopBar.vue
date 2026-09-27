@@ -4,7 +4,7 @@
       <div class="brand-group">
         <router-link to="/" class="brand" aria-label="Highlyte home">
           <img src="/logo-mark.svg" alt="" class="brand-mark" width="28" height="28" />
-          <span>Highlyte</span>
+          <span class="brand-label">Highlyte</span>
         </router-link>
         <nav class="tabs">
           <router-link to="/" class="tab" exact-active-class="tab-active">Home</router-link>
@@ -42,7 +42,7 @@
         </div>
         <div class="account">
           <button class="btn btn-secondary" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen">
-            {{ auth.me?.team.name || 'Account' }}
+            <span class="account-label">{{ auth.me?.team.name || 'Account' }}</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
           </button>
           <div v-if="menuOpen" class="account-menu card" role="menu">
@@ -132,8 +132,16 @@ async function onLogout() {
 .account { position: relative; flex-shrink: 0; }
 .account-menu {
   position: absolute; right: 0; top: calc(100% + 6px); min-width: 200px; padding: 10px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.08); z-index: 30;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04); z-index: 30;
 }
 .account-email { padding: 4px 6px 10px; border-bottom: 1px solid var(--border); margin-bottom: 8px; word-break: break-all; font-size: 12.5px; }
 .logout { width: 100%; justify-content: flex-start; }
+.account-label { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .topbar-inner { gap: 8px; }
+  .brand-group { gap: 12px; }
+  .brand-label { display: none; }
+  .tab { padding: 0 8px; font-size: 12.5px; }
+}
 </style>
