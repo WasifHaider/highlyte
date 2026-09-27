@@ -124,10 +124,19 @@ a { color: var(--accent); }
 .slide-up-enter-active, .slide-up-leave-active { transition: transform 220ms cubic-bezier(.2,.8,.2,1), opacity 180ms ease-out; }
 .slide-up-enter-from, .slide-up-leave-to { transform: translateY(24px); opacity: 0; }
 
+/* Same as slide-up, but keeps the export pill's own translateX(-50%)
+   horizontal centring instead of overriding it (avoids a diagonal slide). */
+.export-slide-enter-active, .export-slide-leave-active { transition: transform 220ms cubic-bezier(.2,.8,.2,1), opacity 180ms ease-out; }
+.export-slide-enter-from, .export-slide-leave-to { transform: translate(-50%, 24px); opacity: 0; }
+
 /* Height expand for collapsible sections: wrap content in .collapse > .collapse-inner and toggle .open. */
 .collapse { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 200ms ease-out, opacity 160ms ease-out; opacity: 0; }
 .collapse.open { grid-template-rows: 1fr; opacity: 1; }
-.collapse > .collapse-inner { overflow: hidden; min-height: 0; }
+/* overflow: hidden clips the content while its track is shrunk or animating
+   (needed so a closed section doesn't spill into what's below); a small
+   padding keeps a focused control's outline from being cut off by that clip
+   once open, instead of switching overflow on/off around the transition. */
+.collapse > .collapse-inner { overflow: hidden; min-height: 0; padding: 3px; margin: -3px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

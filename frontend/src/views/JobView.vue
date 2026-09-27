@@ -1,47 +1,49 @@
 <template>
-  <div class="page" :class="{ editing: !!jobStore.editingClipId }">
-    <div class="job-layout">
-      <div class="job-main">
-        <Transition name="fade">
-          <div v-if="jobStore.error" class="danger-note">{{ jobStore.error }}</div>
-        </Transition>
+  <div class="job-view">
+    <div class="page" :class="{ editing: !!jobStore.editingClipId }">
+      <div class="job-layout">
+        <div class="job-main">
+          <Transition name="fade">
+            <div v-if="jobStore.error" class="danger-note">{{ jobStore.error }}</div>
+          </Transition>
 
-        <VideoCard
-          v-if="jobStore.job?.videoMeta"
-          :meta="jobStore.job.videoMeta"
-          :status-note="statusNote"
-        />
+          <VideoCard
+            v-if="jobStore.job?.videoMeta"
+            :meta="jobStore.job.videoMeta"
+            :status-note="statusNote"
+          />
 
-        <ProcessingSteps v-if="jobStore.isProcessing" :status="jobStore.job.status" :progress="jobStore.progress" />
-        <Transition name="fade">
-          <p v-if="jobStore.job?.languageNote" class="subtle-note lang-note">{{ jobStore.job.languageNote }}</p>
-        </Transition>
+          <ProcessingSteps v-if="jobStore.isProcessing" :status="jobStore.job.status" :progress="jobStore.progress" />
+          <Transition name="fade">
+            <p v-if="jobStore.job?.languageNote" class="subtle-note lang-note">{{ jobStore.job.languageNote }}</p>
+          </Transition>
 
-        <Transition name="fade">
-          <div v-if="jobStore.selectionFailed" class="selection-failed card">
-            <p class="sf-title">Clip selection didn't finish</p>
-            <p class="sf-msg">{{ jobStore.job.error }}</p>
-            <p class="sf-sub">The transcript is saved, so a retry skips the download and transcription.</p>
-            <button class="btn btn-primary" :disabled="retrying" @click="onRetry">
-              {{ retrying ? 'Retrying…' : 'Retry selection' }}
-            </button>
-          </div>
-        </Transition>
+          <Transition name="fade">
+            <div v-if="jobStore.selectionFailed" class="selection-failed card">
+              <p class="sf-title">Clip selection didn't finish</p>
+              <p class="sf-msg">{{ jobStore.job.error }}</p>
+              <p class="sf-sub">The transcript is saved, so a retry skips the download and transcription.</p>
+              <button class="btn btn-primary" :disabled="retrying" @click="onRetry">
+                {{ retrying ? 'Retrying…' : 'Retry selection' }}
+              </button>
+            </div>
+          </Transition>
 
-        <Transition name="fade">
-          <p v-if="jobStore.isDone && jobStore.job?.selectionNote" class="subtle-note selection-note">{{ jobStore.job.selectionNote }}</p>
-        </Transition>
+          <Transition name="fade">
+            <p v-if="jobStore.isDone && jobStore.job?.selectionNote" class="subtle-note selection-note">{{ jobStore.job.selectionNote }}</p>
+          </Transition>
 
-        <ClipList v-if="jobStore.isDone" />
+          <ClipList v-if="jobStore.isDone" />
+        </div>
+
+        <ClipEditPanel v-if="jobStore.isDone" />
       </div>
-
-      <ClipEditPanel v-if="jobStore.isDone" />
     </div>
-  </div>
 
-  <Transition name="slide-up">
-    <ExportBar v-if="jobStore.isDone" />
-  </Transition>
+    <Transition name="export-slide">
+      <ExportBar v-if="jobStore.isDone" />
+    </Transition>
+  </div>
 </template>
 
 <script setup>
@@ -103,6 +105,10 @@ onUnmounted(() => {
   jobStore.stopPolling()
   jobStore.closeEditor()
 })
+// App.vue keys <router-view> by route.path, so a job-id change now remounts
+// this component (onMounted re-runs startForId) instead of updating props.id
+// in place; this watcher no longer fires but is kept as a harmless fallback
+// in case that keying strategy ever changes.
 watch(() => props.id, (newId) => startForId(newId))
 </script>
 

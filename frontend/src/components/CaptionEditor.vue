@@ -154,7 +154,7 @@ async function reset() {
 .captions-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
 .field-label { font-size: 12.5px; font-weight: 500; }
 .status { font-size: 11px; }
-.captions-toggle { display: flex; gap: 8px; align-items: center; }
+.captions-toggle { display: flex; flex-direction: column; gap: 8px; }
 .lines-wrap { display: flex; flex-direction: column; gap: 8px; }
 .row { display: flex; gap: 8px; margin-top: 4px; }
 .lines { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; padding-right: 4px; }

@@ -21,13 +21,13 @@
         class="btn btn-ghost btn-sm style-all-btn"
         :class="{ open: showStyleAll }"
         :aria-expanded="showStyleAll"
-        @click="showStyleAll = !showStyleAll"
+        @click="toggleStyleAll"
       >Style all</button>
     </div>
 
     <div v-if="hasVerticalClips" class="collapse" :class="{ open: showStyleAll }">
       <div class="collapse-inner" :inert="!showStyleAll">
-        <StyleAllBar />
+        <StyleAllBar :key="styleAllGen" />
       </div>
     </div>
 
@@ -52,6 +52,15 @@ import StyleAllBar from './StyleAllBar.vue'
 const jobStore = useJobStore()
 const hasVerticalClips = computed(() => jobStore.clips.some(c => c.spec))
 const showStyleAll = ref(false)
+// StyleAllBar stays mounted through the collapse animation (so it can
+// animate closed instead of vanishing), but it should still re-seed its form
+// from the current first-clip style each time it's reopened, as before:
+// bumping this key forces a fresh instance on every open.
+const styleAllGen = ref(0)
+function toggleStyleAll() {
+  if (!showStyleAll.value) styleAllGen.value++
+  showStyleAll.value = !showStyleAll.value
+}
 </script>
 
 <style scoped>

@@ -179,6 +179,10 @@ watch(clip, (newClip, oldClip) => {
 }
 .close-btn:hover { color: var(--ink); }
 .panel-body { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+/* The outgoing clip's fields fade out under the incoming ones during the
+   cross-fade; block clicks on them so a stray click can't land on a field
+   that belongs to the clip already being replaced. */
+.panel-body.fade-leave-active { pointer-events: none; }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; width: 100%; }
 .field-label { font-size: 12.5px; font-weight: 500; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin-top: -12px; }
