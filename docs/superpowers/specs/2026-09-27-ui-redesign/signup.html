@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="view-transition" content="same-origin">
+<title>Highlyte - Sign up</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Sora:wght@600&display=swap" rel="stylesheet">
+
+<!-- Prefetch Optimization Links -->
+<link rel="prefetch" href="https://p.superdesign.dev/draft/696230d6-bad4-476c-9d43-94113fc86bbe" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/b955495a-c9e5-46d5-978d-ed6399530075" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/f40c63b9-2726-4c2f-97e2-1d26d169f388" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/eff70993-4b27-4157-b8ed-82d8632cdc4b" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/fb3ae691-354e-4fbc-a66e-a395f52e55ec" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/ba1271a4-1300-4f1b-b640-937c5b5368df" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/03fd2bd1-71ae-4ac8-b0da-8ace7382a33f" as="document">
+
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --bg-subtle: #F7F6F2;
+    --surface: #FFFFFF;
+    --border: #E6E6E1;
+    --ink: #14201F;
+    --ink-soft: #5B6664;
+    --ink-faint: #9AA3A1;
+    --accent: #004741;
+    --accent-hover: #00362F;
+    --accent-soft: rgba(0,71,65,0.08);
+    --danger: #B42318;
+    --danger-soft: #FEF3F2;
+    --warning: #B54708;
+    --warning-soft: #FFFAEB;
+  }
+  body {
+    font-family: 'Public Sans', sans-serif;
+    background-color: var(--bg);
+    color: var(--ink);
+    margin: 0;
+  }
+  
+  /* View Transitions API configuration */
+  @view-transition {
+    navigation: auto;
+  }
+  html {
+    background-color: #FFFFFF;
+  }
+  ::view-transition {
+    background-color: #FFFFFF;
+  }
+  ::view-transition-old(main-header),
+  ::view-transition-new(main-header) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+  ::view-transition-old(main-content) {
+    animation: 0.16s ease-out both fade-out;
+  }
+  ::view-transition-new(main-content) {
+    animation: 0.16s ease-in 0.04s both fade-in;
+  }
+  @keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head>
+<body>
+  <div class="min-h-screen relative flex flex-col bg-white">
+    <!-- Top Bar -->
+    <header style="view-transition-name: main-header" class="h-[56px] bg-white border-b border-[#E6E6E1] sticky top-0 z-40 flex items-center px-4 md:px-6">
+      <div class="max-w-[1120px] mx-auto w-full flex items-center justify-between gap-4">
+        <div class="flex items-center gap-6">
+          <a href="https://p.superdesign.dev/draft/b955495a-c9e5-46d5-978d-ed6399530075" class="flex items-center gap-2 text-[20px] font-semibold text-[#14201F] tracking-tight font-['Sora']" id="nav-brand">
+            <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/523c7f65-d20e-437f-80fb-a027bcfcef62/brand-assets/frontend-public-logo-mark.svg/logo-mark.svg" alt="Highlyte" class="w-7 h-7">
+            Highlyte
+          </a>
+          <nav class="hidden md:flex gap-1">
+            <a href="https://p.superdesign.dev/draft/b955495a-c9e5-46d5-978d-ed6399530075" class="text-[13.5px] font-semibold text-[#5B6664] px-3 py-1.5 rounded-lg hover:bg-[rgba(0,71,65,0.08)] hover:text-[#14201F] transition-colors" id="nav-home">Home</a>
+            <a href="https://p.superdesign.dev/draft/eff70993-4b27-4157-b8ed-82d8632cdc4b" class="text-[13.5px] font-semibold text-[#5B6664] px-3 py-1.5 rounded-lg hover:bg-[rgba(0,71,65,0.08)] hover:text-[#14201F] transition-colors" id="nav-projects">Projects</a>
+            <a href="https://p.superdesign.dev/draft/fb3ae691-354e-4fbc-a66e-a395f52e55ec" class="text-[13.5px] font-semibold text-[#5B6664] px-3 py-1.5 rounded-lg hover:bg-[rgba(0,71,65,0.08)] hover:text-[#14201F] transition-colors" id="nav-team">Team</a>
+          </nav></div>
+        <div class="flex items-center gap-3 flex-1 justify-end">
+          <a href="https://p.superdesign.dev/draft/ba1271a4-1300-4f1b-b640-937c5b5368df" class="h-9 px-4 border border-[#E6E6E1] bg-white rounded-lg text-[13px] font-semibold flex items-center justify-center hover:bg-[#F7F6F2] transition-colors text-[#14201F]" id="btn-topbar-login">
+            Log in
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Layout (Centered Sign up Card) -->
+    <main style="view-transition-name: main-content" class="flex-1 flex flex-col items-center justify-center px-4 py-12 md:py-20 bg-white">
+      <div class="w-full max-w-[390px] flex flex-col">
+        <div class="border border-[#E6E6E1] rounded-xl p-6 md:p-8 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+          
+          <!-- Logo and Heading -->
+          <div class="flex flex-col items-center text-center mb-6">
+            <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/523c7f65-d20e-437f-80fb-a027bcfcef62/brand-assets/frontend-public-logo-mark.svg/logo-mark.svg" alt="Highlyte" class="w-9 h-9 mb-4">
+            <h1 class="text-[22px] font-semibold text-[#14201F] tracking-tight">Create your account</h1>
+            <p class="text-[13px] text-[#5B6664] mt-1">Start turning podcast links into vertical clips</p>
+          </div>
+
+          <!-- Signup Form -->
+          <form onsubmit="event.preventDefault();" class="flex flex-col gap-4">
+            <!-- Name Input -->
+            <div class=

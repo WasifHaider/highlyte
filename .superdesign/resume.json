@@ -26,18 +26,20 @@
         "frontend/src/components/ClipCard.vue",
         "frontend/src/components/CaptionEditor.vue",
         "frontend/src/components/ExportBar.vue",
-        "frontend/src/components/StyleAllBar.vue"
+        "frontend/src/components/StyleAllBar.vue",
+        "frontend/src/components/TrimControls.vue"
       ],
       "fingerprints": {
         ".superdesign/design-system.md": "2576546e4c8ac3f635e345bb6f0589bb66e2c109b7ce176c50c94e44429814fd",
         "frontend/src/style.css": "a3588bfe055b8baf16bddc31d519c12db179a1631c42d5ea1f8b5a6c08365f01",
         "frontend/src/components/TopBar.vue": "d3488168f0d53c631b9593123421e32829c0d5b53a9d11ba78baa892eb8d3f2d",
-        "frontend/src/views/JobView.vue": "72ee04a23465b89731f4a8db0fc081705165a820aa0c87ab55396b514afe2bf2",
+        "frontend/src/views/JobView.vue": "552e29780a273673251e7bfb73a97ac18a7dd51b18c3830f9f1f18a1038e43ca",
         "frontend/src/components/ClipList.vue": "023df9237eb737befa77249898f3c902b25e46f8cb3f7bedd79d49e48d711e54",
-        "frontend/src/components/ClipCard.vue": "a676a627ab79ee992f146945f8ba8547aeb2884f264150fa314ddf360e8903d6",
-        "frontend/src/components/CaptionEditor.vue": "44d822fbcfff7dedce02073d9f311f483638165dbe2be61e6d43204e72c7bf43",
+        "frontend/src/components/ClipCard.vue": "fa3943136b5a3949d2afc2dc03ebbed1bed8abc1c180984e6c8e0534ed66c1f0",
+        "frontend/src/components/CaptionEditor.vue": "85e0e44bc5bc6b3cf34fb7d2787d6bf75ef643a760366e8558b8f3fe3d426056",
         "frontend/src/components/ExportBar.vue": "471a30214d95c64439d6db7e564b5f0f5bab19f538e38a3f61e53cf3fe237475",
-        "frontend/src/components/StyleAllBar.vue": "c9ceae8c228decfd369100a645835735a0a6fc03aca1ad9d2a19b3775fe8e6d9"
+        "frontend/src/components/StyleAllBar.vue": "c9ceae8c228decfd369100a645835735a0a6fc03aca1ad9d2a19b3775fe8e6d9",
+        "frontend/src/components/TrimControls.vue": "196865efd1b633cf7817c6aaedc8f6d91eb958be8914df34988c89bb201c3ef6"
       },
       "components": [
         {
@@ -52,9 +54,329 @@
           "description": "Pixel-perfect reproduction of current clips page"
         },
         "696230d6-bad4-476c-9d43-94113fc86bbe": {
-          "description": "Minimal redesign (keep teal brand), incl. QA chips, skipped-range note, Edit side panel"
+          "description": "Minimal redesign (keep teal brand), incl. QA chips, skipped-range note, Edit side panel; v6 adds 3a controls (trim row, swap/regenerate/SRT, caption line + reason, replacing/error/v1 states) by direct edit of v1",
+          "currentVersion": 6
         }
-      }
+      },
+      "updatedAt": "2026-09-27T00:10:58.633371+00:00"
+    },
+    "/": {
+      "targetKind": "new-ui",
+      "projectId": "523c7f65-d20e-437f-80fb-a027bcfcef62",
+      "activeDraftId": "b955495a-c9e5-46d5-978d-ed6399530075",
+      "sourceTarget": "/jobs/:id",
+      "sourceDraftId": "696230d6-bad4-476c-9d43-94113fc86bbe",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "frontend-public-logo-mark.svg"
+      ],
+      "brandAssets": {
+        "logo": {
+          "assetKey": "frontend-public-logo-mark.svg",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/523c7f65-d20e-437f-80fb-a027bcfcef62/brand-assets/frontend-public-logo-mark.svg/logo-mark.svg",
+          "sourcePath": "frontend/public/logo-mark.svg"
+        }
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "frontend/src/style.css",
+        "frontend/src/components/TopBar.vue",
+        "frontend/src/views/HomeView.vue",
+        "frontend/src/views/ProjectsView.vue",
+        "frontend/src/views/TeamView.vue",
+        "frontend/src/views/LoginView.vue",
+        "frontend/src/views/SignupView.vue",
+        "frontend/src/components/ProjectCard.vue",
+        "frontend/src/components/ProcessingSteps.vue",
+        "frontend/src/components/VideoCard.vue"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "2576546e4c8ac3f635e345bb6f0589bb66e2c109b7ce176c50c94e44429814fd",
+        "frontend/src/style.css": "a3588bfe055b8baf16bddc31d519c12db179a1631c42d5ea1f8b5a6c08365f01",
+        "frontend/src/components/TopBar.vue": "d3488168f0d53c631b9593123421e32829c0d5b53a9d11ba78baa892eb8d3f2d",
+        "frontend/src/views/HomeView.vue": "3c63cd47b1ee60dc9f82163fd7b84b31c25f95504766263322c0d552b7a3ac79",
+        "frontend/src/views/ProjectsView.vue": "f2e9957b9db62e10d53f0ac75355db2f14e6b6641fefbf211b7e30c5b69fc44a",
+        "frontend/src/views/TeamView.vue": "6a2214873e325589c8879525c42e047af67ceebf8db0c5e0f37152c95d9ed866",
+        "frontend/src/views/LoginView.vue": "3f505c2c806a00c83f2564b800249d2961b814fb9dc1a3f6eb172d82d1e274ea",
+        "frontend/src/views/SignupView.vue": "0f1c73c90d8aeba4110326530008fbb1c3dd748f6abf661491ceadb9a650ec2c",
+        "frontend/src/components/ProjectCard.vue": "86d2293c87e397d1bc1c58447f5070bce072b25281020079acb212edb4ea9bae",
+        "frontend/src/components/ProcessingSteps.vue": "e1ebfaf6e0cb8110f1bb6f51e7d4b817727655f9463b21ced025658d26f7766a",
+        "frontend/src/components/VideoCard.vue": "6a9486070f51aa7b3f8cc18e07f203d8dc83f3053c838e3d80710a014f7dc067"
+      },
+      "drafts": {
+        "b955495a-c9e5-46d5-978d-ed6399530075": {
+          "title": "Home",
+          "description": "Minimal teal redesign, flow page from clips draft v6",
+          "parentDraftId": "696230d6-bad4-476c-9d43-94113fc86bbe",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-09-27T00:14:07.587194+00:00"
+    },
+    "/jobs/:id#processing": {
+      "targetKind": "new-ui",
+      "projectId": "523c7f65-d20e-437f-80fb-a027bcfcef62",
+      "activeDraftId": "f40c63b9-2726-4c2f-97e2-1d26d169f388",
+      "sourceTarget": "/jobs/:id",
+      "sourceDraftId": "696230d6-bad4-476c-9d43-94113fc86bbe",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "frontend-public-logo-mark.svg"
+      ],
+      "brandAssets": {
+        "logo": {
+          "assetKey": "frontend-public-logo-mark.svg",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/523c7f65-d20e-437f-80fb-a027bcfcef62/brand-assets/frontend-public-logo-mark.svg/logo-mark.svg",
+          "sourcePath": "frontend/public/logo-mark.svg"
+        }
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "frontend/src/style.css",
+        "frontend/src/components/TopBar.vue",
+        "frontend/src/views/HomeView.vue",
+        "frontend/src/views/ProjectsView.vue",
+        "frontend/src/views/TeamView.vue",
+        "frontend/src/views/LoginView.vue",
+        "frontend/src/views/SignupView.vue",
+        "frontend/src/components/ProjectCard.vue",
+        "frontend/src/components/ProcessingSteps.vue",
+        "frontend/src/components/VideoCard.vue"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "2576546e4c8ac3f635e345bb6f0589bb66e2c109b7ce176c50c94e44429814fd",
+        "frontend/src/style.css": "a3588bfe055b8baf16bddc31d519c12db179a1631c42d5ea1f8b5a6c08365f01",
+        "frontend/src/components/TopBar.vue": "d3488168f0d53c631b9593123421e32829c0d5b53a9d11ba78baa892eb8d3f2d",
+        "frontend/src/views/HomeView.vue": "3c63cd47b1ee60dc9f82163fd7b84b31c25f95504766263322c0d552b7a3ac79",
+        "frontend/src/views/ProjectsView.vue": "f2e9957b9db62e10d53f0ac75355db2f14e6b6641fefbf211b7e30c5b69fc44a",
+        "frontend/src/views/TeamView.vue": "6a2214873e325589c8879525c42e047af67ceebf8db0c5e0f37152c95d9ed866",
+        "frontend/src/views/LoginView.vue": "3f505c2c806a00c83f2564b800249d2961b814fb9dc1a3f6eb172d82d1e274ea",
+        "frontend/src/views/SignupView.vue": "0f1c73c90d8aeba4110326530008fbb1c3dd748f6abf661491ceadb9a650ec2c",
+        "frontend/src/components/ProjectCard.vue": "86d2293c87e397d1bc1c58447f5070bce072b25281020079acb212edb4ea9bae",
+        "frontend/src/components/ProcessingSteps.vue": "e1ebfaf6e0cb8110f1bb6f51e7d4b817727655f9463b21ced025658d26f7766a",
+        "frontend/src/components/VideoCard.vue": "6a9486070f51aa7b3f8cc18e07f203d8dc83f3053c838e3d80710a014f7dc067"
+      },
+      "drafts": {
+        "f40c63b9-2726-4c2f-97e2-1d26d169f388": {
+          "title": "Job processing (steps, failed, selection failed)",
+          "description": "Minimal teal redesign, flow page from clips draft v6",
+          "parentDraftId": "696230d6-bad4-476c-9d43-94113fc86bbe",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-09-27T00:14:07.587194+00:00"
+    },
+    "/projects": {
+      "targetKind": "new-ui",
+      "projectId": "523c7f65-d20e-437f-80fb-a027bcfcef62",
+      "activeDraftId": "eff70993-4b27-4157-b8ed-82d8632cdc4b",
+      "sourceTarget": "/jobs/:id",
+      "sourceDraftId": "696230d6-bad4-476c-9d43-94113fc86bbe",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "frontend-public-logo-mark.svg"
+      ],
+      "brandAssets": {
+        "logo": {
+          "assetKey": "frontend-public-logo-mark.svg",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/523c7f65-d20e-437f-80fb-a027bcfcef62/brand-assets/frontend-public-logo-mark.svg/logo-mark.svg",
+          "sourcePath": "frontend/public/logo-mark.svg"
+        }
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "frontend/src/style.css",
+        "frontend/src/components/TopBar.vue",
+        "frontend/src/views/HomeView.vue",
+        "frontend/src/views/ProjectsView.vue",
+        "frontend/src/views/TeamView.vue",
+        "frontend/src/views/LoginView.vue",
+        "frontend/src/views/SignupView.vue",
+        "frontend/src/components/ProjectCard.vue",
+        "frontend/src/components/ProcessingSteps.vue",
+        "frontend/src/components/VideoCard.vue"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "2576546e4c8ac3f635e345bb6f0589bb66e2c109b7ce176c50c94e44429814fd",
+        "frontend/src/style.css": "a3588bfe055b8baf16bddc31d519c12db179a1631c42d5ea1f8b5a6c08365f01",
+        "frontend/src/components/TopBar.vue": "d3488168f0d53c631b9593123421e32829c0d5b53a9d11ba78baa892eb8d3f2d",
+        "frontend/src/views/HomeView.vue": "3c63cd47b1ee60dc9f82163fd7b84b31c25f95504766263322c0d552b7a3ac79",
+        "frontend/src/views/ProjectsView.vue": "f2e9957b9db62e10d53f0ac75355db2f14e6b6641fefbf211b7e30c5b69fc44a",
+        "frontend/src/views/TeamView.vue": "6a2214873e325589c8879525c42e047af67ceebf8db0c5e0f37152c95d9ed866",
+        "frontend/src/views/LoginView.vue": "3f505c2c806a00c83f2564b800249d2961b814fb9dc1a3f6eb172d82d1e274ea",
+        "frontend/src/views/SignupView.vue": "0f1c73c90d8aeba4110326530008fbb1c3dd748f6abf661491ceadb9a650ec2c",
+        "frontend/src/components/ProjectCard.vue": "86d2293c87e397d1bc1c58447f5070bce072b25281020079acb212edb4ea9bae",
+        "frontend/src/components/ProcessingSteps.vue": "e1ebfaf6e0cb8110f1bb6f51e7d4b817727655f9463b21ced025658d26f7766a",
+        "frontend/src/components/VideoCard.vue": "6a9486070f51aa7b3f8cc18e07f203d8dc83f3053c838e3d80710a014f7dc067"
+      },
+      "drafts": {
+        "eff70993-4b27-4157-b8ed-82d8632cdc4b": {
+          "title": "Projects",
+          "description": "Minimal teal redesign, flow page from clips draft v6",
+          "parentDraftId": "696230d6-bad4-476c-9d43-94113fc86bbe",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-09-27T00:14:07.587194+00:00"
+    },
+    "/team": {
+      "targetKind": "new-ui",
+      "projectId": "523c7f65-d20e-437f-80fb-a027bcfcef62",
+      "activeDraftId": "fb3ae691-354e-4fbc-a66e-a395f52e55ec",
+      "sourceTarget": "/jobs/:id",
+      "sourceDraftId": "696230d6-bad4-476c-9d43-94113fc86bbe",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "frontend-public-logo-mark.svg"
+      ],
+      "brandAssets": {
+        "logo": {
+          "assetKey": "frontend-public-logo-mark.svg",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/523c7f65-d20e-437f-80fb-a027bcfcef62/brand-assets/frontend-public-logo-mark.svg/logo-mark.svg",
+          "sourcePath": "frontend/public/logo-mark.svg"
+        }
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "frontend/src/style.css",
+        "frontend/src/components/TopBar.vue",
+        "frontend/src/views/HomeView.vue",
+        "frontend/src/views/ProjectsView.vue",
+        "frontend/src/views/TeamView.vue",
+        "frontend/src/views/LoginView.vue",
+        "frontend/src/views/SignupView.vue",
+        "frontend/src/components/ProjectCard.vue",
+        "frontend/src/components/ProcessingSteps.vue",
+        "frontend/src/components/VideoCard.vue"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "2576546e4c8ac3f635e345bb6f0589bb66e2c109b7ce176c50c94e44429814fd",
+        "frontend/src/style.css": "a3588bfe055b8baf16bddc31d519c12db179a1631c42d5ea1f8b5a6c08365f01",
+        "frontend/src/components/TopBar.vue": "d3488168f0d53c631b9593123421e32829c0d5b53a9d11ba78baa892eb8d3f2d",
+        "frontend/src/views/HomeView.vue": "3c63cd47b1ee60dc9f82163fd7b84b31c25f95504766263322c0d552b7a3ac79",
+        "frontend/src/views/ProjectsView.vue": "f2e9957b9db62e10d53f0ac75355db2f14e6b6641fefbf211b7e30c5b69fc44a",
+        "frontend/src/views/TeamView.vue": "6a2214873e325589c8879525c42e047af67ceebf8db0c5e0f37152c95d9ed866",
+        "frontend/src/views/LoginView.vue": "3f505c2c806a00c83f2564b800249d2961b814fb9dc1a3f6eb172d82d1e274ea",
+        "frontend/src/views/SignupView.vue": "0f1c73c90d8aeba4110326530008fbb1c3dd748f6abf661491ceadb9a650ec2c",
+        "frontend/src/components/ProjectCard.vue": "86d2293c87e397d1bc1c58447f5070bce072b25281020079acb212edb4ea9bae",
+        "frontend/src/components/ProcessingSteps.vue": "e1ebfaf6e0cb8110f1bb6f51e7d4b817727655f9463b21ced025658d26f7766a",
+        "frontend/src/components/VideoCard.vue": "6a9486070f51aa7b3f8cc18e07f203d8dc83f3053c838e3d80710a014f7dc067"
+      },
+      "drafts": {
+        "fb3ae691-354e-4fbc-a66e-a395f52e55ec": {
+          "title": "Team",
+          "description": "Minimal teal redesign, flow page from clips draft v6",
+          "parentDraftId": "696230d6-bad4-476c-9d43-94113fc86bbe",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-09-27T00:14:07.587194+00:00"
+    },
+    "/login": {
+      "targetKind": "new-ui",
+      "projectId": "523c7f65-d20e-437f-80fb-a027bcfcef62",
+      "activeDraftId": "ba1271a4-1300-4f1b-b640-937c5b5368df",
+      "sourceTarget": "/jobs/:id",
+      "sourceDraftId": "696230d6-bad4-476c-9d43-94113fc86bbe",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "frontend-public-logo-mark.svg"
+      ],
+      "brandAssets": {
+        "logo": {
+          "assetKey": "frontend-public-logo-mark.svg",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/523c7f65-d20e-437f-80fb-a027bcfcef62/brand-assets/frontend-public-logo-mark.svg/logo-mark.svg",
+          "sourcePath": "frontend/public/logo-mark.svg"
+        }
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "frontend/src/style.css",
+        "frontend/src/components/TopBar.vue",
+        "frontend/src/views/HomeView.vue",
+        "frontend/src/views/ProjectsView.vue",
+        "frontend/src/views/TeamView.vue",
+        "frontend/src/views/LoginView.vue",
+        "frontend/src/views/SignupView.vue",
+        "frontend/src/components/ProjectCard.vue",
+        "frontend/src/components/ProcessingSteps.vue",
+        "frontend/src/components/VideoCard.vue"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "2576546e4c8ac3f635e345bb6f0589bb66e2c109b7ce176c50c94e44429814fd",
+        "frontend/src/style.css": "a3588bfe055b8baf16bddc31d519c12db179a1631c42d5ea1f8b5a6c08365f01",
+        "frontend/src/components/TopBar.vue": "d3488168f0d53c631b9593123421e32829c0d5b53a9d11ba78baa892eb8d3f2d",
+        "frontend/src/views/HomeView.vue": "3c63cd47b1ee60dc9f82163fd7b84b31c25f95504766263322c0d552b7a3ac79",
+        "frontend/src/views/ProjectsView.vue": "f2e9957b9db62e10d53f0ac75355db2f14e6b6641fefbf211b7e30c5b69fc44a",
+        "frontend/src/views/TeamView.vue": "6a2214873e325589c8879525c42e047af67ceebf8db0c5e0f37152c95d9ed866",
+        "frontend/src/views/LoginView.vue": "3f505c2c806a00c83f2564b800249d2961b814fb9dc1a3f6eb172d82d1e274ea",
+        "frontend/src/views/SignupView.vue": "0f1c73c90d8aeba4110326530008fbb1c3dd748f6abf661491ceadb9a650ec2c",
+        "frontend/src/components/ProjectCard.vue": "86d2293c87e397d1bc1c58447f5070bce072b25281020079acb212edb4ea9bae",
+        "frontend/src/components/ProcessingSteps.vue": "e1ebfaf6e0cb8110f1bb6f51e7d4b817727655f9463b21ced025658d26f7766a",
+        "frontend/src/components/VideoCard.vue": "6a9486070f51aa7b3f8cc18e07f203d8dc83f3053c838e3d80710a014f7dc067"
+      },
+      "drafts": {
+        "ba1271a4-1300-4f1b-b640-937c5b5368df": {
+          "title": "Log in",
+          "description": "Minimal teal redesign, flow page from clips draft v6",
+          "parentDraftId": "696230d6-bad4-476c-9d43-94113fc86bbe",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-09-27T00:14:07.587194+00:00"
+    },
+    "/signup": {
+      "targetKind": "new-ui",
+      "projectId": "523c7f65-d20e-437f-80fb-a027bcfcef62",
+      "activeDraftId": "03fd2bd1-71ae-4ac8-b0da-8ace7382a33f",
+      "sourceTarget": "/jobs/:id",
+      "sourceDraftId": "696230d6-bad4-476c-9d43-94113fc86bbe",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "frontend-public-logo-mark.svg"
+      ],
+      "brandAssets": {
+        "logo": {
+          "assetKey": "frontend-public-logo-mark.svg",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/523c7f65-d20e-437f-80fb-a027bcfcef62/brand-assets/frontend-public-logo-mark.svg/logo-mark.svg",
+          "sourcePath": "frontend/public/logo-mark.svg"
+        }
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "frontend/src/style.css",
+        "frontend/src/components/TopBar.vue",
+        "frontend/src/views/HomeView.vue",
+        "frontend/src/views/ProjectsView.vue",
+        "frontend/src/views/TeamView.vue",
+        "frontend/src/views/LoginView.vue",
+        "frontend/src/views/SignupView.vue",
+        "frontend/src/components/ProjectCard.vue",
+        "frontend/src/components/ProcessingSteps.vue",
+        "frontend/src/components/VideoCard.vue"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "2576546e4c8ac3f635e345bb6f0589bb66e2c109b7ce176c50c94e44429814fd",
+        "frontend/src/style.css": "a3588bfe055b8baf16bddc31d519c12db179a1631c42d5ea1f8b5a6c08365f01",
+        "frontend/src/components/TopBar.vue": "d3488168f0d53c631b9593123421e32829c0d5b53a9d11ba78baa892eb8d3f2d",
+        "frontend/src/views/HomeView.vue": "3c63cd47b1ee60dc9f82163fd7b84b31c25f95504766263322c0d552b7a3ac79",
+        "frontend/src/views/ProjectsView.vue": "f2e9957b9db62e10d53f0ac75355db2f14e6b6641fefbf211b7e30c5b69fc44a",
+        "frontend/src/views/TeamView.vue": "6a2214873e325589c8879525c42e047af67ceebf8db0c5e0f37152c95d9ed866",
+        "frontend/src/views/LoginView.vue": "3f505c2c806a00c83f2564b800249d2961b814fb9dc1a3f6eb172d82d1e274ea",
+        "frontend/src/views/SignupView.vue": "0f1c73c90d8aeba4110326530008fbb1c3dd748f6abf661491ceadb9a650ec2c",
+        "frontend/src/components/ProjectCard.vue": "86d2293c87e397d1bc1c58447f5070bce072b25281020079acb212edb4ea9bae",
+        "frontend/src/components/ProcessingSteps.vue": "e1ebfaf6e0cb8110f1bb6f51e7d4b817727655f9463b21ced025658d26f7766a",
+        "frontend/src/components/VideoCard.vue": "6a9486070f51aa7b3f8cc18e07f203d8dc83f3053c838e3d80710a014f7dc067"
+      },
+      "drafts": {
+        "03fd2bd1-71ae-4ac8-b0da-8ace7382a33f": {
+          "title": "Sign up",
+          "description": "Minimal teal redesign, flow page from clips draft v6",
+          "parentDraftId": "696230d6-bad4-476c-9d43-94113fc86bbe",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-09-27T00:14:07.587194+00:00"
     }
   }
 }

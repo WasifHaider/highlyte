@@ -1,0 +1,357 @@
+<!DOCTYPE html><html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Highlyte - Clips</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Sora:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --bg-subtle: #F7F6F2;
+    --surface: #FFFFFF;
+    --border: #E6E6E1;
+    --ink: #14201F;
+    --ink-soft: #5B6664;
+    --ink-faint: #9AA3A1;
+    --accent: #004741;
+    --accent-hover: #00362F;
+    --accent-soft: rgba(0,71,65,0.08);
+    --danger: #B42318;
+    --danger-soft: #FEF3F2;
+    --warning: #B54708;
+    --warning-soft: #FFFAEB;
+  }
+  body {
+    font-family: 'Public Sans', sans-serif;
+    background-color: var(--bg);
+    color: var(--ink);
+  }
+</style>
+</head>
+<body>
+  <div class="min-h-screen relative flex flex-col">
+    <!-- Top Bar -->
+    <header class="h-[56px] bg-white border-b border-[#E6E6E1] sticky top-0 z-40 flex items-center px-4 md:px-6">
+      <div class="max-w-[1120px] mx-auto w-full flex items-center justify-between gap-4">
+        <div class="flex items-center gap-6">
+          <a href="#home" class="flex items-center gap-2 text-[20px] font-semibold text-[#14201F] tracking-tight font-['Sora']" id="nav-brand">
+            <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/523c7f65-d20e-437f-80fb-a027bcfcef62/brand-assets/frontend-public-logo-mark.svg/logo-mark.svg" alt="Highlyte" class="w-7 h-7">
+            Highlyte
+          </a>
+          <nav class="hidden md:flex gap-1">
+            <a href="#home" class="text-[13.5px] font-semibold text-[#5B6664] px-3 py-1.5 rounded-lg hover:bg-[rgba(0,71,65,0.08)] hover:text-[#14201F] transition-colors" id="nav-home">Home</a>
+            <a href="#projects" class="text-[13.5px] font-semibold text-[#004741] bg-[rgba(0,71,65,0.08)] px-3 py-1.5 rounded-lg transition-colors" id="nav-projects">Projects</a>
+            <a href="#team" class="text-[13.5px] font-semibold text-[#5B6664] px-3 py-1.5 rounded-lg hover:bg-[rgba(0,71,65,0.08)] hover:text-[#14201F] transition-colors" id="nav-team">Team</a>
+          </nav>
+        </div>
+        <div class="flex items-center gap-3 flex-1 justify-end">
+          <div class="hidden lg:flex items-center flex-1 max-w-[400px]">
+            <input type="text" placeholder="Paste a YouTube link" class="flex-1 h-9 border border-[#E6E6E1] rounded-l-lg px-3.5 text-[14px] outline-none focus:border-[#004741] focus:ring-1 focus:ring-[#004741]">
+            <div class="flex h-9 border-y border-[#E6E6E1] bg-[#F7F6F2]">
+              <button class="px-2.5 text-[12.5px] font-semibold text-[#004741] bg-white border border-[#E6E6E1] border-y-0 relative z-10" id="btn-lang-hinglish">Hinglish</button>
+              <button class="px-2.5 text-[12.5px] font-semibold text-[#5B6664] border-r border-[#E6E6E1] hover:bg-[#E6E6E1]/50" id="btn-lang-english">English</button>
+            </div>
+            <button class="h-9 px-4 bg-[#004741] text-white text-[14px] font-semibold rounded-r-lg hover:bg-[#00362F] transition-colors" id="btn-generate">Generate</button>
+          </div>
+          <button class="h-9 px-3 border border-[#E6E6E1] bg-white rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:bg-[#F7F6F2]" id="btn-account">
+            Account <iconify-icon icon="lucide:chevron-down" class="text-[14px]"></iconify-icon>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <div class="flex flex-1 max-w-[1120px] mx-auto w-full relative">
+      
+      <!-- Left/Center Main Area -->
+      <main class="flex-1 px-4 md:px-6 py-8 min-w-0 pb-24">
+        
+        <!-- Video Header (Quiet Row) -->
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-[80px] h-[45px] shrink-0 rounded border border-[#E6E6E1] overflow-hidden">
+            <img src="https://images.unsplash.com/photo-1598929213452-52d72f63e307?auto=format&fit=crop&q=80&w=160&h=90" alt="Thumbnail" class="w-full h-full object-cover">
+          </div>
+          <div class="min-w-0">
+            <h1 class="text-[15px] font-semibold truncate">The Future of AI in Media Production | Episode 42</h1>
+            <div class="text-[12.5px] text-[#5B6664] mt-0.5 flex items-center gap-1.5">
+              Tech Talk Weekly · <span class="font-mono tabular-nums">1:24:00</span> · <span class="text-[#004741] font-medium">6 clips</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Warning Banner -->
+        <div class="bg-[#F7F6F2] text-[#5B6664] text-[12.5px] px-3 py-2 rounded-lg mb-8 inline-block">
+          Skipped 12:30–18:40 (rate limit). Some moments may be missing.
+        </div>
+
+        <!-- Grid Header -->
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded border-2 border-[#004741] bg-[#004741] flex items-center justify-center text-white text-[10px] cursor-pointer">
+              <iconify-icon icon="lucide:check"></iconify-icon>
+            </div>
+            <span class="text-[14px] font-semibold">Highlights</span>
+          </div>
+          <button class="text-[13px] font-semibold text-[#5B6664] hover:text-[#14201F] bg-transparent border-none cursor-pointer flex items-center gap-1.5" id="btn-style-all">
+            <iconify-icon icon="lucide:paint-brush" class="text-[14px]"></iconify-icon> Style all
+          </button>
+        </div>
+
+        <!-- Clips Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          
+          <!-- Clip 1 (Selected/Editing) -->
+          <div class="bg-white rounded-xl border-2 border-[#004741] overflow-hidden flex flex-col">
+            <div class="aspect-[9/16] bg-black relative">
+              <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400&h=711" alt="Preview" class="w-full h-full object-cover opacity-80">
+              <div class="absolute inset-x-4 bottom-16 text-center">
+                <div class="inline-block bg-[#FFD400] text-black px-2 py-1 text-sm font-bold uppercase tracking-tight">
+                  THE SECRET TO
+                </div>
+              </div>
+              <!-- Overlay indicating editing state -->
+              <div class="absolute inset-0 bg-[#004741]/10 pointer-events-none"></div>
+            </div>
+            <div class="p-3.5 flex flex-col gap-2.5">
+              <div class="flex flex-col gap-1.5 pb-3 border-b border-[#E6E6E1]">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-medium text-[#5B6664] uppercase tracking-wider">Trim</span>
+                  <span class="flex items-center gap-2"><span class="font-mono tabular-nums text-[12px] text-[#14201F]">28.4 s</span><a href="#" class="text-[12px] font-medium text-[#004741] hover:underline" id="trim-1-reset">Reset</a></span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <span class="w-9 text-[11.5px] text-[#9AA3A1]">Start</span>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#5B6664] border border-[#E6E6E1] rounded-md bg-white hover:bg-[#F7F6F2] tabular-nums" id="trim-1-start-prev">◀ Sentence</button>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#5B6664] border border-[#E6E6E1] rounded-md bg-white hover:bg-[#F7F6F2] tabular-nums" id="trim-1-start-minus">−0.5 s</button>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#5B6664] border border-[#E6E6E1] rounded-md bg-white hover:bg-[#F7F6F2] tabular-nums" id="trim-1-start-plus">+0.5 s</button>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#5B6664] border border-[#E6E6E1] rounded-md bg-white hover:bg-[#F7F6F2] tabular-nums" id="trim-1-start-next">Sentence ▶</button>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <span class="w-9 text-[11.5px] text-[#9AA3A1]">End</span>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#5B6664] border border-[#E6E6E1] rounded-md bg-white hover:bg-[#F7F6F2] tabular-nums" id="trim-1-end-prev">◀ Sentence</button>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#5B6664] border border-[#E6E6E1] rounded-md bg-white hover:bg-[#F7F6F2] tabular-nums" id="trim-1-end-minus">−0.5 s</button>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#5B6664] border border-[#E6E6E1] rounded-md bg-white hover:bg-[#F7F6F2] tabular-nums" id="trim-1-end-plus">+0.5 s</button>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#5B6664] border border-[#E6E6E1] rounded-md bg-white hover:bg-[#F7F6F2] tabular-nums" id="trim-1-end-next">Sentence ▶</button>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-4 h-4 shrink-0 rounded border-2 border-[#004741] bg-[#004741] flex items-center justify-center text-white text-[10px] cursor-pointer">
+                  <iconify-icon icon="lucide:check"></iconify-icon>
+                </div>
+                <span class="font-mono tabular-nums text-[12.5px] text-[#5B6664]">12:04–12:31</span>
+                <span class="font-mono tabular-nums text-[11px] text-[#9AA3A1]">28s</span>
+              </div>
+              <p class="text-[13px] text-[#5B6664] truncate">“The biggest mistake I see early-stage founders make…”</p>
+              <p class="text-[12px] text-[#9AA3A1] -mt-1.5">Strong hook, pays off in the last line</p>
+              <div class="flex flex-wrap gap-1.5">
+                <span class="bg-[#F7F6F2] text-[#5B6664] text-[12px] px-2 py-0.5 rounded-full">Key insight</span>
+                <span class="text-[#5B6664] text-[12px] font-semibold tabular-nums ml-auto">7.8</span>
+              </div>
+              <button class="mt-1 w-full py-1.5 text-[12.5px] font-semibold text-[#004741] bg-[#F7F6F2] rounded-lg" id="btn-edit-1">Edit active</button>
+              <div class="flex items-center gap-2">
+                <button class="h-8 px-3 text-[12.5px] font-semibold text-[#9AA3A1] border border-[#E6E6E1] rounded-lg bg-white cursor-not-allowed" id="btn-swap-1" title="Another clip is being replaced. Wait for it to finish.">Swap scene</button>
+                <button class="h-8 px-3 text-[12.5px] font-semibold text-[#9AA3A1] border border-[#E6E6E1] rounded-lg bg-white cursor-not-allowed" id="btn-regen-1" title="Another clip is being replaced. Wait for it to finish.">Regenerate</button>
+                <a href="#" class="ml-auto text-[12.5px] font-medium text-[#5B6664] hover:text-[#14201F] flex items-center gap-1" id="btn-srt-1"><iconify-icon icon="lucide:download" class="text-[13px]"></iconify-icon>SRT</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Clip 2 (Warning) -->
+          <div class="bg-white rounded-xl border border-[#E6E6E1] hover:border-[#9AA3A1] transition-colors overflow-hidden flex flex-col">
+            <div class="aspect-[9/16] bg-black relative">
+              <img style="filter:grayscale(.3)" src="https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=400&h=711" alt="Preview" class="w-full h-full object-cover opacity-40">
+              <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/40 animate-pulse">
+                <iconify-icon icon="lucide:loader-2" class="text-[22px] text-[#004741] animate-spin"></iconify-icon>
+                <span class="text-[13px] font-semibold text-[#14201F] bg-white/90 px-3 py-1 rounded-full">Swapping in another moment…</span>
+              </div>
+            </div>
+            <div class="p-3.5 flex flex-col gap-2.5">
+              <div class="flex flex-col gap-1.5 pb-3 border-b border-[#E6E6E1] opacity-50 pointer-events-none">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-medium text-[#5B6664] uppercase tracking-wider">Trim</span>
+                  <span class="flex items-center gap-2"><span class="font-mono tabular-nums text-[12px] text-[#14201F]">40.0 s</span></span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <span class="w-9 text-[11.5px] text-[#9AA3A1]">Start</span>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#9AA3A1] border border-[#E6E6E1] rounded-md bg-white cursor-not-allowed tabular-nums" id="trim-2-start-prev" title="Another clip is being replaced. Wait for it to finish.">◀ Sentence</button>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#9AA3A1] border border-[#E6E6E1] rounded-md bg-white cursor-not-allowed tabular-nums" id="trim-2-start-minus" title="Another clip is being replaced. Wait for it to finish.">−0.5 s</button>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#9AA3A1] border border-[#E6E6E1] rounded-md bg-white cursor-not-allowed tabular-nums" id="trim-2-start-plus" title="Another clip is being replaced. Wait for it to finish.">+0.5 s</button>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#9AA3A1] border border-[#E6E6E1] rounded-md bg-white cursor-not-allowed tabular-nums" id="trim-2-start-next" title="Another clip is being replaced. Wait for it to finish.">Sentence ▶</button>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <span class="w-9 text-[11.5px] text-[#9AA3A1]">End</span>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#9AA3A1] border border-[#E6E6E1] rounded-md bg-white cursor-not-allowed tabular-nums" id="trim-2-end-prev" title="Another clip is being replaced. Wait for it to finish.">◀ Sentence</button>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#9AA3A1] border border-[#E6E6E1] rounded-md bg-white cursor-not-allowed tabular-nums" id="trim-2-end-minus" title="Another clip is being replaced. Wait for it to finish.">−0.5 s</button>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#9AA3A1] border border-[#E6E6E1] rounded-md bg-white cursor-not-allowed tabular-nums" id="trim-2-end-plus" title="Another clip is being replaced. Wait for it to finish.">+0.5 s</button>
+                  <button class="h-7 px-2 text-[12px] font-medium text-[#9AA3A1] border border-[#E6E6E1] rounded-md bg-white cursor-not-allowed tabular-nums" id="trim-2-end-next" title="Another clip is being replaced. Wait for it to finish.">Sentence ▶</button>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-4 h-4 shrink-0 rounded border border-[#E6E6E1] bg-white cursor-pointer hover:border-[#9AA3A1]"></div>
+                <span class="font-mono tabular-nums text-[12.5px] text-[#5B6664]">24:15–24:55</span>
+                <span class="font-mono tabular-nums text-[11px] text-[#9AA3A1]">40s</span>
+              </div>
+              <p class="text-[13px] text-[#5B6664] truncate">“Log kehte hain AI sab kuch badal dega, par sach yeh hai…”</p>
+              <p class="text-[12px] text-[#9AA3A1] -mt-1.5">Bold claim, clear setup</p>
+              <div class="flex flex-col gap-1.5">
+                <div class="flex flex-wrap gap-1.5">
+                  <span class="bg-[#FFFAEB] text-[#B54708] text-[12px] px-2 py-0.5 rounded-full">Low confidence — check captions</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="bg-[#F7F6F2] text-[#5B6664] text-[12px] px-2 py-0.5 rounded-full">Controversial</span>
+                  <span class="text-[#5B6664] text-[12px] font-semibold tabular-nums">8.2</span>
+                </div>
+              </div>
+              <button class="mt-1 w-full py-1.5 text-[12.5px] font-semibold text-[#9AA3A1] cursor-not-allowed border border-[#E6E6E1] rounded-lg " id="btn-edit-2">Edit</button>
+              <div class="flex items-center gap-2">
+                <button class="h-8 px-3 text-[12.5px] font-semibold text-[#9AA3A1] border border-[#E6E6E1] rounded-lg bg-white cursor-not-allowed" id="btn-swap-2" title="Another clip is being replaced. Wait for it to finish.">Swap scene</button>
+                <button class="h-8 px-3 text-[12.5px] font-semibold text-[#9AA3A1] border border-[#E6E6E1] rounded-lg bg-white cursor-not-allowed" id="btn-regen-2" title="Another clip is being replaced. Wait for it to finish.">Regenerate</button>
+                <a href="#" class="ml-auto text-[12.5px] font-medium text-[#5B6664] hover:text-[#14201F] flex items-center gap-1" id="btn-srt-2"><iconify-icon icon="lucide:download" class="text-[13px]"></iconify-icon>SRT</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Clip 3 (Weaker pick) -->
+          <div class="bg-white rounded-xl border border-[#E6E6E1] hover:border-[#9AA3A1] transition-colors overflow-hidden flex flex-col">
+            <div class="aspect-[9/16] bg-black relative">
+               <div class="absolute inset-0 flex items-center justify-center bg-[#F7F6F2] text-[#9AA3A1] text-xs px-6 text-center">
+                 No vertical preview. Re-run video to generate.
+               </div>
+            </div>
+            <div class="p-3.5 flex flex-col gap-2.5">
+              <p class="text-[12px] text-[#9AA3A1] pb-3 border-b border-[#E6E6E1]">Re-run the video to trim this clip.</p>
+              <div class="flex items-center gap-2">
+                <div class="w-4 h-4 shrink-0 rounded border border-[#E6E6E1] bg-white cursor-pointer hover:border-[#9AA3A1]"></div>
+                <span class="font-mono tabular-nums text-[12.5px] text-[#5B6664]">45:10–45:32</span>
+                <span class="font-mono tabular-nums text-[11px] text-[#9AA3A1]">22s</span>
+              </div>
+              <p class="text-[13px] text-[#5B6664] truncate">“Pehli company band hui toh maine socha…”</p>
+              <p class="text-[12px] text-[#9AA3A1] -mt-1.5">Personal story with a turn</p>
+              <div class="flex flex-col gap-1.5">
+                 <div class="flex flex-wrap gap-1.5">
+                  <span class="bg-[#FFFAEB] text-[#B54708] text-[12px] px-2 py-0.5 rounded-full">Weaker pick</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="bg-[#F7F6F2] text-[#5B6664] text-[12px] px-2 py-0.5 rounded-full">Story</span>
+                  <span class="text-[#5B6664] text-[12px] font-semibold tabular-nums">6.1</span>
+                </div>
+              </div>
+              <p class="text-[12.5px] text-[#B42318] bg-[#FEF3F2] rounded-lg px-2.5 py-1.5 flex items-center gap-1.5"><iconify-icon icon="lucide:alert-circle" class="text-[14px] shrink-0"></iconify-icon>No better take found around this moment.</p>
+              <button class="mt-1 w-full py-1.5 text-[12.5px] font-semibold text-[#5B6664] border border-[#E6E6E1] rounded-lg hover:bg-[#F7F6F2]" id="btn-edit-3">Edit</button>
+              <div class="flex items-center gap-2">
+                <button class="h-8 px-3 text-[12.5px] font-semibold text-[#9AA3A1] border border-[#E6E6E1] rounded-lg bg-white cursor-not-allowed" id="btn-swap-3" title="Another clip is being replaced. Wait for it to finish.">Swap scene</button>
+                <button class="h-8 px-3 text-[12.5px] font-semibold text-[#9AA3A1] border border-[#E6E6E1] rounded-lg bg-white cursor-not-allowed" id="btn-regen-3" title="Another clip is being replaced. Wait for it to finish.">Regenerate</button>
+                <a href="#" class="ml-auto text-[12.5px] font-medium text-[#5B6664] hover:text-[#14201F] flex items-center gap-1" id="btn-srt-3"><iconify-icon icon="lucide:download" class="text-[13px]"></iconify-icon>SRT</a>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+
+      <!-- Right Side Edit Panel -->
+      <aside class="hidden lg:block w-[320px] shrink-0 border-l border-[#E6E6E1] bg-white h-[calc(100vh-56px)] sticky top-[56px] overflow-y-auto">
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-[15px] font-semibold">Edit Clip</h2>
+            <button class="text-[#9AA3A1] hover:text-[#14201F]" id="btn-close-panel">
+              <iconify-icon icon="lucide:x" class="text-lg"></iconify-icon>
+            </button>
+          </div>
+
+          <div class="flex flex-col gap-5">
+            <!-- Hook Title -->
+            <label class="flex flex-col gap-1.5">
+              <span class="text-[12.5px] font-medium">Hook title</span>
+              <input type="text" value="Why most AI startups fail in year 1" class="h-9 px-3 border border-[#E6E6E1] rounded-lg text-[13.5px] outline-none focus:border-[#004741] focus:ring-1 focus:ring-[#004741]">
+              <div class="flex items-center gap-2 mt-1">
+                <input type="checkbox" checked class="w-3.5 h-3.5 accent-[#004741] rounded">
+                <span class="text-[12.5px] text-[#5B6664]">Show hook title</span>
+              </div>
+            </label>
+
+            <!-- Style Controls -->
+            <div class="grid grid-cols-2 gap-3">
+              <label class="flex flex-col gap-1.5">
+                <span class="text-[12.5px] font-medium">Layout</span>
+                <select class="h-9 px-2.5 border border-[#E6E6E1] rounded-lg text-[13.5px] bg-white outline-none">
+                  <option>Fit (auto)</option>
+                  <option>Split screen</option>
+                </select>
+              </label>
+              <label class="flex flex-col gap-1.5">
+                <span class="text-[12.5px] font-medium">Captions</span>
+                <select class="h-9 px-2.5 border border-[#E6E6E1] rounded-lg text-[13.5px] bg-white outline-none">
+                  <option>Karaoke</option>
+                  <option>Block</option>
+                </select>
+              </label>
+              <label class="flex flex-col gap-1.5">
+                <span class="text-[12.5px] font-medium">Position</span>
+                <select class="h-9 px-2.5 border border-[#E6E6E1] rounded-lg text-[13.5px] bg-white outline-none">
+                  <option>Lower third</option>
+                  <option>Middle</option>
+                </select>
+              </label>
+              <label class="flex flex-col gap-1.5">
+                <span class="text-[12.5px] font-medium">Accent colour</span>
+                <div class="flex items-center gap-2 h-9 border border-[#E6E6E1] rounded-lg px-2 bg-white">
+                   <input type="color" value="#FFD400" class="w-5 h-5 rounded cursor-pointer border-0 p-0">
+                   <span class="text-[12px] text-[#5B6664] uppercase font-mono">#FFD400</span>
+                </div>
+              </label>
+            </div>
+
+            <hr class="border-[#E6E6E1]">
+
+            <!-- Caption Editor -->
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-[12.5px] font-medium">Captions</span>
+                <span class="text-[11px] text-[#9AA3A1]">Approx. sync</span>
+              </div>
+              <div class="flex flex-col gap-2 max-h-[240px] overflow-y-auto pr-2">
+                <div class="flex gap-2">
+                  <span class="font-mono tabular-nums text-[11.5px] text-[#9AA3A1] w-10 shrink-0 pt-1">12:04</span>
+                  <input type="text" value="The biggest mistake I see" class="flex-1 h-7 px-2 border border-[#E6E6E1] rounded md text-[13px] outline-none focus:border-[#004741]">
+                </div>
+                <div class="flex gap-2">
+                  <span class="font-mono tabular-nums text-[11.5px] text-[#9AA3A1] w-10 shrink-0 pt-1">12:06</span>
+                  <input type="text" value="early-stage founders make" class="flex-1 h-7 px-2 border border-[#E6E6E1] rounded md text-[13px] outline-none focus:border-[#004741]">
+                </div>
+                <div class="flex gap-2">
+                  <span class="font-mono tabular-nums text-[11.5px] text-[#9AA3A1] w-10 shrink-0 pt-1">12:08</span>
+                  <input type="text" value="when integrating LLMs is" class="flex-1 h-7 px-2 border border-[#E6E6E1] rounded md text-[13px] outline-none focus:border-[#004741]">
+                </div>
+                 <div class="flex gap-2">
+                  <span class="font-mono tabular-nums text-[11.5px] text-[#9AA3A1] w-10 shrink-0 pt-1">12:10</span>
+                  <input type="text" value="treating them like APIs" class="flex-1 h-7 px-2 border border-[#E6E6E1] rounded md text-[13px] outline-none focus:border-[#004741]">
+                </div>
+              </div>
+              <div class="flex gap-2 mt-4">
+                <button class="flex-1 h-8 bg-[rgba(0,71,65,0.08)] text-[#004741] rounded-lg text-[12.5px] font-semibold" id="btn-save-caps">Save changes</button>
+                <button class="px-3 h-8 text-[#5B6664] text-[12.5px] font-semibold hover:bg-[#F7F6F2] rounded-lg" id="btn-reset-caps">Reset</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Floating Export Bar -->
+    <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white border border-[#E6E6E1] shadow-[0_4px_12px_rgba(0,0,0,0.08)] rounded-full px-4 py-2.5 flex items-center gap-4">
+      <span class="text-[13.5px] font-medium text-[#14201F]">1 selected</span>
+      <div class="w-px h-4 bg-[#E6E6E1]"></div>
+      <button class="text-[13.5px] font-semibold text-[#5B6664] hover:text-[#14201F]" id="btn-export-download">
+        Download zip
+      </button>
+      <button class="h-8 px-4 bg-[#004741] text-white text-[13.5px] font-semibold rounded-full hover:bg-[#00362F] transition-colors" id="btn-export-render">
+        Render &amp; export
+      </button>
+    </div>
+
+  </div>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Highlyte - Processing Episode</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Sora:wght@600&display=swap" rel="stylesheet">
+<meta name="view-transition" content="same-origin">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/696230d6-bad4-476c-9d43-94113fc86bbe" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/b955495a-c9e5-46d5-978d-ed6399530075" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/eff70993-4b27-4157-b8ed-82d8632cdc4b" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/fb3ae691-354e-4fbc-a66e-a395f52e55ec" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/ba1271a4-1300-4f1b-b640-937c5b5368df" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/03fd2bd1-71ae-4ac8-b0da-8ace7382a33f" as="document">
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --bg-subtle: #F7F6F2;
+    --surface: #FFFFFF;
+    --border: #E6E6E1;
+    --ink: #14201F;
+    --ink-soft: #5B6664;
+    --ink-faint: #9AA3A1;
+    --accent: #004741;
+    --accent-hover: #00362F;
+    --accent-soft: rgba(0,71,65,0.08);
+    --danger: #B42318;
+    --danger-soft: #FEF3F2;
+    --warning: #B54708;
+    --warning-soft: #FFFAEB;
+  }
+  body {
+    font-family: 'Public Sans', sans-serif;
+    background-color: var(--bg);
+    color: var(--ink);
+    margin: 0;
+  }
+  @view-transition { navigation: auto; }
+  ::view-transition-old(main-nav),
+  ::view-transition-new(main-nav) { animation: none; mix-blend-mode: normal; }
+  ::view-transition-old(brand),
+  ::view-transition-new(brand) { animation: none; mix-blend-mode: normal; }
+  ::view-transition-old(main-content) { animation: 0.25s ease-out both fade-out; }
+  ::view-transition-new(main-content) { animation: 0.25s ease-in 0.1s both fade-in; }
+  @keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .pulse-soft { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+  .step-check { color: #004741; }
+</style>
+</head>
+<body>
+  <div class="min-h-screen relative flex flex-col">
+    <!-- Persistent Header -->
+    <header style="view-transition-name: main-nav" class="h-[56px] bg-white border-b border-[#E6E6E1] sticky top-0 z-40 flex items-center px-4 md:px-6">
+      <div class="max-w-[1120px] mx-auto w-full flex items-center justify-between gap-4">
+        <div class="flex items-center gap-6">
+          <a href="https://p.superdesign.dev/draft/b955495a-c9e5-46d5-978d-ed6399530075" style="view-transition-name: brand" class="flex items-center gap-2 text-[20px] font-semibold text-[#14201F] tracking-tight font-['Sora']" id="nav-brand">
+            <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/523c7f65-d20e-437f-80fb-a027bcfcef62/brand-assets/frontend-public-logo-mark.svg/logo-mark.svg" alt="Highlyte" class="w-7 h-7">
+            Highlyte
+          </a>
+          <nav class="hidden md:flex gap-1">
+            <a href="https://p.superdesign.dev/draft/b955495a-c9e5-46d5-978d-ed6399530075" class="text-[13.5px] font-semibold text-[#5B6664] px-3 py-1.5 rounded-lg hover:bg-[rgba(0,71,65,0.08)] hover:text-[#14201F] transition-colors" id="nav-home">Home</a>
+            <a href="https://p.superdesign.dev/draft/eff70993-4b27-4157-b8ed-82d8632cdc4b" class="text-[13.5px] font-semibold text-[#004741] bg-[rgba(0,71,65,0.08)] px-3 py-1.5 rounded-lg transition-colors" id="nav-projects">Projects</a>
+            <a href="https://p.superdesign.dev/draft/fb3ae691-354e-4fbc-a66e-a395f52e55ec" class="text-[13.5px] font-semibold text-[#5B6664] px-3 py-1.5 rounded-lg hover:bg-[rgba(0,71,65,0.08)] hover:text-[#14201F] transition-colors" id="nav-team">Team</a>
+          </nav>
+        </div>
+        <div class="flex items-center gap-3 flex-1 justify-end">
+          <button class="h-9 px-3 border border-[#E6E6E1] bg-white rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:bg-[#F7F6F2]" id="btn-account">
+            Account <iconify-icon icon="lucide:chevron-down" class="text-[14px]"></iconify-icon>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main style="view-transition-name: main-content" class="flex-1 max-w-[640px] mx-auto w-full px-4 md:px-6 py-12">
+      
+      <!-- Active Job Progress -->
+      <div class="space-y-8">
+        
+        <!-- Video Summary Card -->
+        <div class="flex gap-4 p-4 border border-[#E6E6E1] rounded-xl bg-white">
+          <div class="w-[160px] aspect-video shrink-0 rounded-lg overflow-hidden border border-[#E6E6E1] bg-[#F7F6F2] relative">
+            <img src="https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&q=80&w=320" alt="Thumbnail" class="w-full h-full object-cover grayscale-[0.5]">
+            <div class="absolute inset-0 bg-black/10"></div>
+          </div>
+          <div class="min-w-0 flex flex-col justify-center">
+            <h1 class="text-[16px] font-semibold leading-tight line-clamp-2">The Psychology of High Performance Under Stress</h1>
+            <p class="text-[13px] text-[#5B6664] mt-1">Modern Mind Podcast · 1:42:15</p>
+          </div>
+        </div>
+
+        <!-- Progress List -->
+        <div class="px-2">
+          <h2 class="text-[15px] font-semibold mb-6">Processing your episode</h2>
+          <div class="space-y-6 relative">
+            <!-- Vertical Line -->
+            <div class="absolute left-[9px] top-2 bottom-2 w-px bg-[#E6E6E1]"></div>
+            
+            <!-- Step 1: Done -->
+            <div class="flex gap-4 items-start relative z-10">
+              <div class="w-[20px] h-[20px] rounded-full bg-[#004741] border border-[#004741] flex items-center justify-center">
+                <iconify-icon icon="lucide:check" class="text-white text-[12px]"></iconify-icon>
+              </div>
+              <div>
+                <p class="text-[14px] font-medium">Downloading audio</p>
+                <p class="text-[12px] text-[#9AA3A1]">Complete</p>
+              </div>
+            </div>
+
+            <!-- Step 2: Done -->
+            <div class="flex gap-4 items-start relative z-10">
+              <div class="w-[20px] h-[20px] rounded-full bg-[#004741] border border-[#004741] flex items-center justify-center">
+                <iconify-icon icon="lucide:check" class="text-white text-[12px]"></iconify-icon>
+              </div>
+              <div>
+                <p class="text-[14px] font-medium">Transcribing</p>
+                <p class="text-[12px] text-[#9AA3A1]">Hinglish model active</p>
+              </div>
+            </div>
+
+            <!-- Step 3: Active -->
+            <div class="flex gap-4 items-start relative z-10">
+              <div class="w-[20px] h-[20px] rounded-full bg-white border-2 border-[#004741] flex items-center justify-center">
+                <div class="w-2 h-2 rounded-full bg-[#004741] pulse-soft"></div>
+              </div>
+              <div class="flex-1">
+                <p class="text-[14px] font-semibold">Finding the best moments</p>
+                <div class="mt-2 h-1.5 w-full bg-[#F7F6F2] rounded-full overflow-hidden">
+                  <div class="h-full bg-[#004741] w-[65%] transition-all duration-500"></div>
+                </div>
+                <p class="text-[11.5px] font-mono text-[#5B6664] mt-1.5">Analyzing sentiment and visual cues... 65%</p>
+              </div>
+            </div>
+
+            <!-- Step 4: Pending -->
+            <div class="flex gap-4 items-start relative z-10">
+              <div class="w-[20px] h-[20px] rounded-full bg-white border border-[#E6E6E1] flex items-center justify-center">
+              </div>
+              <div>
+                <p class="text-[14px] text-[#9AA3A1]">Preparing clips</p>
+                <p class="text-[12px] text-[#9AA3A1]">Waiting...</p>
+              </div>
+            </div>
+          </div>
+
+          <p class="mt-8 text-[13px] text-[#5B6664] bg-[#F7F6F2] py-2.5 px-3 rounded-lg flex items-center gap-2">
+            <iconify-icon icon="lucide:info" class="text-[16px]"></iconify-icon>
+            You can leave this page; we will keep working.
+          </p>
+        </div>
+
+        <div class="pt-12 border-t border-[#E6E6E1] space-y-6">
+          <h3 class="text-[12.5px] font-semibold text-[#9AA3A1] uppercase tracking-wider">Simulated Error States</h3>
+          
+          <!-- Example: Failed State -->
+          <div class="bg-[#FEF3F2] border border-[#FECDCA] rounded-xl p-5">
+            <div class="flex gap-3">
+              <iconify-icon icon="lucide:alert-circle" class="text-[#B42318] text-[20px] shrink-0"></iconify-icon>
+              <div class="flex-1 min-w-0">
+                <h4 class="text-[14px] font-semibold text-[#B42318]">Transcription failed</h4>
+                <p class="text-[13px] text-[#B42318] mt-1 opacity-90">The audio quality was too low or the format is unsupported. Please try another link.</p>
+                <button class="mt-4 h-8 px-3 border border-[#FECDCA] bg-white rounded-lg text-[13px] font-semibold text-[#14201F] hover:bg-white/50" id="btn-retry-failed">Try again</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Example: Clip Selection Failed -->
+          <div class="bg-white border border-[#E6E6E1] rounded-xl p-5">
+             <div class="flex gap-3">
+              <iconify-icon icon="lucide:scissors" class="text-[#B54708] text-[20px] shrink-0"></iconify-icon>
+              <div class="flex-1 min-w-0">
+                <h4 class="text-[14px] font-semibold">Clip selection failed</h4>
+                <p class="text-[13px] text-[#5B6664] mt-1">We couldn't find distinct highlights in this segment. The content might be too uniform for automatic detection.</p>
+                <div class="mt-4 flex gap-2">
+                  <button class="h-8 px-4 bg-[#004741] text-white text-[13px] font-semibold rounded-lg hover:bg-[#00362F]" id="btn-retry-selection">Retry selection</button>
+                  <button class="h-8 px-3 border border-[#E6E6E1] rounded-lg text-[13px] font-semibold text-[#5B6664]" id="btn-skip-selection">Skip</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

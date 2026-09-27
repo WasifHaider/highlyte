@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Highlyte - Home</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Sora:wght@600&display=swap" rel="stylesheet">
+<meta name="view-transition" content="same-origin">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/696230d6-bad4-476c-9d43-94113fc86bbe" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/b955495a-c9e5-46d5-978d-ed6399530075" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/f40c63b9-2726-4c2f-97e2-1d26d169f388" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/eff70993-4b27-4157-b8ed-82d8632cdc4b" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/fb3ae691-354e-4fbc-a66e-a395f52e55ec" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/ba1271a4-1300-4f1b-b640-937c5b5368df" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/03fd2bd1-71ae-4ac8-b0da-8ace7382a33f" as="document">
+<style>
+  html {
+    background-color: #FFFFFF;
+  }
+  @view-transition {
+    navigation: auto;
+  }
+  ::view-transition {
+    background-color: #FFFFFF;
+  }
+  ::view-transition-old(main-header),
+  ::view-transition-new(main-header) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+  ::view-transition-old(main-content) {
+    animation: 0.2s ease-out both fade-out;
+  }
+  ::view-transition-new(main-content) {
+    animation: 0.2s ease-in 0.05s both fade-in;
+  }
+  @keyframes fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+  <div class="min-h-screen relative flex flex-col bg-white text-[#14201F] font-['Public_Sans']">
+    <!-- Top Bar -->
+    <header class="h-[56px] bg-white border-b border-[#E6E6E1] sticky top-0 z-40 flex items-center px-4 md:px-6" style="view-transition-name: main-header;">
+      <div class="max-w-[1120px] mx-auto w-full flex items-center justify-between gap-4">
+        <div class="flex items-center gap-6">
+          <a href="https://p.superdesign.dev/draft/b955495a-c9e5-46d5-978d-ed6399530075" class="flex items-center gap-2 text-[20px] font-semibold text-[#14201F] tracking-tight font-['Sora']" id="nav-brand">
+            <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/523c7f65-d20e-437f-80fb-a027bcfcef62/brand-assets/frontend-public-logo-mark.svg/logo-mark.svg" alt="Highlyte" class="w-7 h-7">
+            Highlyte
+          </a>
+          <nav class="hidden md:flex gap-1">
+            <a href="https://p.superdesign.dev/draft/b955495a-c9e5-46d5-978d-ed6399530075" class="text-[13.5px] font-semibold text-[#004741] bg-[rgba(0,71,65,0.08)] px-3 py-1.5 rounded-lg transition-colors" id="nav-home">Home</a>
+            <a href="https://p.superdesign.dev/draft/eff70993-4b27-4157-b8ed-82d8632cdc4b" class="text-[13.5px] font-semibold text-[#5B6664] px-3 py-1.5 rounded-lg hover:bg-[rgba(0,71,65,0.08)] hover:text-[#14201F] transition-colors" id="nav-projects">Projects</a>
+            <a href="https://p.superdesign.dev/draft/fb3ae691-354e-4fbc-a66e-a395f52e55ec" class="text-[13.5px] font-semibold text-[#5B6664] px-3 py-1.5 rounded-lg hover:bg-[rgba(0,71,65,0.08)] hover:text-[#14201F] transition-colors" id="nav-team">Team</a>
+          </nav> mentor
+        </div>
+        <div class="flex items-center gap-3 flex-1 justify-end">
+          <a href="https://p.superdesign.dev/draft/ba1271a4-1300-4f1b-b640-937c5b5368df" class="h-9 px-3 border border-[#E6E6E1] bg-white rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:bg-[#F7F6F2] text-[#14201F]" id="btn-account">
+            Account <iconify-icon icon="lucide:chevron-down" class="text-[14px]"></iconify-icon>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-[1120px] mx-auto w-full px-4 md:px-6 py-12 pb-24 flex flex-col justify-between" style="view-transition-name: main-content;">
+      
+      <!-- Centered Hero -->
+      <section class="text-center pt-16 pb-20 max-w-[720px] mx-auto w-full">
+        <h1 class="text-[28px] md:text-[36px] font-semibold text-[#14201F] tracking-tight leading-tight">
+          Turn a podcast into vertical clips
+        </h1>
+        <p class="text-[14.5px] text-[#5B6664] mt-3 max-w-[540px] mx-auto leading-relaxed">
+          Highlyte pulls the audio, transcribes multilingual conversations, and clips your best moments with face-tracking and Roman-script captions.
+        </p>
+
+        <!-- Single Wide Input Box & Controls Container -->
+        <div class="mt-10 bg-white border border-[#E6E6E1] rounded-xl p-4 flex flex-col gap-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+          <div class="w-full">
+            <input type="text" placeholder="Paste a YouTube link" class="w-full h-10 border border-[#E6E6E1] rounded-lg px-3.5 text-[14px] outline-none focus:border-[#004741] focus:ring-2 focus:ring-[rgba(0,71,65,0.08)] transition-all text-[#14201F]" id="hero-url-input">
+          </div>
+          
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <!-- Segmented Control for Language Selection -->
+            <div class="flex p-0.5 bg-[#F7F6F2] rounded-lg border border-[#E6E6E1]">
+              <button type="button" onclick="selectLanguage('hinglish')" class="flex-1 sm:flex-initial px-4 h-8 text-[13px] font-semibold text-[#004741] bg-white rounded-md border border-[#E6E6E1] shadow-sm relative z-10 transition-all" id="hero-lang-hinglish">
+                Hinglish
+              </button>
+              <button type="button" onclick="selectLanguage('english')" class="flex-1 sm:flex-initial px-4 h-8 text-[13px] font-semibold text-[#5B6664] rounded-md hover:text-[#14201F] transition-colors" id="hero-lang-english">
+                English
+              </button>
+            </div>
+
+            <!-- Teal Primary Generate Button -->
+            <a href="https://p.superdesign.dev/draft/f40c63b9-2726-4c2f-97e2-1d26d169f388" class="h-9 px-6 bg-[#004741] text-white text-[14px] font-semibold rounded-lg hover:bg-[#00362F] transition-colors inline-flex items-center justify-center text-center shadow-sm" id="hero-btn-generate">
+              Generate
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quiet Recent Projects Section -->
+      <section class="mt-auto border-t border-[#E6E6E1] pt-12">
+        <div class="flex items-baseline justify-between mb-6">
+          <h2 class="text-[15px] font-semibold text-[#14201F]">Recent projects</h2>
+          <a href="https://p.superdesign.dev/draft/eff70993-4b27-4157-b8ed-82d8632cdc4b" class="text-[13px] font-semibold text-[#5B6664] hover:text-[#004741] transition-colors" id="btn-view-all-projects">
+            See all projects
+          </a>
+        </div>
+
+        <!-- Project Cards Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          
+          <!-- Card 1 (Done) -->
+          <a href="https://p.superdesign.dev/draft/696230d6-bad4-476c-9d43-94113fc86bbe" class="group bg-white border border-[#E6E6E1] hover:border-[#004741] rounded-xl overflow-hidden flex flex-col transition-colors duration-150" id="project-card-1">
+            <div class="relative aspect-[16/9] bg-[#F7F6F2] overflow-hidden">
+              <img src="https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&q=80&w=400&h=225" alt="Thumbnail" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-150">
+              <span class="absolute right-2 bottom-2 bg-black/75 text-white text-[11px] font-mono tabular-nums px-1.5 py-0.5 rounded">42:15</span>
+            </div>
+            <div class="p-3.5 flex flex-col gap-1 flex-1">
+              <h3 class="font-semibold text-[14px] line-clamp-2 leading-snug text-[#14201F]">The Reality of Scaling a Startup in India | Episode 84</h3>
+              <p class="text-[12.5px] text-[#5B6664]">The Founders Journey</p>
+              <div class="flex items-center gap-2 mt-auto pt-2 text-[12px]">
+                <span class="font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,71,65,0.08)] text-[#004741]">Done · 6 clips</span>
+                <span class="text-[#9AA3A1] font-mono tabular-nums ml-auto">2h ago</span>
+              </div>
+            </div>
+          </a>
+
+          <!-- Card 2 (Done) -->
+          <a href="https://p.superdesign.dev/draft/696230d6-bad4-476c-9d43-94113fc86bbe" class="group bg-white border border-[#E6E6E1] hover:border-[#004741] rounded-xl overflow-hidden flex flex-col transition-colors duration-150" id="project-card-2">
+            <div class="relative aspect-[16/9] bg-[#F7F6F2] overflow-hidden">
+              <img src="https://images.unsplash.com/photo-1610116306796-6fea9f4fae38?auto=format&fit=crop&q=80&w=400&h=225" alt="Thumbnail" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-150">
+              <span class="absolute right-2 bottom-2 bg-black/75 text-white text-[11px] font-mono tabular-nums px-1.5 py-0.5 rounded">1:05:30</span>
+            </div>
+            <div class="p-3.5 flex flex-col gap-1 flex-1">
+              <h3 class="font-semibold text-[14px] line-clamp-2 leading-snug text-[#14201F]">Why Urdu Poetry Still Rules Hearts Across Borders</h3>
+              <p class="text-[12.5px] text-[#5B6664]">Adab Aur Guftagu</p>
+              <div class="flex items-center gap-2 mt-auto pt-2 text-[12px]">
+                <span class="font-semibold px-2 py-0.5 rounded-full bg-[rgba(0,71,65,0.08)] text-[#004741]">Done · 8 clips</span>
+                <span class="text-[#9AA3A1] font-mono tabular-nums ml-auto">Yesterday</span>
+              </div>
+            </div>
+          </a>
+
+          <!-- Card 3 (Processing) -->
+          <a href="https://p.superdesign.dev/draft/696230d6-bad4-476c-9d43-94113fc86bbe" class="group bg-white border border-[#E6E6E1] hover:border-[#004741] rounded-xl overflow-hidden flex flex-col transition-colors duration-150" id="project-card-3">
+            <div class="relative aspect-[16/9] bg-[#F7F6F2] overflow-hidden">
+              <img src="https://images.unsplash.com/photo-1593642632823-8f785ba67e45?auto=format&fit=crop&q=80&w=400&h=225" alt="Thumbnail" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-150 opacity-60">
+              <span class="absolute right-2 bottom-2 bg-black/75 text-white text-[11px] font-mono tabular-nums px-1.5 py-0.5 rounded">28:40</span>
+              <div class="absolute inset-0 bg-[#004741]/5 animate-pulse"></div>
+            </div>
+            <div class="p-3.5 flex flex-col gap-1 flex-1">
+              <h3 class="font-semibold text-[14px] line-clamp-2 leading-snug text-[#14201F]">How AI Agents are Changing Software Engineering</h3>
+              <p class="text-[12.5px] text-[#5B6664]">Tech Pulse Daily</p>
+              <div class="flex items-center gap-2 mt-auto pt-2 text-[12px]">
+                <span class="font-semibold px-2 py-0.5 rounded-full bg-[#FFF4D6] text-[#8A5A00] animate-pulse">Processing</span>
+                <span class="text-[#9AA3A1] font-mono tabular-nums ml-auto">Just now</span>
+              </div>
+            </div>
+          </a>
+
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    function selectLanguage(lang) {
+      const hinglishBtn = document.getElementById('hero-lang-hinglish');
+      const englishBtn = document.getElementById('hero-lang-english');
+      if (lang === 'hinglish') {
+        hinglishBtn.className = 'flex-1 sm:flex-initial px-4 h-8 text-[13px] font-semibold text-[#004741] bg-white rounded-md border border-[#E6E6E1] shadow-sm relative z-10 transition-all';
+        englishBtn.className = 'flex-1 sm:flex-initial px-4 h-8 text-[13px] font-semibold text-[#5B6664] rounded-md hover:text-[#14201F] transition-colors';
+      } else {
+        englishBtn.className = 'flex-1 sm:flex-initial px-4 h-8 text-[13px] font-semibold text-[#004741] bg-white rounded-md border border-[#E6E6E1] shadow-sm relative z-10 transition-all';
+        hinglishBtn.className = 'flex-1 sm:flex-initial px-4 h-8 text-[13px] font-semibold text-[#5B6664] rounded-md hover:text-[#14201F] transition-colors';
+      }
+    }
+  </script>
+</body>
+</html>
