@@ -17,6 +17,7 @@
         <div v-if="step.state === 'active' && progress.latestText" class="step-progress-quote">"{{ progress.latestText }}"</div>
       </div>
     </div>
+    <p class="processing-hint">This takes a few minutes on CPU: every clip gets word-timed captions and face tracking.</p>
     <p class="processing-hint">You can leave this page; we will keep working.</p>
   </div>
 </template>
@@ -87,5 +88,6 @@ const progressText = computed(() => {
   font-size: 12px; color: var(--ink-faint); font-style: italic;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.processing-hint { margin-top: 24px; font-size: 12.5px; color: var(--ink-faint); }
+.processing-hint { margin-top: 24px; margin-bottom: 0; font-size: 12.5px; color: var(--ink-faint); }
+.processing-hint + .processing-hint { margin-top: 4px; }
 </style>
