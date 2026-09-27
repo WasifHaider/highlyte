@@ -1,7 +1,7 @@
 <template>
-  <div ref="root" class="ui-color" :class="{ open, disabled }">
+  <div class="ui-color" :class="{ open, disabled }">
     <button
-      ref="trigger"
+      ref="triggerEl"
       type="button"
       class="ui-color-trigger"
       :disabled="disabled"
@@ -15,40 +15,43 @@
       <span class="ui-color-hex mono">{{ modelValue }}</span>
       <svg class="ui-color-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
     </button>
-    <Transition name="pop">
-      <div v-if="open" ref="popover" class="ui-color-popover" :class="{ up: openUp }" role="dialog" tabindex="-1" @keydown="onPopoverKey">
-        <div class="ui-color-grid">
-          <button
-            v-for="hex in ACCENT_PRESETS"
-            :key="hex"
-            type="button"
-            class="ui-color-preset"
-            :class="{ current: sameColor(hex, modelValue) }"
-            :style="{ background: hex }"
-            :aria-label="hex"
-            @click="choose(hex)"
-          ></button>
+    <Teleport to="body">
+      <Transition name="pop">
+        <div v-if="open" ref="layerEl" class="ui-color-popover" :class="{ up: openUp }" :style="popoverStyle" role="dialog" tabindex="-1" @keydown="onPopoverKey">
+          <div class="ui-color-grid">
+            <button
+              v-for="hex in ACCENT_PRESETS"
+              :key="hex"
+              type="button"
+              class="ui-color-preset"
+              :class="{ current: sameColor(hex, modelValue) }"
+              :style="{ background: hex }"
+              :aria-label="hex"
+              @click="choose(hex)"
+            ></button>
+          </div>
+          <hr class="ui-color-divider" />
+          <button type="button" class="ui-color-custom" @click="openCustom">
+            <span class="ui-color-swatch" :style="{ background: modelValue }"></span>
+            <span>Custom colour&hellip;</span>
+            <input
+              ref="customInput"
+              type="color"
+              class="ui-color-native"
+              :value="modelValue"
+              tabindex="-1"
+              @input="onCustomInput"
+            />
+          </button>
         </div>
-        <hr class="ui-color-divider" />
-        <button type="button" class="ui-color-custom" @click="openCustom">
-          <span class="ui-color-swatch" :style="{ background: modelValue }"></span>
-          <span>Custom colour&hellip;</span>
-          <input
-            ref="customInput"
-            type="color"
-            class="ui-color-native"
-            :value="modelValue"
-            tabindex="-1"
-            @input="onCustomInput"
-          />
-        </button>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { nextTick, onBeforeUnmount, ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useFloating } from './useFloating'
 import { ACCENT_PRESETS } from '../../utils/clipStyle'
 
 const props = defineProps({
@@ -58,36 +61,22 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue'])
 
-const root = ref(null)
-const trigger = ref(null)
-const popover = ref(null)
+const { open, openUp, style, triggerEl, layerEl, show: showFloating, close } = useFloating()
 const customInput = ref(null)
-const open = ref(false)
-const openUp = ref(false)
+
+// The popover has a fixed 212px content width; useFloating's clamp still
+// needs that number to keep the right edge on-screen before the layer has
+// rendered once (it remeasures against the real element after that).
+const popoverStyle = computed(() => ({ ...style, width: '212px' }))
 
 function sameColor(a, b) {
   return (a || '').toLowerCase() === (b || '').toLowerCase()
 }
 
-function onOutside(e) {
-  if (root.value && !root.value.contains(e.target)) close(false)
-}
-
 async function show() {
-  if (props.disabled || open.value) return
-  const rect = trigger.value.getBoundingClientRect()
-  openUp.value = window.innerHeight - rect.bottom < 240 && rect.top > 240
-  open.value = true
-  document.addEventListener('pointerdown', onOutside, true)
-  await nextTick()
-  popover.value?.focus()
-}
-
-function close(refocus = true) {
-  if (!open.value) return
-  open.value = false
-  document.removeEventListener('pointerdown', onOutside, true)
-  if (refocus) trigger.value?.focus()
+  if (props.disabled) return
+  await showFloating()
+  layerEl.value?.focus()
 }
 
 function toggle() {
@@ -117,8 +106,6 @@ function onTriggerKey(e) {
 function onPopoverKey(e) {
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close() }
 }
-
-onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutside, true))
 </script>
 
 <style scoped>
@@ -140,12 +127,12 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutside, tru
 .ui-color-chevron { flex-shrink: 0; color: var(--ink-soft); transition: transform 160ms ease-out; }
 .open .ui-color-chevron { transform: rotate(180deg); }
 .ui-color-popover {
-  position: absolute; left: 0; top: calc(100% + 4px); z-index: 70; width: 212px; padding: 10px;
+  position: fixed; z-index: 70; padding: 10px;
   background: #fff; border: 1px solid var(--border); border-radius: 10px;
   box-shadow: 0 8px 24px rgba(20, 32, 31, .10), 0 1px 2px rgba(0,0,0,.04); outline: none;
   transform-origin: top left;
 }
-.ui-color-popover.up { top: auto; bottom: calc(100% + 4px); transform-origin: bottom left; }
+.ui-color-popover.up { transform-origin: bottom left; }
 .ui-color-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; justify-items: center; }
 .ui-color-preset {
   width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer; padding: 0;
