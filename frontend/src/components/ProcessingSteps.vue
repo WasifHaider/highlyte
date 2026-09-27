@@ -3,22 +3,21 @@
     <div class="processing-title">Processing your episode</div>
     <div class="steps">
       <div class="step" v-for="step in steps" :key="step.key">
-        <div class="step-dot" :class="step.state">
-          <span v-if="step.state === 'done'">✓</span>
-        </div>
-        <div class="step-text">
-          <span class="step-label" :class="step.state === 'active' ? 'current' : step.state">{{ step.label }}</span>
-          <div v-if="step.state === 'active' && progressNote" class="step-progress">
-            <div v-if="progress.percent != null" class="progress-bar">
-              <div class="progress-bar-fill" :style="{ width: Math.min(100, progress.percent) + '%' }"></div>
-            </div>
-            <span class="step-progress-note">{{ progressNote }}</span>
-            <div v-if="progress.latestText" class="step-progress-text">"{{ progress.latestText }}"</div>
+        <div class="row">
+          <div class="step-marker" :class="step.state">
+            <span v-if="step.state === 'done'" class="check">✓</span>
+            <span v-else-if="step.state === 'active'" class="dot"></span>
           </div>
+          <span class="step-label" :class="step.state">{{ step.label }}</span>
+          <span v-if="step.state === 'active' && progressText" class="step-progress-text tabular">{{ progressText }}</span>
         </div>
+        <div v-if="step.state === 'active' && progress.percent != null" class="progress-bar">
+          <div class="progress-bar-fill" :style="{ width: Math.min(100, progress.percent) + '%' }"></div>
+        </div>
+        <div v-if="step.state === 'active' && progress.latestText" class="step-progress-quote">"{{ progress.latestText }}"</div>
       </div>
     </div>
-    <div class="processing-hint">This takes a few minutes on CPU: every clip gets word-timed captions and face tracking.</div>
+    <p class="processing-hint">You can leave this page; we will keep working.</p>
   </div>
 </template>
 
@@ -47,44 +46,46 @@ const steps = computed(() => {
   })
 })
 
-const progressNote = computed(() => props.progress?.note || '')
+// Same progress logic as before (note + percent + latestText), just
+// formatted into a single right-aligned string for the active row.
+const progressText = computed(() => {
+  const note = props.progress?.note || ''
+  const percent = props.progress?.percent
+  if (note && percent != null) return `${note} ${Math.min(100, Math.round(percent))}%`
+  if (note) return note
+  if (percent != null) return `${Math.min(100, Math.round(percent))}%`
+  return ''
+})
 </script>
 
 <style scoped>
-.processing-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 48px 32px;
-  max-width: 440px;
-  margin: 0 auto;
-  text-align: center;
-}
-.processing-title { font-family: var(--font-serif); font-size: 19px; font-weight: 500; margin-bottom: 28px; }
-.step { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; text-align: left; }
-.step-dot {
-  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; margin-top: 1px;
+.processing-card { padding: 8px 0 0; }
+.processing-title { font-size: 15px; font-weight: 600; margin-bottom: 24px; }
+.steps { display: flex; flex-direction: column; gap: 12px; }
+.step { display: flex; flex-direction: column; }
+.row { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+.step-marker {
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 10px; color: #fff;
-  background: #fff; border: 1.5px solid var(--border);
 }
-.step-dot.active { background: var(--accent); animation: dotPulse 1s ease-in-out infinite; }
-.step-dot.done { background: var(--accent); }
-.step-text { flex: 1; min-width: 0; }
-.step-label { font-size: 14px; color: var(--ink-faint); }
-.step-label.current { color: var(--ink); font-weight: 600; }
-.step-label.done { color: var(--ink); }
-.step-progress { margin-top: 6px; }
+.step-marker.pending { border: 1px solid var(--border); background: #fff; }
+.step-marker.active { border: 2px solid var(--accent); background: #fff; animation: softPulse 1.6s ease-in-out infinite; }
+.step-marker.active .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.step-marker.done { background: var(--accent); border: 1px solid var(--accent); }
+.step-marker.done .check { color: #fff; font-size: 11px; line-height: 1; }
+.step-label { font-size: 14px; flex: 1; min-width: 0; }
+.step-label.pending { color: var(--ink-faint); }
+.step-label.active, .step-label.done { color: var(--ink); }
+.step-progress-text { font-size: 12.5px; color: var(--ink-soft); flex-shrink: 0; }
 .progress-bar {
-  height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; margin-bottom: 5px;
+  margin-left: 32px; margin-top: 2px;
+  height: 4px; border-radius: 2px; background: var(--border); overflow: hidden;
 }
-.progress-bar-fill {
-  height: 100%; background: var(--accent); transition: width .3s ease;
-}
-.step-progress-note { font-size: 11.5px; color: var(--ink-soft); font-family: monospace; }
-.step-progress-text {
-  margin-top: 4px; font-size: 12px; color: var(--ink-faint); font-style: italic;
+.progress-bar-fill { height: 100%; background: var(--accent); transition: width .3s ease; }
+.step-progress-quote {
+  margin-left: 32px; margin-top: 4px;
+  font-size: 12px; color: var(--ink-faint); font-style: italic;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.processing-hint { margin-top: 20px; font-size: 12px; color: var(--ink-soft); }
+.processing-hint { margin-top: 24px; font-size: 12.5px; color: var(--ink-faint); }
 </style>

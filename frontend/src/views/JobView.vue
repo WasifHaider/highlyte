@@ -13,11 +13,11 @@
         <ProcessingSteps v-if="jobStore.isProcessing" :status="jobStore.job.status" :progress="jobStore.progress" />
         <p v-if="jobStore.job?.languageNote" class="subtle-note lang-note">{{ jobStore.job.languageNote }}</p>
 
-        <div v-if="jobStore.selectionFailed" class="selection-failed">
+        <div v-if="jobStore.selectionFailed" class="selection-failed card">
           <p class="sf-title">Clip selection didn't finish</p>
           <p class="sf-msg">{{ jobStore.job.error }}</p>
           <p class="sf-sub">The transcript is saved, so a retry skips the download and transcription.</p>
-          <button class="sf-retry" :disabled="retrying" @click="onRetry">
+          <button class="btn btn-primary" :disabled="retrying" @click="onRetry">
             {{ retrying ? 'Retrying…' : 'Retry selection' }}
           </button>
         </div>
@@ -99,17 +99,12 @@ watch(() => props.id, (newId) => startForId(newId))
 <style scoped>
 .lang-note { margin: 12px 0 0; display: inline-block; }
 .selection-failed {
-  margin-top: 24px; padding: 20px; border: 1px solid var(--border); border-radius: 12px;
-  background: var(--surface); display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+  margin-top: 24px; padding: 20px;
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
 }
 .sf-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
-.sf-msg { margin: 0; font-size: 14px; color: var(--ink); }
-.sf-sub { margin: 0 0 8px; font-size: 13px; color: var(--ink-soft); }
-.sf-retry {
-  border: none; border-radius: 8px; padding: 9px 16px; font-size: 14px; font-weight: 600;
-  font-family: var(--font-sans); color: #fff; background: var(--accent); cursor: pointer;
-}
-.sf-retry:disabled { opacity: .6; cursor: default; }
+.sf-msg { margin: 0; font-size: 14px; color: var(--ink-soft); }
+.sf-sub { margin: 0 0 8px; font-size: 12.5px; color: var(--ink-faint); }
 .selection-note { margin: 0 0 32px; display: inline-block; }
 .job-layout { display: flex; }
 .job-main { flex: 1; min-width: 0; }
