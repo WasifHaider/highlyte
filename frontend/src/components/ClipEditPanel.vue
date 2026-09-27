@@ -87,17 +87,27 @@ function set(patch) {
 function onKeydown(e) {
   if (e.key === 'Escape' && jobStore.editingClipId) jobStore.closeEditor()
 }
-onMounted(() => window.addEventListener('keydown', onKeydown))
+
+// Below 1024px the panel is a full-screen sheet over the page, not a side
+// column, so the page behind it must not scroll while it's open. Driven off
+// a media query listener (not just a clip watcher) so resizing the viewport
+// across the breakpoint while the sheet is open updates the lock too.
+const mobileSheetQuery = window.matchMedia('(max-width: 1023px)')
+function updateScrollLock() {
+  document.body.style.overflow = clip.value && mobileSheetQuery.matches ? 'hidden' : ''
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  mobileSheetQuery.addEventListener('change', updateScrollLock)
+})
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
+  mobileSheetQuery.removeEventListener('change', updateScrollLock)
   document.body.style.overflow = ''
 })
 
-// Below 1024px the panel is a full-screen sheet over the page, not a side
-// column, so the page behind it must not scroll while it's open.
-watch(clip, (value) => {
-  document.body.style.overflow = value && window.innerWidth < 1024 ? 'hidden' : ''
-}, { immediate: true })
+watch(clip, updateScrollLock, { immediate: true })
 </script>
 
 <style scoped>
