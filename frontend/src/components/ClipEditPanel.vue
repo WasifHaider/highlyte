@@ -29,35 +29,45 @@
         </label>
 
         <div class="grid-2">
-          <label class="field">
+          <label class="field" for="edit-layout-select">
             <span class="field-label">Layout</span>
-            <select class="select" :value="clip.style.layout" :disabled="!!clip.pendingAction" @change="set({ layout: $event.target.value })">
-              <option v-for="l in LAYOUTS" :key="l.value" :value="l.value" :disabled="!layoutAllowed(l.value, clipTime.reframe)">
-                {{ l.label }}{{ l.value === clipTime.reframe.auto ? ' (auto)' : '' }}
-              </option>
-            </select>
+            <UiSelect
+              id="edit-layout-select"
+              :model-value="clip.style.layout"
+              :options="layoutOptions"
+              :disabled="!!clip.pendingAction"
+              @update:model-value="v => set({ layout: v })"
+            />
           </label>
-          <label class="field">
+          <label class="field" for="edit-captions-select">
             <span class="field-label">Captions</span>
-            <select class="select" :value="clip.style.captionPreset" :disabled="!!clip.pendingAction" @change="set({ captionPreset: $event.target.value })">
-              <option v-for="p in PRESETS" :key="p.value" :value="p.value">{{ p.label }}</option>
-            </select>
+            <UiSelect
+              id="edit-captions-select"
+              :model-value="clip.style.captionPreset"
+              :options="captionOptions"
+              :disabled="!!clip.pendingAction"
+              @update:model-value="v => set({ captionPreset: v })"
+            />
           </label>
-          <label class="field">
+          <label class="field" for="edit-position-select">
             <span class="field-label">Position</span>
-            <select class="select" :value="clip.style.captionPosition" :disabled="clip.style.layout === 'split' || !!clip.pendingAction"
-              @change="set({ captionPosition: $event.target.value })">
-              <option value="lower">Lower third</option>
-              <option value="middle">Middle</option>
-            </select>
+            <UiSelect
+              id="edit-position-select"
+              :model-value="clip.style.captionPosition"
+              :options="positionOptions"
+              :disabled="clip.style.layout === 'split' || !!clip.pendingAction"
+              @update:model-value="v => set({ captionPosition: v })"
+            />
           </label>
-          <label class="field">
+          <div class="field">
             <span class="field-label">Accent colour</span>
-            <div class="accent-box">
-              <input type="color" :value="clip.style.accent" :disabled="!!clip.pendingAction" @input="set({ accent: $event.target.value })" />
-              <span class="accent-hex mono">{{ clip.style.accent }}</span>
-            </div>
-          </label>
+            <UiColorField
+              aria-label="Accent colour"
+              :model-value="clip.style.accent"
+              :disabled="!!clip.pendingAction"
+              @update:model-value="v => set({ accent: v })"
+            />
+          </div>
         </div>
 
         <div v-if="clip.spec.wordsApprox" class="approx-note faint">Approximate caption sync</div>
@@ -79,6 +89,8 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import CaptionEditor from './CaptionEditor.vue'
+import UiSelect from './ui/UiSelect.vue'
+import UiColorField from './ui/UiColorField.vue'
 import { LAYOUTS, PRESETS, layoutAllowed } from '../utils/clipStyle'
 import { toClipTime } from '@renderer/lib/timeline'
 
@@ -86,6 +98,17 @@ const jobStore = useJobStore()
 const clip = computed(() => jobStore.clips.find(c => c.id === jobStore.editingClipId))
 const clipTime = computed(() => toClipTime(clip.value.spec))
 const closeBtn = ref(null)
+
+const layoutOptions = computed(() => LAYOUTS.map(l => ({
+  value: l.value,
+  label: l.label + (l.value === clipTime.value.reframe.auto ? ' (auto)' : ''),
+  disabled: !layoutAllowed(l.value, clipTime.value.reframe),
+})))
+const captionOptions = PRESETS.map(p => ({ value: p.value, label: p.label }))
+const positionOptions = [
+  { value: 'lower', label: 'Lower third' },
+  { value: 'middle', label: 'Middle' },
+]
 
 function set(patch) {
   jobStore.updateStyle(clip.value.id, patch)
@@ -150,18 +173,11 @@ watch(clip, (newClip, oldClip) => {
   display: inline-flex; align-items: center; justify-content: center;
 }
 .close-btn:hover { color: var(--ink); }
-.panel-body { display: flex; flex-direction: column; gap: 20px; }
-.field { display: flex; flex-direction: column; gap: 6px; }
+.panel-body { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; width: 100%; }
 .field-label { font-size: 12.5px; font-weight: 500; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin-top: -12px; }
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.accent-box {
-  display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px;
-  border: 1px solid var(--border); border-radius: var(--radius); background: #fff;
-}
-.accent-box input[type="color"] { width: 20px; height: 20px; border-radius: 4px; border: none; padding: 0; cursor: pointer; }
-.accent-hex { font-size: 12px; color: var(--ink-soft); text-transform: uppercase; }
-.mono { font-family: monospace; }
+.grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .approx-note { font-size: 12px; }
 .divider { border: none; border-top: 1px solid var(--border); margin: 0; }
 /* CSS-only disable: a pending swap/regenerate is blocked here by dimming and

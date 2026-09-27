@@ -5,6 +5,8 @@ export const LAYOUTS = [
   { value: 'fit', label: 'Fit with blur', minFaces: 0 },
 ]
 
+export const ACCENT_PRESETS = ['#FFD400', '#FFFFFF', '#00E0B8', '#4DA3FF', '#FF5C8A', '#FF8A00', '#B388FF', '#14201F']
+
 export const PRESETS = [
   { value: 'karaoke', label: 'Karaoke highlight' },
   { value: 'pop', label: 'Pop word-by-word' },

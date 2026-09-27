@@ -1,24 +1,18 @@
 <template>
   <div class="style-all">
     <div class="fields">
-      <label class="field">
+      <div class="field">
         <span class="field-label">Layout</span>
-        <select class="select" v-model="form.layout">
-          <option v-for="l in LAYOUTS" :key="l.value" :value="l.value">{{ l.label }}</option>
-        </select>
-      </label>
-      <label class="field">
+        <UiSelect v-model="form.layout" :options="layoutOptions" aria-label="Layout" />
+      </div>
+      <div class="field">
         <span class="field-label">Captions</span>
-        <select class="select" v-model="form.captionPreset">
-          <option v-for="p in PRESETS" :key="p.value" :value="p.value">{{ p.label }}</option>
-        </select>
-      </label>
-      <label class="field color">
+        <UiSelect v-model="form.captionPreset" :options="captionOptions" aria-label="Captions" />
+      </div>
+      <div class="field color">
         <span class="field-label">Accent colour</span>
-        <div class="color-box">
-          <input v-model="form.accent" type="color" />
-        </div>
-      </label>
+        <UiColorField v-model="form.accent" aria-label="Accent colour" />
+      </div>
       <label class="check">
         <input v-model="form.showHook" type="checkbox" /> Show hook title
       </label>
@@ -34,9 +28,13 @@
 <script setup>
 import { onUnmounted, reactive, ref } from 'vue'
 import { useJobStore } from '../stores/jobStore'
+import UiSelect from './ui/UiSelect.vue'
+import UiColorField from './ui/UiColorField.vue'
 import { LAYOUTS, PRESETS } from '../utils/clipStyle'
 
 const APPLIED_MESSAGE_MS = 2400
+const layoutOptions = LAYOUTS.map(l => ({ value: l.value, label: l.label }))
+const captionOptions = PRESETS.map(p => ({ value: p.value, label: p.label }))
 
 const jobStore = useJobStore()
 // Start from the first clip's current style so the bar reflects what's there.
@@ -62,12 +60,7 @@ onUnmounted(() => clearTimeout(timer))
 .style-all { background: var(--bg-subtle); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
 .fields { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
-.field.color { min-width: 0; }
-.color-box {
-  display: flex; align-items: center; height: 36px; border: 1px solid var(--border); border-radius: 8px;
-  padding: 0 8px; background: #fff;
-}
-.color-box input[type="color"] { width: 24px; height: 24px; border: none; padding: 0; background: none; cursor: pointer; }
+.field.color { min-width: 0; width: 212px; }
 .check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); padding-bottom: 8px; }
 .check input[type="checkbox"] { accent-color: var(--accent); }
 .apply { margin-left: 4px; }
