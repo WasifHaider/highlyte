@@ -1,29 +1,29 @@
 <template>
   <div class="page">
-    <div v-if="jobStore.error" class="danger-note">{{ jobStore.error }}</div>
-
-    <VideoCard
-      v-if="jobStore.job?.videoMeta"
-      :meta="jobStore.job.videoMeta"
-      :status-note="statusNote"
-    />
-
-    <ProcessingSteps v-if="jobStore.isProcessing" :status="jobStore.job.status" :progress="jobStore.progress" />
-    <p v-if="jobStore.job?.languageNote" class="subtle-note lang-note">{{ jobStore.job.languageNote }}</p>
-
-    <div v-if="jobStore.selectionFailed" class="selection-failed">
-      <p class="sf-title">Clip selection didn't finish</p>
-      <p class="sf-msg">{{ jobStore.job.error }}</p>
-      <p class="sf-sub">The transcript is saved, so a retry skips the download and transcription.</p>
-      <button class="sf-retry" :disabled="retrying" @click="onRetry">
-        {{ retrying ? 'Retrying…' : 'Retry selection' }}
-      </button>
-    </div>
-
-    <p v-if="jobStore.isDone && jobStore.job?.selectionNote" class="subtle-note selection-note">{{ jobStore.job.selectionNote }}</p>
-
     <div class="job-layout">
       <div class="job-main">
+        <div v-if="jobStore.error" class="danger-note">{{ jobStore.error }}</div>
+
+        <VideoCard
+          v-if="jobStore.job?.videoMeta"
+          :meta="jobStore.job.videoMeta"
+          :status-note="statusNote"
+        />
+
+        <ProcessingSteps v-if="jobStore.isProcessing" :status="jobStore.job.status" :progress="jobStore.progress" />
+        <p v-if="jobStore.job?.languageNote" class="subtle-note lang-note">{{ jobStore.job.languageNote }}</p>
+
+        <div v-if="jobStore.selectionFailed" class="selection-failed">
+          <p class="sf-title">Clip selection didn't finish</p>
+          <p class="sf-msg">{{ jobStore.job.error }}</p>
+          <p class="sf-sub">The transcript is saved, so a retry skips the download and transcription.</p>
+          <button class="sf-retry" :disabled="retrying" @click="onRetry">
+            {{ retrying ? 'Retrying…' : 'Retry selection' }}
+          </button>
+        </div>
+
+        <p v-if="jobStore.isDone && jobStore.job?.selectionNote" class="subtle-note selection-note">{{ jobStore.job.selectionNote }}</p>
+
         <ClipList v-if="jobStore.isDone" />
       </div>
     </div>
