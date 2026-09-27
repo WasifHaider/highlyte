@@ -26,6 +26,8 @@
 
         <ClipList v-if="jobStore.isDone" />
       </div>
+
+      <ClipEditPanel v-if="jobStore.isDone" />
     </div>
   </div>
 
@@ -39,6 +41,7 @@ import VideoCard from '../components/VideoCard.vue'
 import ProcessingSteps from '../components/ProcessingSteps.vue'
 import ClipList from '../components/ClipList.vue'
 import ExportBar from '../components/ExportBar.vue'
+import ClipEditPanel from '../components/ClipEditPanel.vue'
 
 const props = defineProps({ id: { type: String, required: true } })
 const jobStore = useJobStore()
@@ -86,7 +89,10 @@ onMounted(() => {
   jobStore.loadHealth()
   startForId(props.id)
 })
-onUnmounted(() => jobStore.stopPolling())
+onUnmounted(() => {
+  jobStore.stopPolling()
+  jobStore.closeEditor()
+})
 watch(() => props.id, (newId) => startForId(newId))
 </script>
 

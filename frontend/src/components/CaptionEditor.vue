@@ -1,20 +1,25 @@
 <template>
   <div class="captions-edit">
-    <div class="row">
-      <button v-if="!open" class="btn" @click="start">Edit captions</button>
-      <button v-if="!open && edited" class="btn ghost" :disabled="busy" @click="reset">Reset to original</button>
-    </div>
-    <div v-if="open" class="lines">
-      <label v-for="line in lines" :key="line.index" class="line">
-        <span class="time">{{ clock(line.start - (props.start ?? 0)) }}</span>
-        <input :value="textOf(line)" type="text" @input="texts[line.index] = $event.target.value" />
-      </label>
-      <div class="row">
-        <button class="btn" :disabled="busy || saveDisabled" @click="save">{{ busy ? 'Saving…' : 'Save captions' }}</button>
-        <button class="btn ghost" :disabled="busy" @click="cancel">Cancel</button>
+    <button v-if="!open" class="btn btn-secondary btn-sm" @click="start">Edit captions</button>
+    <button v-if="!open && edited" class="btn btn-ghost btn-sm" :disabled="busy" @click="reset">Reset to original</button>
+
+    <template v-if="open">
+      <div class="captions-header">
+        <span class="field-label">Captions</span>
+        <span class="status faint">{{ edited ? 'Edited' : 'Approx. sync' }}</span>
       </div>
-    </div>
-    <div v-if="error" class="error">{{ error }}</div>
+      <div class="lines">
+        <label v-for="line in lines" :key="line.index" class="line">
+          <span class="time faint tabular mono">{{ clock(line.start - (props.start ?? 0)) }}</span>
+          <input class="input" :value="textOf(line)" type="text" @input="texts[line.index] = $event.target.value" />
+        </label>
+      </div>
+      <div class="row">
+        <button class="btn-save" :disabled="busy || saveDisabled" @click="save">{{ busy ? 'Saving…' : 'Save changes' }}</button>
+        <button class="btn btn-ghost btn-sm" :disabled="busy" @click="cancel">Cancel</button>
+      </div>
+    </template>
+    <div v-if="error" class="danger-note error">{{ error }}</div>
   </div>
 </template>
 
@@ -139,14 +144,20 @@ async function reset() {
 </script>
 
 <style scoped>
-.captions-edit { margin-top: 10px; }
-.row { display: flex; gap: 8px; margin-top: 8px; }
-.lines { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; }
+.captions-edit { display: flex; flex-direction: column; gap: 8px; }
+.captions-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+.field-label { font-size: 12.5px; font-weight: 500; }
+.status { font-size: 11px; }
+.row { display: flex; gap: 8px; margin-top: 4px; }
+.lines { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; padding-right: 4px; }
 .line { display: flex; align-items: center; gap: 8px; }
-.time { font-family: monospace; font-size: 11.5px; color: var(--ink-soft); width: 36px; flex-shrink: 0; }
-.line input { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font-size: 13px; }
-.btn { border: 1px solid var(--border); background: var(--accent-soft); color: var(--accent-text); border-radius: 6px; padding: 4px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
-.btn.ghost { background: transparent; color: var(--ink-soft); }
-.btn:disabled { opacity: .6; cursor: default; }
-.error { color: #9C3B14; font-size: 12.5px; margin-top: 6px; }
+.time { width: 40px; flex-shrink: 0; padding-top: 6px; }
+.mono { font-family: monospace; }
+.line .input { flex: 1; min-width: 0; height: 28px; padding: 0 8px; font-size: 13px; }
+.btn-save {
+  flex: 1; height: 32px; border: none; border-radius: var(--radius); cursor: pointer;
+  background: var(--accent-soft); color: var(--accent-text); font: 600 12.5px var(--font-sans);
+}
+.btn-save:disabled { opacity: .6; cursor: default; }
+.error { margin-top: 4px; }
 </style>
