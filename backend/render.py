@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from . import db, storage
-from .spec import ClipStyle, style_hash
+from .spec import ClipStyle, Word, render_hash, style_hash
 
 FPS = 30
 MAX_ACTIVE = 2
@@ -146,8 +146,11 @@ class RenderService:
         self.now = now
         self._lock = threading.Lock()
 
-    def request(self, clip_id: str, style: ClipStyle) -> Render:
-        hash_value = style_hash(style)
+    def request(
+        self, clip_id: str, style: ClipStyle, words: list[Word] | None = None,
+        bounds: tuple[float, float] | None = None,
+    ) -> Render:
+        hash_value = style_hash(style) if words is None else render_hash(style, words, bounds)
         with self._lock:
             existing = self.store.find(clip_id, hash_value)
             if existing is not None:
@@ -183,6 +186,18 @@ class RenderService:
     def _start(self, r: Render) -> bool:
         try:
             props, duration_s = self.build_props(r.clip_id, r.style)
+            style = ClipStyle(**r.style)
+            if r.style_hash != style_hash(style):
+                # This render was requested with words (render_hash), so if
+                # the live spec.words no longer match, captions were saved
+                # while it sat in the queue: the mp4 would show new text but
+                # be cached under the old hash. Fail instead of rendering it.
+                words = [Word(**w) for w in props["spec"]["words"]]
+                bounds = (props["spec"]["start"], props["spec"]["end"])
+                if r.style_hash not in (render_hash(style, words, bounds), render_hash(style, words)):
+                    r.status, r.error = "error", "Captions or trim changed after this export was requested. Export again."
+                    self.store.put(r)
+                    return False
             lambda_id, bucket = self.renderer.start(props, duration_s)
         except Exception as e:  # noqa: BLE001
             msg = str(e)

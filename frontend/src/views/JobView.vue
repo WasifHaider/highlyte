@@ -1,28 +1,75 @@
 <template>
-  <div class="page">
-    <div v-if="jobStore.error" class="error-banner">{{ jobStore.error }}</div>
+  <div class="job-view">
+    <div class="page" :class="{ editing: !!jobStore.editingClipId }">
+      <div class="job-layout">
+        <div class="job-main">
+          <Transition name="fade">
+            <div v-if="jobStore.error" class="danger-note">{{ jobStore.error }}</div>
+          </Transition>
 
-    <VideoCard
-      v-if="jobStore.job?.videoMeta"
-      :meta="jobStore.job.videoMeta"
-      :status-note="statusNote"
-    />
+          <div v-if="!jobStore.job && !jobStore.error" class="job-skeleton" aria-busy="true">
+            <span class="visually-hidden">Loading clips…</span>
+            <div class="video-row-skeleton">
+              <div class="thumb skeleton"></div>
+              <div class="lines">
+                <div class="bar text-80 skeleton"></div>
+                <div class="bar text-40 skeleton"></div>
+              </div>
+            </div>
+            <div class="clip-grid">
+              <SkeletonCard v-for="i in 3" :key="i" variant="clip" />
+            </div>
+          </div>
 
-    <ProcessingSteps v-if="jobStore.isProcessing" :status="jobStore.job.status" :progress="jobStore.progress" />
+          <VideoCard
+            v-if="jobStore.job?.videoMeta"
+            :meta="jobStore.job.videoMeta"
+            :status-note="statusNote"
+          />
 
-    <ClipList v-if="jobStore.isDone" />
+          <ProcessingSteps v-if="jobStore.isProcessing" :status="jobStore.job.status" :progress="jobStore.progress" />
+          <Transition name="fade">
+            <p v-if="jobStore.job?.languageNote" class="subtle-note lang-note">{{ jobStore.job.languageNote }}</p>
+          </Transition>
+
+          <Transition name="fade">
+            <div v-if="jobStore.selectionFailed" class="selection-failed card">
+              <p class="sf-title">Clip selection didn't finish</p>
+              <p class="sf-msg">{{ jobStore.job.error }}</p>
+              <p class="sf-sub">The transcript is saved, so a retry skips the download and transcription.</p>
+              <button class="btn btn-primary" :disabled="retrying" @click="onRetry">
+                <BusyLabel :busy="retrying" idle="Retry selection" busy-text="Retrying…" />
+              </button>
+            </div>
+          </Transition>
+
+          <Transition name="fade">
+            <p v-if="jobStore.isDone && jobStore.job?.selectionNote" class="subtle-note selection-note">{{ jobStore.job.selectionNote }}</p>
+          </Transition>
+
+          <ClipList v-if="jobStore.isDone" />
+        </div>
+
+        <ClipEditPanel v-if="jobStore.isDone" />
+      </div>
+    </div>
+
+    <Transition name="export-slide">
+      <ExportBar v-if="jobStore.isDone" />
+    </Transition>
   </div>
-
-  <ExportBar v-if="jobStore.isDone" />
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import VideoCard from '../components/VideoCard.vue'
 import ProcessingSteps from '../components/ProcessingSteps.vue'
 import ClipList from '../components/ClipList.vue'
 import ExportBar from '../components/ExportBar.vue'
+import ClipEditPanel from '../components/ClipEditPanel.vue'
+import SkeletonCard from '../components/ui/SkeletonCard.vue'
+import BusyLabel from '../components/ui/BusyLabel.vue'
 
 const props = defineProps({ id: { type: String, required: true } })
 const jobStore = useJobStore()
@@ -34,6 +81,7 @@ const STATUS_NOTES = {
   preparing: 'Preparing clips…',
   done: null,
   error: 'Something went wrong',
+  selection_failed: 'Clip selection needs a retry',
 }
 
 const statusNote = computed(() => {
@@ -41,6 +89,16 @@ const statusNote = computed(() => {
   if (status === 'done') return `Processed · ${jobStore.clips.length} highlights found`
   return STATUS_NOTES[status] || ''
 })
+
+const retrying = ref(false)
+async function onRetry() {
+  retrying.value = true
+  try {
+    await jobStore.retrySelection()
+  } finally {
+    retrying.value = false
+  }
+}
 
 function startForId(id) {
   jobStore.currentJobId = id
@@ -50,6 +108,9 @@ function startForId(id) {
   jobStore.error = null
   jobStore.selected = {}
   jobStore.renders = {}
+  jobStore.editingClipId = null
+  jobStore.captionDrafts = {}
+  jobStore.clearSaveTracking()
   jobStore.startPolling()
 }
 
@@ -57,23 +118,57 @@ onMounted(() => {
   jobStore.loadHealth()
   startForId(props.id)
 })
-onUnmounted(() => jobStore.stopPolling())
+onUnmounted(() => {
+  jobStore.stopPolling()
+  jobStore.closeEditor()
+})
+// App.vue keys <router-view> by route.path, so a job-id change now remounts
+// this component (onMounted re-runs startForId) instead of updating props.id
+// in place; this watcher no longer fires but is kept as a harmless fallback
+// in case that keying strategy ever changes.
 watch(() => props.id, (newId) => startForId(newId))
 </script>
 
 <style scoped>
-.page {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 40px 24px 160px;
+.danger-note { margin-bottom: 24px; }
+.lang-note { margin: 12px 0 0; display: inline-block; }
+.selection-failed {
+  margin-top: 24px; padding: 20px;
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
 }
-.error-banner {
-  background: #FBEAE3;
-  border: 1px solid #E8B79E;
-  color: #9C3B14;
-  border-radius: 10px;
-  padding: 12px 16px;
-  margin-bottom: 24px;
-  font-size: 13.5px;
+.sf-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
+.sf-msg { margin: 0; font-size: 14px; color: var(--ink-soft); }
+.sf-sub { margin: 0 0 8px; font-size: 12.5px; color: var(--ink-faint); }
+.selection-note { margin: 0 0 32px; display: inline-block; }
+.job-layout { display: flex; }
+/* While a clip is being edited, keep the clips column where it was and let
+   the edit panel take the space to its right, out to the window edge,
+   instead of squeezing the column from inside the centred 1120px page. */
+@media (min-width: 1024px) {
+  .page.editing {
+    max-width: none;
+    margin-left: max(0px, calc((100% - 1120px) / 2));
+    margin-right: 0;
+    padding-right: 0;
+  }
+  .page.editing .job-main { max-width: 1072px; }
 }
+.job-main { flex: 1; min-width: 0; }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.job-skeleton { margin-bottom: 24px; }
+.video-row-skeleton { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.video-row-skeleton .thumb { width: 80px; height: 45px; flex-shrink: 0; }
+.video-row-skeleton .lines { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.video-row-skeleton .bar { height: 14px; border-radius: 6px; }
+.video-row-skeleton .text-80 { width: 80%; max-width: 360px; }
+.video-row-skeleton .text-40 { width: 40%; max-width: 180px; }
+/* Mirrors ClipList's .clip-grid so the loading skeleton lines up with the
+   real grid that replaces it once the first status arrives. */
+.clip-grid { display: grid; gap: 24px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1024px) { .clip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .clip-grid { grid-template-columns: 1fr; } }
 </style>

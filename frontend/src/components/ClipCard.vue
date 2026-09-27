@@ -1,90 +1,114 @@
 <template>
-  <div class="clip-card">
+  <div class="card card-interactive clip-card" :class="{ editing: isEditing }">
     <div class="preview">
-      <RemotionPreview v-if="clip.spec" :spec="clip.spec" :clip-style="clip.style" />
+      <RemotionPreview v-if="clip.spec" :spec="previewSpec" :clip-style="clip.style" />
       <div v-else class="no-preview">No vertical preview for this clip. Re-run the video to generate one.</div>
+      <Transition name="fade">
+        <div v-if="clip.pendingAction" class="pending-overlay">
+          <svg class="spinner" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></svg>
+          <span class="pending-pill">{{ pendingText }}</span>
+        </div>
+      </Transition>
     </div>
 
-    <div class="details">
+    <div class="body">
+      <TrimControls v-if="clip.spec" :clip="clip" />
+
       <div class="meta-row">
-        <div class="checkbox" :class="{ checked: isSelected }" @click="$emit('toggle')">
-          <span v-if="isSelected">✓</span>
+        <div
+          class="checkbox"
+          :class="{ checked: isSelected }"
+          role="checkbox"
+          :aria-checked="isSelected"
+          tabindex="0"
+          aria-label="Select clip"
+          @click="$emit('toggle')"
+          @keydown.space.prevent="$emit('toggle')"
+          @keydown.enter.prevent="$emit('toggle')"
+        >
+          <svg v-if="isSelected" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
         </div>
-        <span class="clip-range">{{ clip.startLabel }} – {{ clip.endLabel }}</span>
-        <span class="clip-duration">{{ clip.durationLabel }}</span>
-        <span class="clip-tag">{{ clip.tag }}</span>
-        <span v-if="clip.viralityScore != null" class="virality" title="Virality score">{{ Number(clip.viralityScore).toFixed(1) }}/10</span>
+        <span class="clip-range tabular">{{ clip.startLabel }}–{{ clip.endLabel }}</span>
+        <span class="clip-duration tabular">{{ clip.durationLabel }}</span>
       </div>
 
-      <template v-if="clip.spec">
-        <label class="field">
-          <span>Hook title</span>
-          <input type="text" :value="clip.style.hookTitle || ''" maxlength="80"
-            @input="set({ hookTitle: $event.target.value || null })" />
-        </label>
-        <label class="check">
-          <input type="checkbox" :checked="clip.style.showHook" @change="set({ showHook: $event.target.checked })" />
-          Show hook title
-        </label>
-        <div class="field-row">
-          <label class="field">
-            <span>Layout</span>
-            <select :value="clip.style.layout" @change="set({ layout: $event.target.value })">
-              <option v-for="l in LAYOUTS" :key="l.value" :value="l.value" :disabled="l.minFaces > faceCount">
-                {{ l.label }}{{ l.value === clip.spec.reframe.auto ? ' (auto)' : '' }}
-              </option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Captions</span>
-            <select :value="clip.style.captionPreset" @change="set({ captionPreset: $event.target.value })">
-              <option v-for="p in PRESETS" :key="p.value" :value="p.value">{{ p.label }}</option>
-            </select>
-          </label>
-        </div>
-        <div class="field-row">
-          <label class="field">
-            <span>Caption position</span>
-            <select :value="clip.style.captionPosition" :disabled="clip.style.layout === 'split'"
-              @change="set({ captionPosition: $event.target.value })">
-              <option value="lower">Lower third</option>
-              <option value="middle">Middle</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Accent colour</span>
-            <input type="color" :value="clip.style.accent" @input="set({ accent: $event.target.value })" />
-          </label>
-        </div>
-        <div v-if="clip.spec.wordsApprox" class="note">Approximate caption sync</div>
-      </template>
+      <div v-if="firstCaptionLine" class="caption-preview">"{{ firstCaptionLine }}"</div>
+      <div v-if="clip.reason" class="reason">{{ clip.reason }}</div>
 
-      <div class="clip-snippet">"{{ snippet }}"</div>
-
-      <div v-if="render" class="render-status" :class="render.status">
-        <template v-if="render.status === 'queued'">Waiting to render…</template>
-        <template v-else-if="render.status === 'rendering'">
-          Rendering {{ Math.round(render.progress || 0) }}%
-          <div class="progress-bar"><div class="progress-bar-fill" :style="{ width: (render.progress || 0) + '%' }"></div></div>
-        </template>
-        <template v-else-if="render.status === 'done'">
-          <a :href="clipDownloadUrl(render.downloadUrl)">Download mp4</a>
-        </template>
-        <template v-else>
-          Render failed: {{ render.error }}
-          <button class="retry" @click="jobStore.retryRender(clip.id)">Retry</button>
-        </template>
+      <div v-if="clip.qaFlags?.length" class="qa-flags">
+        <span v-for="f in clip.qaFlags" :key="f" class="chip chip-warning">{{ QA_LABELS[f] || f }}</span>
       </div>
+      <div class="chips-row">
+        <span v-if="clip.tag" class="chip">{{ clip.tag }}</span>
+        <span v-if="clip.viralityScore != null" class="virality tabular" title="Virality score">{{ Number(clip.viralityScore).toFixed(1) }}/10</span>
+      </div>
+
+      <button
+        v-if="clip.spec"
+        class="btn btn-secondary btn-sm edit-btn"
+        :class="{ editing: isEditing }"
+        :aria-pressed="isEditing"
+        :disabled="!!clip.pendingAction"
+        @click="toggleEdit"
+      >{{ isEditing ? 'Editing' : 'Edit' }}</button>
+
+      <div class="actions-row">
+        <button class="btn btn-secondary btn-sm" :disabled="swapDisabled || startingSwap" :title="swapTitle" @click="onSwap">
+          <BusyLabel :busy="startingSwap" idle="Swap scene" busy-text="Swap scene" spinner-size="12" />
+        </button>
+        <button class="btn btn-secondary btn-sm" :disabled="regenerateDisabled || startingRegenerate" :title="regenerateTitle" @click="onRegenerate">
+          <BusyLabel :busy="startingRegenerate" idle="Regenerate" busy-text="Regenerate" spinner-size="12" />
+        </button>
+        <a class="btn-ghost srt-link" :href="clipSrtUrl(clip.id)" download>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 21h14"/></svg>
+          SRT
+        </a>
+      </div>
+
+      <Transition name="fade">
+        <div v-if="clip.actionError" class="danger-note action-error">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+          {{ clip.actionError }}
+        </div>
+      </Transition>
+
+      <Transition name="fade">
+        <div v-if="render" class="render-status" :class="render.status">
+          <template v-if="render.status === 'queued'">Waiting to render…</template>
+          <template v-else-if="render.status === 'rendering'">
+            Rendering {{ Math.round(render.progress || 0) }}%
+            <div class="progress-bar"><div class="progress-bar-fill" :style="{ width: (render.progress || 0) + '%' }"></div></div>
+          </template>
+          <template v-else-if="render.status === 'done'">
+            <a class="download-link" :href="clipDownloadUrl(render.downloadUrl)">Download mp4</a>
+          </template>
+          <template v-else>
+            <div class="danger-note">
+              Render failed: {{ render.error }}
+            </div>
+            <button class="btn btn-ghost btn-sm retry" @click="jobStore.retryRender(clip.id)">Retry</button>
+          </template>
+        </div>
+      </Transition>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useJobStore } from '../stores/jobStore'
-import { clipDownloadUrl } from '../services/highlyteApi'
+import { clipDownloadUrl, clipSrtUrl } from '../services/highlyteApi'
 import RemotionPreview from './RemotionPreview.vue'
-import { LAYOUTS, PRESETS } from '../utils/clipStyle'
+import TrimControls from './TrimControls.vue'
+import BusyLabel from './ui/BusyLabel.vue'
+import { captionLines, lineText } from '@renderer/captions/edit'
+import { toClipTime } from '@renderer/lib/timeline'
+
+const QA_LABELS = {
+  low_confidence: 'Low confidence — check captions',
+  weak_pick: 'Weaker pick',
+  no_face_start: 'No face at start',
+}
 
 const props = defineProps({
   clip: { type: Object, required: true },
@@ -93,56 +117,101 @@ const props = defineProps({
 defineEmits(['toggle'])
 
 const jobStore = useJobStore()
-const faceCount = computed(() => props.clip.spec?.reframe.faces.length || 0)
 const render = computed(() => jobStore.renders[props.clip.id])
-const snippet = computed(() => {
-  const t = props.clip.text || ''
-  return t.length > 220 ? t.slice(0, 217) + '…' : t
+const previewSpec = computed(() => {
+  const draft = jobStore.captionDrafts[props.clip.id]
+  return draft ? { ...props.clip.spec, words: draft } : props.clip.spec
 })
+const clipTime = computed(() => toClipTime(props.clip.spec))
+const firstCaptionLine = computed(() => {
+  if (!props.clip.spec) return ''
+  const lines = captionLines(clipTime.value.words)
+  return lines[0] ? lineText(lines[0]) : ''
+})
+const anyPending = computed(() => jobStore.clips.some(c => c.pendingAction))
+const swapDisabled = computed(() => anyPending.value || jobStore.job?.alternatesLeft === 0)
+const swapTitle = computed(() => {
+  if (anyPending.value) return 'Another clip is being replaced. Wait for it to finish.'
+  if (jobStore.job?.alternatesLeft === 0) return 'No other moments left to swap in.'
+  return ''
+})
+const regenerateDisabled = computed(() => anyPending.value)
+const regenerateTitle = computed(() => anyPending.value ? 'Another clip is being replaced. Wait for it to finish.' : '')
+const pendingText = computed(() => props.clip.pendingAction === 'swap' ? 'Swapping in another moment…' : 'Regenerating this clip…')
+const isEditing = computed(() => jobStore.editingClipId === props.clip.id)
 
-function set(patch) {
-  jobStore.updateStyle(props.clip.id, patch)
+function toggleEdit() {
+  if (isEditing.value) jobStore.closeEditor()
+  else jobStore.openEditor(props.clip.id)
+}
+
+// Shows a spinner for the brief window between the click and the store
+// setting clip.pendingAction (the request that starts the replace), on top
+// of the store's own pendingAction overlay that covers the rest of it.
+const startingSwap = ref(false)
+const startingRegenerate = ref(false)
+async function onSwap() {
+  startingSwap.value = true
+  try {
+    await jobStore.swapClip(props.clip.id)
+  } finally {
+    startingSwap.value = false
+  }
+}
+async function onRegenerate() {
+  startingRegenerate.value = true
+  try {
+    await jobStore.regenerateClip(props.clip.id)
+  } finally {
+    startingRegenerate.value = false
+  }
 }
 </script>
 
 <style scoped>
-.clip-card {
-  display: grid; grid-template-columns: 220px 1fr; gap: 20px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px;
-}
-@media (max-width: 640px) { .clip-card { grid-template-columns: 1fr; } }
+.clip-card { overflow: hidden; display: flex; flex-direction: column; }
+.clip-card.editing { border-color: var(--accent); border-width: 2px; }
+.preview { aspect-ratio: 9 / 16; background: #000; position: relative; }
 .no-preview {
-  aspect-ratio: 9 / 16; display: flex; align-items: center; justify-content: center; text-align: center;
-  padding: 16px; border-radius: 10px; background: var(--accent-soft); color: var(--ink-soft); font-size: 13px;
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 16px; background: var(--bg-subtle); color: var(--ink-faint); font-size: 12px;
 }
-.details { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
-.meta-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pending-overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  background: rgba(255,255,255,0.4); animation: softPulse 1.6s infinite;
+}
+.spinner { color: var(--accent); animation: spin 1s linear infinite; }
+.pending-pill {
+  font-size: 13px; font-weight: 600; color: var(--ink); background: rgba(255,255,255,0.9);
+  padding: 4px 12px; border-radius: 999px;
+}
+.body { padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.meta-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .checkbox {
-  width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; font-size: 13px; color: #fff;
+  width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: #fff;
   background: #fff; border: 1.5px solid var(--border);
 }
 .checkbox.checked { background: var(--accent); border-color: var(--accent); }
-.clip-range { font-family: monospace; font-size: 12.5px; color: var(--ink-soft); }
+.clip-range { font-size: 12.5px; color: var(--ink-soft); }
 .clip-duration { font-size: 11px; color: var(--ink-faint); }
-.clip-tag, .virality {
-  background: var(--accent-soft); color: var(--accent-text); font-size: 11.5px; font-weight: 600;
-  padding: 3px 10px; border-radius: 999px;
+.caption-preview { font-size: 13px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reason { font-size: 12px; color: var(--ink-faint); margin-top: -4px; }
+.qa-flags { display: flex; gap: 6px; flex-wrap: wrap; }
+.chips-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.virality { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.edit-btn { width: 100%; }
+.edit-btn.editing { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.actions-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.srt-link {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12.5px; font-weight: 500; color: var(--ink-soft); text-decoration: none; padding: 4px 6px; border-radius: 6px;
 }
-.field-row { display: flex; gap: 12px; flex-wrap: wrap; }
-.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-soft); flex: 1; min-width: 140px; }
-.field input[type="text"], .field select {
-  font-family: var(--font-sans); font-size: 13.5px; color: var(--ink);
-  border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; background: #fff;
-}
-.field input[type="color"] { width: 48px; height: 32px; border: 1px solid var(--border); border-radius: 8px; padding: 2px; background: #fff; }
-.check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); }
-.note { font-size: 12px; color: var(--ink-faint); }
-.clip-snippet { font-family: var(--font-serif); font-style: italic; font-size: 14.5px; line-height: 1.5; }
-.render-status { font-size: 13px; color: var(--ink-soft); }
-.render-status.error { color: #9C3B14; }
-.render-status a { color: var(--accent); font-weight: 600; }
-.retry { margin-left: 8px; border: 1px solid var(--border); background: #fff; border-radius: 6px; padding: 3px 10px; cursor: pointer; }
-.progress-bar { margin-top: 6px; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
+.srt-link:hover { color: var(--ink); background: var(--bg-subtle); }
+.action-error { display: flex; align-items: center; gap: 6px; }
+.render-status { font-size: 12.5px; color: var(--ink-soft); }
+.download-link { color: var(--accent); font-weight: 600; }
+.progress-bar { margin-top: 6px; height: 4px; border-radius: 2px; background: var(--bg-subtle); overflow: hidden; }
 .progress-bar-fill { height: 100%; background: var(--accent); transition: width .3s ease; }
+.retry { margin-top: 6px; }
 </style>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Highlyte - Projects</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Sora:wght@600&display=swap" rel="stylesheet">
+  <meta name="view-transition" content="same-origin">
+  <link rel="prefetch" href="https://p.superdesign.dev/draft/696230d6-bad4-476c-9d43-94113fc86bbe" as="document">
+  <link rel="prefetch" href="https://p.superdesign.dev/draft/b955495a-c9e5-46d5-978d-ed6399530075" as="document">
+  <link rel="prefetch" href="https://p.superdesign.dev/draft/f40c63b9-2726-4c2f-97e2-1d26d169f388" as="document">
+  <link rel="prefetch" href="https://p.superdesign.dev/draft/eff70993-4b27-4157-b8ed-82d8632cdc4b" as="document">
+  <link rel="prefetch" href="https://p.superdesign.dev/draft/fb3ae691-354e-4fbc-a66e-a395f52e55ec" as="document">
+  <link rel="prefetch" href="https://p.superdesign.dev/draft/ba1271a4-1300-4f1b-b640-937c5b5368df" as="document">
+  <link rel="prefetch" href="https://p.superdesign.dev/draft/03fd2bd1-71ae-4ac8-b0da-8ace7382a33f" as="document">
+  <style>
+    :root {
+      --bg: #FFFFFF;
+      --bg-subtle: #F7F6F2;
+      --surface: #FFFFFF;
+      --border: #E6E6E1;
+      --ink: #14201F;
+      --ink-soft: #5B6664;
+      --ink-faint: #9AA3A1;
+      --accent: #004741;
+      --accent-hover: #00362F;
+      --accent-soft: rgba(0,71,65,0.08);
+      --danger: #B42318;
+      --danger-soft: #FEF3F2;
+      --warning: #B54708;
+      --warning-soft: #FFFAEB;
+    }
+    body {
+      font-family: 'Public Sans', sans-serif;
+      background-color: var(--bg);
+      color: var(--ink);
+      margin: 0;
+    }
+    @view-transition {
+      navigation: auto;
+    }
+    html {
+      background-color: var(--bg);
+    }
+    ::view-transition-old(main-nav),
+    ::view-transition-new(main-nav),
+    ::view-transition-old(brand),
+    ::view-transition-new(brand) {
+      animation: none;
+      mix-blend-mode: normal;
+    }
+    ::view-transition-old(main-content) {
+      animation: 0.25s ease-out both fade-out;
+    }
+    ::view-transition-new(main-content) {
+      animation: 0.25s ease-in 0.1s both fade-in;
+    }
+    @keyframes fade-out {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+    @keyframes fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="min-h-screen flex flex-col">
+    <!-- Top Bar -->
+    <header style="view-transition-name: main-nav" class="h-[56px] bg-white border-b border-[#E6E6E1] sticky top-0 z-40 flex items-center px-4 md:px-6">
+      <div class="max-w-[1120px] mx-auto w-full flex items-center justify-between gap-4">
+        <div class="flex items-center gap-6">
+          <a style="view-transition-name: brand" href="https://p.superdesign.dev/draft/b955495a-c9e5-46d5-978d-ed6399530075" class="flex items-center gap-2 text-[20px] font-semibold text-[#14201F] tracking-tight font-['Sora']" id="nav-brand">
+            <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/523c7f65-d20e-437f-80fb-a027bcfcef62/brand-assets/frontend-public-logo-mark.svg/logo-mark.svg" alt="Highlyte" class="w-7 h-7">
+            Highlyte
+          </a>
+          <nav class="hidden md:flex gap-1">
+            <a href="https://p.superdesign.dev/draft/b955495a-c9e5-46d5-978d-ed6399530075" class="text-[13.5px] font-semibold text-[#5B6664] px-3 py-1.5 rounded-lg hover:bg-[rgba(0,71,65,0.08)] hover:text-[#14201F] transition-colors" id="nav-home">Home</a>
+            <a href="https://p.superdesign.dev/draft/eff70993-4b27-4157-b8ed-82d8632cdc4b" class="text-[13.5px] font-semibold text-[#004741] bg-[rgba(0,71,65,0.08)] px-3 py-1.5 rounded-lg transition-colors active" id="nav-projects">Projects</a>
+            <a href="https://p.superdesign.dev/draft/fb3ae691-354e-4fbc-a66e-a395f52e55ec" class="text-[13.5px] font-semibold text-[#5B6664] px-3 py-1.5 rounded-lg hover:bg-[rgba(0,71,65,0.08)] hover:text-[#14201F] transition-colors" id="nav-team">Team</a>
+          </nav>
+        </div>
+        <div class="flex items-center gap-3 flex-1 justify-end">
+          <div class="hidden lg:flex items-center flex-1 max-w-[400px]">
+            <input type="text" placeholder="Paste a YouTube link" class="flex-1 h-9 border border-[#E6E6E1] rounded-l-lg px-3.5 text-[14px] outline-none focus:border-[#004741] focus:ring-1 focus:ring-[#004741]">
+            <button class="h-9 px-4 bg-[#004741] text-white text-[14px] font-semibold rounded-r-lg hover:bg-[#00362F] transition-colors" id="btn-generate">Generate</button>
+          </div>
+          <button class="h-9 px-3 border border-[#E6E6E1] bg-white rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:bg-[#F7F6F2]" id="btn-account">
+            Account <iconify-icon icon="lucide:chevron-down" class="text-[14px]"></iconify-icon>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main style="view-transition-name: main-content" class="flex-1 max-w-[1120px] mx-auto w-full px-4 md:px-6 py-12">
+      
+      <!-- Page Header -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+        <div>
+          <h1 class="text-[22px] font-semibold tracking-tight">Projects</h1>
+          <p class="text-[14px] text-[#5B6664] mt-1">Manage and view all your generated podcast clips.</p>
+        </div>
+        <div class="relative w-full md:w-[320px]">
+          <iconify-icon icon="lucide:search" class="absolute left-3 top-1/2 -translate-y-1/2 text-[#9AA3A1] text-[16px]"></iconify-icon>
+          <input type="text" placeholder="Search by title..." class="w-full h-10 pl-10 pr-4 border border-[#E6E6E1] rounded-lg text-[14px] outline-none focus:border-[#004741] focus:ring-1 focus:ring-[#004741] transition-all">
+        </div>
+      </div>
+
+      <!-- Projects Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        
+        <!-- Project Card 1: Done -->
+        <a href="https://p.superdesign.dev/draft/696230d6-bad4-476c-9d43-94113fc86bbe" class="group bg-white rounded-xl border border-[#E6E6E1] hover:border-[#004741] transition-colors overflow-hidden flex flex-col" id="project-1">
+          <div class="aspect-video bg-[#F7F6F2] relative">
+            <img src="https://images.unsplash.com/photo-1598929213452-52d72f63e307?auto=format&fit=crop&q=80&w=400&h=225" alt="Thumbnail" class="w-full h-full object-cover">
+            <div class="absolute bottom-2 right-2 bg-black/80 text-white text-[11px] font-mono px-1.5 py-0.5 rounded">1:24:00</div>
+          </div>
+          <div class="p-4 flex flex-col flex-1">
+            <h3 class="text-[15px] font-semibold line-clamp-2 leading-tight">The Future of AI in Media Production | Episode 42</h3>
+            <div class="text-[13px] text-[#5B6664] mt-2">Tech Talk Weekly</div>
+            <div class="mt-auto pt-4 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <span class="text-[12px] font-semibold text-[#004741] bg-[rgba(0,71,65,0.08)] px-2 py-0.5 rounded-full">Done</span>
+                <span class="text-[12px] text-[#5B6664]">8 clips</span>
+              </div>
+              <span class="text-[12px] text-[#9AA3A1]">2 days ago</span>
+            </div>
+          </div>
+        </a>
+
+        <!-- Project Card 2: Processing -->
+        <a href="https://p.superdesign.dev/draft/f40c63b9-2726-4c2f-97e2-1d26d169f388" class="group bg-white rounded-xl border border-[#E6E6E1] hover:border-[#004741] transition-colors overflow-hidden flex flex-col" id="project-2">
+          <div class="aspect-video bg-[#F7F6F2] relative">
+            <img src="https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&q=80&w=400&h=225" alt="Thumbnail" class="w-full h-full object-cover opacity-60 grayscale">
+            <div class="absolute inset-0 flex items-center justify-center">
+              <iconify-icon icon="lucide:loader-2" class="text-2xl text-[#004741] animate-spin"></iconify-icon>
+            </div>
+            <div class="absolute bottom-2 right-2 bg-black/80 text-white text-[11px] font-mono px-1.5 py-0.5 rounded">45:12</div>
+          </div>
+          <div class="p-4 flex flex-col flex-1">
+            <h3 class="text-[15px] font-semibold line-clamp-2 leading-tight">Building in Public: Why Transparency Wins in 2024</h3>
+            <div class="text-[13px] text-[#5B6664] mt-2">Founder Journeys</div>
+            <div class="mt-auto pt-4 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <span class="text-[12px] font-semibold text-[#5B6664] bg-[#F7F6F2] px-2 py-0.5 rounded-full">Processing</span>
+                <span class="text-[12px] text-[#5B6664]">Analyzing...</span>
+              </div>
+              <span class="text-[12px] text-[#9AA3A1]">4 hours ago</span>
+            </div>
+          </div>
+        </a>
+
+        <!-- Project Card 3: Failed -->
+        <a href="#" class="group bg-white rounded-xl border border-[#E6E6E1] hover:border-[#004741] transition-colors overflow-hidden flex flex-col" id="project-3">
+          <div class="aspect-video bg-[#F7F6F2] relative">
+             <div class="absolute inset-0 bg-[#FEF3F2] flex items-center justify-center">
+                <iconify-icon icon="lucide:alert-circle" class="text-2xl text-[#B42318]"></iconify-icon>
+             </div>
+          </div>
+          <div class="p-4 flex flex-col flex-1">
+            <h3 class="text-[15px] font-semibold line-clamp-2 leading-tight">Understanding Deep Learning Architectures</h3>
+            <div class="text-[13px] text-[#5B6664] mt-2">Data Science Simplified</div>
+            <div class="mt-auto pt-4 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <span class="text-[12px] font-semibold text-[#B42318] bg-[#FEF3F2] px-2 py-0.5 rounded-full">Failed</span>
+                <span class="text-[12px] text-[#B42318]">Invalid URL</span>
+              </div>
+              <span class="text-[12px] text-[#9AA3A1]">Yesterday</span>
+            </div>
+          </div>
+        </a>
+
+      </div>
+
+      <!-- Empty State / Footer Callout -->
+      <section class="mt-24 border-t border-[#E6E6E1] pt-24 text-center max-w-[600px] mx-auto">
+        <div class="w-16 h-16 bg-[#F7F6F2] rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <iconify-icon icon="lucide:video-off" class="text-2xl text-[#9AA3A1]"></iconify-icon>
+        </div>
+        <h2 class="text-[18px] font-semibold tracking-tight">No more projects yet</h2>
+        <p class="text-[14px] text-[#5B6664] mt-2 mb-8">Paste a podcast link to start generating high-quality clips for your socials.</p>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <input type="text" placeholder="Paste a YouTube link" class="w-full sm:w-[300px] h-10 px-4 border border-[#E6E6E1] rounded-lg text-[14px] outline-none focus:border-[#004741] focus:ring-1 focus:ring-[#004741]">
+          <button class="w-full sm:w-auto h-10 px-6 bg-[#004741] text-white text-[14px] font-semibold rounded-lg hover:bg-[#00362F] transition-colors">
+            Paste a link
+          </button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Global Footer (Simple) -->
+    <footer class="border-t border-[#E6E6E1] bg-white py-8">
+      <div class="max-w-[1120px] mx-auto px-4 md:px-6 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2">
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/523c7f65-d20e-437f-80fb-a027bcfcef62/brand-assets/frontend-public-logo-mark.svg/logo-mark.svg" alt="Highlyte" class="w-5 h-5 opacity-40">
+          <span class="text-[12px] text-[#9AA3A1]">© 2024 Highlyte Inc. All rights reserved.</span>
+        </div>
+        <div class="flex gap-6">
+          <a href="#privacy" class="text-[12px] text-[#9AA3A1] hover:text-[#5B6664]">Privacy</a>
+          <a href="#terms" class="text-[12px] text-[#9AA3A1] hover:text-[#5B6664]">Terms</a>
+          <a href="#help" class="text-[12px] text-[#9AA3A1] hover:text-[#5B6664]">Help</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

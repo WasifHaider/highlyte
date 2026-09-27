@@ -1,20 +1,19 @@
 <template>
-  <div class="bottombar">
-    <div class="bottombar-inner">
-      <span class="selection-label">{{ label }}</span>
-      <div class="actions">
-        <a v-if="zipUrl" class="zip-link" :href="zipUrl">Download all (zip)</a>
-        <button
-          class="export-btn"
-          :class="{ active: canExport }"
-          :disabled="!canExport"
-          :title="jobStore.renderingEnabled ? '' : 'Rendering not configured'"
-          @click="jobStore.exportSelected()"
-        >
-          {{ jobStore.renderingEnabled ? 'Render & export selected' : 'Rendering not configured' }}
-        </button>
-      </div>
-    </div>
+  <div class="export-pill">
+    <span class="selection-label">{{ label }}</span>
+    <div class="divider"></div>
+    <a v-if="zipUrl" class="zip-link" :href="zipUrl">
+      <span class="zip-full">Download zip</span>
+      <span class="zip-short">Zip</span>
+    </a>
+    <button
+      class="btn btn-primary export-btn"
+      :disabled="!canExport"
+      :title="jobStore.renderingEnabled ? '' : 'Rendering not configured'"
+      @click="jobStore.exportSelected()"
+    >
+      {{ jobStore.renderingEnabled ? 'Render & export' : 'Rendering not configured' }}
+    </button>
   </div>
 </template>
 
@@ -46,21 +45,24 @@ const zipUrl = computed(() => {
 </script>
 
 <style scoped>
-.bottombar {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-  background: rgba(255,255,255,0.94); backdrop-filter: blur(6px); border-top: 1px solid var(--border);
+.export-pill {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 30;
+  display: flex; align-items: center; gap: 16px;
+  background: #fff; border: 1px solid var(--border); border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.08);
+  padding: 10px 16px;
+  max-width: calc(100vw - 32px);
 }
-.bottombar-inner {
-  max-width: 800px; margin: 0 auto; padding: 16px 24px;
-  display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+.selection-label { font-size: 13.5px; font-weight: 500; color: var(--ink); white-space: nowrap; }
+.divider { width: 1px; height: 16px; background: var(--border); flex-shrink: 0; }
+.zip-link { font-size: 13.5px; font-weight: 600; color: var(--ink-soft); text-decoration: none; white-space: nowrap; }
+.zip-link:hover { color: var(--ink); }
+.zip-short { display: none; }
+.export-btn { height: 32px; border-radius: 999px; padding: 0 16px; white-space: nowrap; }
+@media (max-width: 480px) {
+  .export-pill { gap: 10px; padding: 10px 12px; }
+  .zip-full { display: none; }
+  .zip-short { display: inline; }
+  .selection-label { overflow: hidden; text-overflow: ellipsis; }
 }
-.selection-label { font-size: 13.5px; color: var(--ink-soft); }
-.actions { display: flex; align-items: center; gap: 14px; }
-.zip-link { font-size: 13.5px; font-weight: 600; color: var(--accent); }
-.export-btn {
-  border: none; border-radius: 8px; padding: 10px 20px; font-size: 13.5px; font-weight: 600;
-  font-family: var(--font-sans); cursor: default; color: #fff;
-  background: rgba(0,71,65,0.25);
-}
-.export-btn.active { background: var(--accent); cursor: pointer; }
 </style>

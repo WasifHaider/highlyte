@@ -1,0 +1,7 @@
+# Spike only: can IndicXlit install on the production base image?
+FROM python:3.11-slim
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential git && rm -rf /var/lib/apt/lists/*
+# fairseq 0.12.2's omegaconf pin has metadata newer pip rejects.
+RUN pip install --no-cache-dir "pip<24.1" "setuptools<70" wheel
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir ai4bharat-transliteration

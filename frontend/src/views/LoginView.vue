@@ -1,18 +1,23 @@
 <template>
   <div class="auth-page">
     <form class="auth-card" @submit.prevent="submit">
-      <img src="/logo-mark.svg" alt="" width="36" height="36" class="logo" />
+      <div class="brand">
+        <img src="/logo-mark.svg" alt="" width="28" height="28" class="logo" />
+        <span class="wordmark">Highlyte</span>
+      </div>
       <h1>Log in to Highlyte</h1>
       <label class="field">
-        <span>Email</span>
-        <input v-model.trim="email" type="email" autocomplete="username" required />
+        <span class="field-label">Email</span>
+        <input v-model.trim="email" type="email" class="input" autocomplete="username" required />
       </label>
       <label class="field">
-        <span>Password</span>
-        <input v-model="password" type="password" autocomplete="current-password" required />
+        <span class="field-label">Password</span>
+        <input v-model="password" type="password" class="input" autocomplete="current-password" required />
       </label>
-      <div v-if="error" class="error" role="alert">{{ error }}</div>
-      <button type="submit" :disabled="busy">{{ busy ? 'Logging in…' : 'Log in' }}</button>
+      <div v-if="error" class="danger-note" role="alert">{{ error }}</div>
+      <button type="submit" class="btn btn-primary" :disabled="busy">
+        <BusyLabel :busy="busy" idle="Log in" busy-text="Logging in…" />
+      </button>
       <p class="note">Users: ask your team admin for your login.</p>
       <p class="switch">New team? <router-link to="/signup">Create a team</router-link></p>
     </form>
@@ -26,6 +31,7 @@ import '../styles/auth.css'
 import { useAuthStore } from '../stores/authStore'
 import { apiErrorMessage } from '../services/highlyteApi'
 import { safeNext } from '../utils/authRedirect'
+import BusyLabel from '../components/ui/BusyLabel.vue'
 
 const route = useRoute()
 const router = useRouter()

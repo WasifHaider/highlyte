@@ -1,9 +1,10 @@
 """Face-track logic for vertical reframing — pure functions, no video I/O
 (face_detect.py produces the per-frame detections this module consumes).
 
-Pipeline: per-sample face detections -> tracks (a face followed across
-samples by horizontal position) -> keep the main tracks -> smooth them ->
-work out who is talking when (jaw movement) -> pick an automatic layout.
+Pipeline: per-sample face detections -> split into shots at camera cuts ->
+tracks (a face followed across samples by horizontal position, restarting
+at each shot) -> keep the main tracks -> smooth them -> work out who is
+talking when (jaw movement) -> pick an automatic layout.
 Everything the renderer needs is stored for every layout, so the team
 can switch layouts in the preview without re-running analysis.
 """
@@ -12,7 +13,8 @@ from __future__ import annotations
 import statistics
 from dataclasses import dataclass, field
 
-from ..spec import FaceTrack, LayoutKind, Reframe, SpeakerTurn, TrackPoint
+from . import shots as shot_ranges
+from ..spec import FaceTrack, LayoutKind, Reframe, Shot, SpeakerTurn, TrackPoint
 
 # A detection joins the track whose last position is within this much
 # horizontal distance (fraction of frame width); otherwise it starts a new one.
@@ -29,6 +31,9 @@ MIN_ACTIVITY = 0.01
 MIN_HOLD_S = 1.5
 FIT_MIN_FACE_FRACTION = 0.40
 FIT_MIN_FACE_AREA = 0.03
+# Lower than FIT_MIN_FACE_AREA: a wide two-person shot's faces (~0.03) must
+# not be mistaken for a tiny webcam-corner face in a screen share (~0.0025).
+FIT_MIN_FACE_AREA_SHOTS = 0.01
 TWO_FACE_PRESENCE = 0.50
 
 
@@ -143,29 +148,104 @@ def speaker_timeline(tracks: list[_Track], times: list[float]) -> list[SpeakerTu
     return [SpeakerTurn(t=0.0 if i == 0 else round(t, 3), faceId=fid) for i, (t, fid) in enumerate(held)]
 
 
+def _needs_fit(frames: list[list[Detection]], tracks: list[_Track]) -> bool:
+    n = len(frames)
+    if n == 0 or not tracks:
+        return True
+    face_fraction = sum(1 for dets in frames if dets) / n
+    main_area = statistics.median(d.w * d.h for _, d in tracks[0].points)
+    return face_fraction < FIT_MIN_FACE_FRACTION or main_area < FIT_MIN_FACE_AREA
+
+
 def choose_layout(
     frames: list[list[Detection]], tracks: list[_Track], timeline: list[SpeakerTurn]
 ) -> LayoutKind:
+    if _needs_fit(frames, tracks):
+        return "fit"
     n = len(frames)
-    if n == 0 or not tracks:
-        return "fit"
-    face_fraction = sum(1 for dets in frames if dets) / n
-    main_area = statistics.median(d.w * d.h for _, d in tracks[0].points)
-    if face_fraction < FIT_MIN_FACE_FRACTION or main_area < FIT_MIN_FACE_AREA:
-        return "fit"
     frequent = [tr for tr in tracks if len(tr.points) / n >= TWO_FACE_PRESENCE]
     if len(frequent) >= 2:
         return "speaker" if len(timeline) > 1 else "split"
     return "follow"
 
 
-def analyze(frames: list[list[Detection]], times: list[float]) -> Reframe:
-    tracks = keep_main_tracks(build_tracks(frames, times), len(times))
-    timeline = speaker_timeline(tracks, times)
+def _shot_kind(tracks: list[_Track], n_samples: int) -> tuple[str, list[int]]:
+    if not tracks:
+        return "none", []
+    largest_area = max(statistics.median(d.w * d.h for _, d in tr.points) for tr in tracks)
+    if largest_area < FIT_MIN_FACE_AREA_SHOTS:
+        return "none", []
+    frequent = [tr for tr in tracks if len(tr.points) / n_samples >= TWO_FACE_PRESENCE]
+    if len(frequent) >= 2:
+        pair = sorted(frequent[:2], key=lambda tr: statistics.median(d.cx for _, d in tr.points))
+        return "two", [tr.id for tr in pair]
+    return "one", [(frequent or tracks)[0].id]
+
+
+def choose_auto(
+    frames: list[list[Detection]], tracks: list[_Track], shots: list[Shot], speaker_switches: bool
+) -> LayoutKind:
+    n = len(frames)
+    if n == 0 or not tracks:
+        return "fit"
+    face_fraction = sum(1 for dets in frames if dets) / n
+    largest_area = max(statistics.median(d.w * d.h for _, d in tr.points) for tr in tracks)
+    if face_fraction < FIT_MIN_FACE_FRACTION or largest_area < FIT_MIN_FACE_AREA_SHOTS:
+        return "fit"
+    total = sum(s.end - s.start for s in shots) or 1.0
+    two = sum(s.end - s.start for s in shots if s.kind == "two")
+    if two / total >= 0.5:
+        return "split"
+    if speaker_switches:
+        return "speaker"
+    return "follow"
+
+
+def analyze(frames: list[list[Detection]], times: list[float], cuts: list[float] | None = None) -> Reframe:
+    if cuts is None:
+        tracks = keep_main_tracks(build_tracks(frames, times), len(times))
+        timeline = speaker_timeline(tracks, times)
+        return Reframe(
+            auto=choose_layout(frames, tracks, timeline),
+            faces=[FaceTrack(id=tr.id, track=smooth(tr.points)) for tr in tracks],
+            speakerTimeline=timeline,
+        )
+
+    all_tracks: list[_Track] = []
+    timeline: list[SpeakerTurn] = []
+    shots: list[Shot] = []
+    speaker_switches = False
+    # A shot's layout should switch as close to the actual cut as possible,
+    # not just at the next sample, which can lag the cut by up to one sample
+    # gap (0.2 s at 5 fps). Start it at the midpoint between the sample just
+    # before the cut and the cut sample itself.
+    for k, (i0, i1) in enumerate(shot_ranges.split_shots(times, cuts)):
+        ts = times[i0:i1]
+        tracks = keep_main_tracks(build_tracks(frames[i0:i1], ts), len(ts))
+        base = len(all_tracks)
+        for tr in tracks:
+            tr.id += base  # ids unique across the whole clip
+        start = 0.0 if k == 0 else round((times[i0 - 1] + times[i0]) / 2, 3)
+        end = times[i1] if i1 < len(times) else ts[-1]
+        kind, face_ids = _shot_kind(tracks, len(ts))
+        shots.append(Shot(start=round(start, 3), end=round(end, 3), kind=kind, faceIds=face_ids))
+        if k > 0:
+            shots[-2] = Shot(start=shots[-2].start, end=start, kind=shots[-2].kind, faceIds=shots[-2].faceIds)
+        turns = speaker_timeline(tracks, ts)
+        if kind == "two" and len(turns) > 1:
+            speaker_switches = True
+        for turn in turns:
+            t = start if turn.t == 0.0 else turn.t
+            if not timeline or timeline[-1].faceId != turn.faceId:
+                timeline.append(SpeakerTurn(t=round(t, 3), faceId=turn.faceId))
+        all_tracks.extend(tracks)
+
+    all_tracks.sort(key=lambda tr: len(tr.points), reverse=True)
     return Reframe(
-        auto=choose_layout(frames, tracks, timeline),
-        faces=[FaceTrack(id=tr.id, track=smooth(tr.points)) for tr in tracks],
+        auto=choose_auto(frames, all_tracks, shots, speaker_switches),
+        faces=[FaceTrack(id=tr.id, track=smooth(tr.points)) for tr in all_tracks],
         speakerTimeline=timeline,
+        shots=shots,
     )
 
 

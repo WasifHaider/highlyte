@@ -4,7 +4,7 @@ import json
 import pytest
 
 from backend import render
-from backend.spec import ClipStyle
+from backend.spec import ClipStyle, Word
 
 
 class FakeRenderer:
@@ -174,6 +174,64 @@ def test_other_start_errors_fail(setup):
     fake.start_error = RuntimeError("clip source is not in R2")
     r = svc.request("job1-0", ClipStyle(layout="fit"))
     assert r.status == "error" and "not in R2" in r.error
+
+
+def test_request_rerenders_when_words_change(setup):
+    svc, _, _, _ = setup
+    # build_props stands in for the live clip: it must reflect whatever
+    # words were most recently "saved" (here, just whatever was requested),
+    # the same way the real _build_props re-reads spec.words.
+    live_words = [Word(text="hum", start=0.0, end=0.3)]
+    svc.build_props = lambda clip_id, style: (
+        {"spec": {"clipId": clip_id, "words": [w.model_dump() for w in live_words], "start": 0.0, "end": 12.0},
+         "style": style}, 12.0,
+    )
+    a = svc.request("job1-9", ClipStyle(layout="fit"), live_words)
+    b = svc.request("job1-9", ClipStyle(layout="fit"), live_words)
+    live_words = [Word(text="ham", start=0.0, end=0.3)]
+    c = svc.request("job1-9", ClipStyle(layout="fit"), live_words)
+    assert a.id == b.id and c.id != a.id
+
+
+def test_queued_render_fails_if_words_changed_before_it_starts(setup):
+    svc, fake, _, _ = setup
+    words = [Word(text="hum", start=0.0, end=0.3)]
+    # build_props always returns the *live* words (word B), simulating a
+    # caption save that lands while the render sits in the queue behind
+    # MAX_ACTIVE other renders. The render was requested with word A, so its
+    # style_hash was computed from A and no longer matches B.
+    svc.build_props = lambda clip_id, style: (
+        {"spec": {"clipId": clip_id, "words": [{"text": "ham", "start": 0.0, "end": 0.3, "emphasis": False}],
+                   "start": 1.0, "end": 9.0}, "style": style},
+        12.0,
+    )
+    r = svc.request("job1-9", ClipStyle(layout="fit"), words)
+    assert r.status == "error"
+    assert r.error == "Captions or trim changed after this export was requested. Export again."
+    assert fake.started == []
+
+
+def test_queued_render_fails_if_bounds_changed_before_it_starts(setup):
+    svc, fake, _, _ = setup
+    words = [Word(text="hum", start=0.0, end=0.3)]
+    # Requested with bounds (1.0, 9.0), but the live spec's start moved to
+    # 1.5 (a trim) before the pump got to it.
+    svc.build_props = lambda clip_id, style: (
+        {"spec": {"clipId": clip_id, "words": [w.model_dump() for w in words], "start": 1.5, "end": 9.0}, "style": style},
+        12.0,
+    )
+    r = svc.request("job1-9", ClipStyle(layout="fit"), words, bounds=(1.0, 9.0))
+    assert r.status == "error"
+    assert r.error == "Captions or trim changed after this export was requested. Export again."
+    assert fake.started == []
+
+
+def test_request_with_bounds_hashes_differently(setup):
+    svc, _, _, _ = setup
+    words = [Word(text="a", start=0, end=1)]
+    a = svc.request("job1-0", ClipStyle(layout="fit"), words, bounds=(1.0, 9.0))
+    b = svc.request("job1-0", ClipStyle(layout="fit"), words, bounds=(1.5, 9.0))
+    assert a.id != b.id
 
 
 def test_lambda_config_requires_all_values(monkeypatch):

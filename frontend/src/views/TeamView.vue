@@ -1,44 +1,75 @@
 <template>
   <div class="page">
     <div class="page-head">
-      <h1>Team</h1>
-      <p class="sub">{{ auth.me?.team.name }} · add the people who should share these projects.</p>
+      <h1 class="page-title">Team</h1>
+      <p class="sub muted">{{ auth.me?.team.name }} · add the people who should share these projects.</p>
     </div>
 
-    <form class="add-user" @submit.prevent="add">
-      <label class="field">
-        <span>Add a user by email</span>
-        <input v-model.trim="newEmail" type="email" placeholder="name@company.com" required />
-      </label>
-      <button type="submit" :disabled="adding">{{ adding ? 'Adding…' : 'Add user' }}</button>
-    </form>
-    <div v-if="addError" class="error" role="alert">{{ addError }}</div>
-
-    <div v-if="created" class="created" role="status">
-      <div class="created-title">User added</div>
-      <div class="creds">
-        <div><span>Email</span><code>{{ created.email }}</code></div>
-        <div><span>Password</span><code>{{ created.password }}</code></div>
-      </div>
-      <div class="created-actions">
-        <button class="copy" @click="copyCreds">{{ copied ? 'Copied' : 'Copy login' }}</button>
-        <button class="done" @click="closeCreated">Done</button>
-      </div>
-      <p class="warn">This password is shown only once. Copy it now and send it to the user.</p>
+    <div class="section">
+      <h2 class="section-title">Team members</h2>
+      <div v-if="listError" class="state-msg error">{{ listError }}</div>
+      <table v-else class="members">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Joined</th>
+            <th class="col-action"></th>
+          </tr>
+        </thead>
+        <tbody v-if="loading" aria-busy="true">
+          <tr v-for="i in TEAM_SKELETON_ROWS" :key="i" class="skeleton-row">
+            <td><div class="bar skeleton bar-email"></div></td>
+            <td><div class="bar skeleton bar-chip"></div></td>
+            <td><div class="bar skeleton bar-date"></div></td>
+            <td class="col-action"></td>
+          </tr>
+        </tbody>
+        <TransitionGroup v-else name="rise" tag="tbody" appear>
+          <tr v-for="u in users" :key="u.id">
+            <td class="cell-email" data-label="Email">{{ u.email }}</td>
+            <td data-label="Role">
+              <span class="chip" :class="{ 'chip-accent': u.role === 'admin' }">{{ u.role === 'admin' ? 'Admin' : 'User' }}</span>
+            </td>
+            <td class="cell-joined faint tabular" data-label="Joined">{{ relativeTime(u.createdAt) }}</td>
+            <td class="col-action">
+              <button v-if="u.role !== 'admin'" type="button" class="btn btn-ghost btn-sm" :disabled="removingId === u.id" @click="remove(u)">Remove</button>
+            </td>
+          </tr>
+        </TransitionGroup>
+      </table>
     </div>
 
-    <div v-if="loading" class="state-msg">Loading…</div>
-    <div v-else-if="listError" class="state-msg error">{{ listError }}</div>
-    <ul v-else class="members">
-      <li v-for="u in users" :key="u.id" class="member">
-        <div class="who">
-          <span class="email">{{ u.email }}</span>
-          <span class="badge" :class="u.role">{{ u.role === 'admin' ? 'Admin' : 'User' }}</span>
+    <div class="section">
+      <h2 class="section-title">Add a user</h2>
+      <form class="add-user" @submit.prevent="add">
+        <label class="field">
+          <span class="field-label">Add a user by email</span>
+          <input v-model.trim="newEmail" type="email" class="input" placeholder="name@company.com" required />
+        </label>
+        <button type="submit" class="btn btn-primary" :disabled="adding">
+          <BusyLabel :busy="adding" idle="Add user" busy-text="Adding…" />
+        </button>
+      </form>
+      <Transition name="fade">
+        <div v-if="addError" class="danger-note" role="alert">{{ addError }}</div>
+      </Transition>
+
+      <Transition name="fade">
+        <div v-if="created" class="created card" role="status">
+          <div class="created-title">User added</div>
+          <div class="creds">
+            <div><span>Email</span><code>{{ created.email }}</code></div>
+            <div><span>Password</span><code>{{ created.password }}</code></div>
+          </div>
+          <div class="created-actions">
+            <button type="button" class="btn btn-secondary btn-sm" @click="copyCreds">{{ copied ? 'Copied' : 'Copy login' }}</button>
+            <button type="button" class="btn btn-ghost btn-sm" @click="closeCreated">Done</button>
+          </div>
+          <p class="subtle-note">This password is shown only once. Copy it now and send it to the user.</p>
         </div>
-        <span class="added">Added {{ relativeTime(u.createdAt) }}</span>
-        <button v-if="u.role !== 'admin'" class="remove" :disabled="removingId === u.id" @click="remove(u)">Remove</button>
-      </li>
-    </ul>
+      </Transition>
+    </div>
   </div>
 </template>
 
@@ -47,8 +78,10 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '../stores/authStore'
 import { addTeamUser, apiErrorMessage, listTeamUsers, removeTeamUser } from '../services/highlyteApi'
 import { relativeTime } from '../utils/time'
+import BusyLabel from '../components/ui/BusyLabel.vue'
 
 const COPIED_MESSAGE_MS = 2000
+const TEAM_SKELETON_ROWS = 3
 
 const auth = useAuthStore()
 const users = ref([])
@@ -119,40 +152,54 @@ onUnmounted(() => clearTimeout(copiedTimer))
 </script>
 
 <style scoped>
-.page { max-width: 760px; margin: 0 auto; padding: 40px 24px 120px; }
-.page-head h1 { font-family: var(--font-serif); font-size: 28px; font-weight: 500; margin: 0; }
-.sub { font-size: 13.5px; color: var(--ink-soft); margin: 6px 0 24px; }
-.add-user { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
-.field { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--ink-soft); }
-.field input {
-  font-family: var(--font-sans); font-size: 14px; color: var(--ink);
-  border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; background: #fff;
+.page { max-width: 760px; }
+.page-head .sub { margin: 6px 0 0; }
+.section { margin-top: 40px; }
+/* .section:first-of-type never matched: .page-head is the first div sibling,
+   so no .section div is ever :first-of-type. Target the section that
+   actually comes right after the page head instead. */
+.page-head + .section { margin-top: 32px; }
+
+.members { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.members th {
+  text-align: left; font-size: 12.5px; font-weight: 500; color: var(--ink-faint);
+  padding: 0 0 10px; border-bottom: 1px solid var(--border);
 }
-button {
-  border: none; border-radius: 8px; padding: 10px 16px; font-size: 13.5px; font-weight: 600;
-  font-family: var(--font-sans); color: #fff; background: var(--accent); cursor: pointer;
-}
-button[disabled] { opacity: .6; cursor: default; }
-.error { margin-top: 10px; background: #FBEAE3; border: 1px solid #E8B79E; color: #9C3B14; border-radius: 8px; padding: 9px 12px; font-size: 13px; }
-.created { margin-top: 18px; background: var(--surface); border: 1px solid var(--accent); border-radius: 12px; padding: 16px 18px; }
+.members td { padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+.members tr:last-child td { border-bottom: none; }
+.cell-email { font-size: 14px; font-weight: 500; }
+.cell-joined { font-size: 13px; }
+.col-action { text-align: right; width: 1%; white-space: nowrap; }
+
+.add-user { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 16px; }
+.field { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 5px; }
+.field .input { width: 100%; }
+
+.danger-note { margin-top: 10px; }
+
+.created { margin-top: 18px; padding: 16px 18px; }
 .created-title { font-weight: 600; margin-bottom: 10px; }
 .creds { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
 .creds span { display: inline-block; width: 80px; color: var(--ink-soft); }
 .creds code { font-size: 14px; background: var(--accent-soft); padding: 2px 8px; border-radius: 6px; }
 .created-actions { display: flex; gap: 8px; margin-top: 12px; }
-.created-actions .done { background: #fff; color: var(--ink); border: 1px solid var(--border); }
-.warn { margin: 10px 0 0; font-size: 12.5px; color: #8A5A00; }
-.members { list-style: none; padding: 0; margin: 28px 0 0; display: flex; flex-direction: column; gap: 8px; }
-.member {
-  display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 12px 14px;
-}
-.who { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
-.email { font-size: 14px; overflow: hidden; text-overflow: ellipsis; }
-.badge { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-text); }
-.badge.admin { background: #FFF4D6; color: #8A5A00; }
-.added { font-size: 12px; color: var(--ink-faint); }
-.remove { background: #fff; color: #9C3B14; border: 1px solid #E8B79E; padding: 6px 12px; }
+.created .subtle-note { margin-top: 10px; }
+
 .state-msg { font-size: 13.5px; color: var(--ink-soft); padding: 24px 0; }
-.state-msg.error { color: #9C3B14; }
+.state-msg.error { color: var(--danger); }
+.skeleton-row td { vertical-align: middle; }
+.bar { height: 14px; border-radius: 6px; }
+.bar-email { width: 170px; }
+.bar-chip { width: 50px; height: 20px; border-radius: 999px; }
+.bar-date { width: 80px; }
+
+@media (max-width: 480px) {
+  .members thead { display: none; }
+  .members, .members tbody, .members tr, .members td { display: block; width: 100%; }
+  .members tr { padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .members td { padding: 2px 0; border-bottom: none; }
+  .cell-joined { display: inline-block; margin-top: 6px; margin-right: 10px; }
+  td[data-label="Role"] { display: inline-block; margin-top: 6px; }
+  .col-action { text-align: left; margin-top: 8px; }
+}
 </style>

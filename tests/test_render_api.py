@@ -98,13 +98,38 @@ def test_render_flow(env):
     z = client.get(f"/api/renders/zip?ids={body['id']}")
     assert z.status_code == 200
     names = zipfile.ZipFile(io.BytesIO(z.content)).namelist()
-    assert names == [f"highlyte-{CLIP_ID}.mp4"]
+    assert names == [f"highlyte-{CLIP_ID}.mp4", f"highlyte-{CLIP_ID}.srt"]
+
+
+def test_render_reflects_edited_captions(env):
+    record, fake = env
+    first = client.post(f"/api/clips/{CLIP_ID}/render", json=STYLE).json()
+    assert first["status"] == "rendering"
+    first_words = fake.props["spec"]["words"]
+
+    edited = [dict(w) for w in record["spec"]["words"]]
+    edited[0]["text"] = "Edited"
+    put = client.put(f"/api/clips/{CLIP_ID}/captions", json={"words": edited})
+    assert put.status_code == 200
+
+    second = client.post(f"/api/clips/{CLIP_ID}/render", json=STYLE).json()
+    assert second["id"] != first["id"]
+    assert fake.props["spec"]["words"][0]["text"] == "Edited"
+    assert fake.props["spec"]["words"] != first_words
 
 
 def test_render_requires_r2_source(env):
     record, _ = env
     record["storageKey"] = None
     assert client.post(f"/api/clips/{CLIP_ID}/render", json=STYLE).status_code == 409
+
+
+def test_render_rejects_unreadable_captions(env):
+    record, _ = env
+    record["spec"]["words"] = [{"text": "a"}]
+    r = client.post(f"/api/clips/{CLIP_ID}/render", json=STYLE)
+    assert r.status_code == 409
+    assert r.json()["detail"] == "This clip's captions can't be read. Re-run the video."
 
 
 def test_render_unknown_clip(env):
@@ -119,3 +144,13 @@ def test_render_not_configured(env, monkeypatch):
 def test_zip_rejects_unfinished_and_bad_ids(env):
     assert client.get("/api/renders/zip?ids=../x").status_code == 400
     assert client.get("/api/renders/zip?ids=nope00000000").status_code == 404
+
+
+def test_render_refused_while_clip_is_being_replaced(env):
+    record, fake = env
+    record["pendingAction"] = "swap"
+    old_style = dict(record["style"])
+    r = client.post(f"/api/clips/{CLIP_ID}/render", json=STYLE)
+    assert r.status_code == 409
+    assert r.json()["detail"] == "This clip is being replaced. Wait for it to finish."
+    assert record["style"] == old_style and fake.props is None

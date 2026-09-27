@@ -5,7 +5,8 @@
     "url": "fixture.mp4",
     "width": 1920,
     "height": 1080,
-    "fps": 30.0
+    "fps": 30.0,
+    "duration": null
   },
   "start": 1.0,
   "end": 9.0,
@@ -766,6 +767,25 @@
       {
         "t": 4.0,
         "faceId": 1
+      }
+    ],
+    "shots": [
+      {
+        "start": 0.0,
+        "end": 4.0,
+        "kind": "two",
+        "faceIds": [
+          0,
+          1
+        ]
+      },
+      {
+        "start": 4.0,
+        "end": 8.0,
+        "kind": "one",
+        "faceIds": [
+          1
+        ]
       }
     ]
   }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { pageAt, paginate } from './paginate'
+import cases from '../__fixtures__/paginate-cases.json'
 
 const w = (text: string, start: number, end: number) => ({ text, start, end })
 
@@ -34,4 +35,14 @@ describe('pageAt', () => {
     expect(paginate([w('a', 1, 2)], 5).length).toBe(1)
     expect(pageAt(paginate([w('a', 1, 2)], 5), 0.5)).toBeNull()
   })
+})
+
+describe('shared pagination cases (also checked by tests/test_srt.py)', () => {
+  for (const c of cases) {
+    it(c.name, () => {
+      const pages = paginate(c.words, c.maxWords, c.maxChars)
+      const indexOf = new Map(c.words.map((w, i) => [w, i]))
+      expect(pages.map(p => p.words.map(w => indexOf.get(w)))).toEqual(c.pages)
+    })
+  }
 })

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Highlyte - Log in</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Sora:wght@600&display=swap" rel="stylesheet">
+<meta name="view-transition" content="same-origin">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/696230d6-bad4-476c-9d43-94113fc86bbe" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/b955495a-c9e5-46d5-978d-ed6399530075" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/f40c63b9-2726-4c2f-97e2-1d26d169f388" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/eff70993-4b27-4157-b8ed-82d8632cdc4b" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/fb3ae691-354e-4fbc-a66e-a395f52e55ec" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/ba1271a4-1300-4f1b-b640-937c5b5368df" as="document">
+<link rel="prefetch" href="https://p.superdesign.dev/draft/03fd2bd1-71ae-4ac8-b0da-8ace7382a33f" as="document">
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --bg-subtle: #F7F6F2;
+    --surface: #FFFFFF;
+    --border: #E6E6E1;
+    --ink: #14201F;
+    --ink-soft: #5B6664;
+    --ink-faint: #9AA3A1;
+    --accent: #004741;
+    --accent-hover: #00362F;
+    --accent-soft: rgba(0,71,65,0.08);
+    --danger: #B42318;
+    --danger-soft: #FEF3F2;
+  }
+  body {
+    font-family: 'Public Sans', sans-serif;
+    background-color: var(--bg);
+    color: var(--ink);
+  }
+  html {
+    background-color: #FFFFFF;
+  }
+  @view-transition {
+    navigation: auto;
+  }
+  ::view-transition {
+    background-color: #FFFFFF;
+  }
+  ::view-transition-old(main-content) {
+    animation: 0.25s ease-out both fade-out;
+  }
+  ::view-transition-new(main-content) {
+    animation: 0.25s ease-in 0.1s both fade-in;
+  }
+  @keyframes fade-out {
+    from { opacity: 1; }  to { opacity: 0; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }  to { opacity: 1; }
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+</style>
+</head>
+<body>
+  <div class="min-h-screen bg-white flex flex-col items-center justify-center p-4 md:p-6" style="view-transition-name: main-content">
+    <div class="max-w-[360px] w-full flex flex-col">
+      
+      <!-- Logo & Wordmark Header -->
+      <div class="flex items-center gap-2 text-[20px] font-semibold text-[#14201F] tracking-tight font-['Sora'] mb-8 justify-center">
+        <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/523c7f65-d20e-437f-80fb-a027bcfcef62/brand-assets/frontend-public-logo-mark.svg/logo-mark.svg" alt="Highlyte" class="w-7 h-7">
+        Highlyte
+      </div>
+
+      <!-- Form Card Content -->
+      <div class="flex flex-col">
+        <h1 class="text-[22px] font-semibold text-[#14201F] mb-6 tracking-tight text-center">Log in</h1>
+        
+        <form class="flex flex-col gap-4" onsubmit="return false;">
+          <!-- Email Input Group -->
+          <div class="flex flex-col gap-1.5">
+            <label for="email-input" class="text-[12.5px] font-medium text-[#5B6664]">Email</label>
+            <input type="email" id="email-input" name="email" placeholder="name@company.com" value="admin@highlyte.ai" class="h-9 px-3 border border-[#E6E6E1] rounded-lg text-[14px] text-[#14201F] outline-none focus:border-[#004741] focus:ring-2 focus:ring-[rgba(0,71,65,0.08)] transition-all bg-white" required>
+          </div>
+
+          <!-- Password Input Group -->
+          <div class="flex flex-col gap-1.5">
+            <label for="password-input" class="text-[12.5px] font-medium text-[#5B6664]">Password</label>
+            <input type="password" id="password-input" name="password" placeholder="••••••••" value="password123" class="h-9 px-3 border border-[#E6E6E1] rounded-lg text-[14px] text-[#14201F] outline-none focus:border-[#004741] focus:ring-2 focus:ring-[rgba(0,71,65,0.08)] transition-all bg-white" required>
+          </div>
+
+          <!-- Inline Danger Error Example -->
+          <div class="bg-[#FEF3F2] border border-transparent rounded-lg px-3 py-2 text-[12.5px] text-[#B42318] flex items-start gap-2 mt-1" role="alert">
+            <iconify-icon icon="lucide:alert-circle" class="text-[14px] shrink-0 mt-0.5"></iconify-icon>
+            <span>Wrong email or password.</span>
+          </div>
+
+          <!-- Teal Full-Width Log In Button / Native Link for Flow Testing -->
+          <a href="https://p.superdesign.dev/draft/b955495a-c9e5-46d5-978d-ed6399530075" id="btn-login-submit" class="mt-2 w-full h-9 bg-[#004741] text-white text-[14px] font-semibold rounded-lg hover:bg-[#00362F] transition-colors flex items-center justify-center">
+            Log in
+          </a>
+        </form>
+
+        <!-- Additional Flow Links -->
+        <p class="text-[13px] text-[#5B6664] text-center mt-6">
+          New here? <a href="https://p.superdesign.dev/draft/03fd2bd1-71ae-4ac8-b0da-8ace7382a33f" id="link-signup" class="text-[#004741] font-semibold hover:underline">Create an account</a>
+        </p>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>

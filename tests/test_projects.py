@@ -40,6 +40,7 @@ def _job(**kw):
                     "videoId": "_aw32rFL680", "thumbnailUrl": "https://x/live.jpg"},
         clips=[{}, {}], progress={"stage": "preparing", "percent": 50, "note": "clip 2/4"},
         created_at="2026-09-24T11:00:00+00:00",
+        language_used=None, language_note=None,
     )
     base.update(kw)
     return SimpleNamespace(**base)
@@ -52,6 +53,7 @@ def test_from_row_shape_and_fallback_thumbnail():
         "videoTitle": "Ep 1", "videoChannel": "Pod", "durationLabel": "2:05",
         "thumbnailUrl": "https://i.ytimg.com/vi/qt6YoGmksCc/hqdefault.jpg",
         "clipCount": 3, "progress": {}, "createdAt": "2026-09-24T10:00:00+00:00",
+        "language": None, "languageNote": None,
     }
 
 
@@ -94,3 +96,14 @@ def test_build_projects_merges_sorts_and_filters():
     assert [p["id"] for p in projects.build_projects(memory, rows, counts, status="processing")] == ["job2"]
     assert [p["id"] for p in projects.build_projects(memory, rows, counts, status="error")] == ["job3"]
     assert len(projects.build_projects(memory, rows, counts, limit=1)) == 1
+
+
+def test_from_row_keeps_selection_failed():
+    row = {"id": "j1", "url": "https://youtu.be/x", "status": "selection_failed", "error": "limit"}
+    out = projects.from_row(row, 0)
+    assert out["status"] == "selection_failed" and out["error"] == "limit"
+
+
+def test_selection_failed_is_grouped_with_errors():
+    assert projects._status_group("selection_failed") == "error"
+    assert projects._status_group("analyzing") == "processing"

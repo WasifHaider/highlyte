@@ -1,0 +1,8 @@
+# Throwaway spike: see docs/superpowers/specs/2026-09-25-hinglish-v1-roadmap.md
+# Spike only: can IndicXlit install on the production base image?
+FROM python:3.10-slim
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential git && rm -rf /var/lib/apt/lists/*
+# fairseq 0.12.2's omegaconf pin has metadata newer pip rejects.
+RUN pip install --no-cache-dir "pip<24.1" "setuptools<70" wheel
+RUN pip install --no-cache-dir torch==2.5.1 --extra-index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir ai4bharat-transliteration

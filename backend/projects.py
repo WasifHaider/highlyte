@@ -32,7 +32,13 @@ def thumbnail_url(video_id: str | None, stored: str | None) -> str | None:
 
 
 def _status_group(status: str) -> str:
-    return "processing" if status in PROCESSING_STATUSES else status
+    if status in PROCESSING_STATUSES:
+        return "processing"
+    # Selection failed but the transcript is kept; it lists with the
+    # failures until the user retries.
+    if status == "selection_failed":
+        return "error"
+    return status
 
 
 def from_job(job: Any) -> dict[str, Any]:
@@ -50,12 +56,14 @@ def from_job(job: Any) -> dict[str, Any]:
         "clipCount": len(job.clips),
         "progress": job.progress,
         "createdAt": job.created_at,
+        "language": job.language_used,
+        "languageNote": job.language_note,
     }
 
 
 def from_row(row: dict[str, Any], clip_count: int) -> dict[str, Any]:
     status, error = row["status"], row.get("error")
-    if status not in ("done", "error"):
+    if status not in ("done", "error", "selection_failed"):
         # Not in memory, so its worker thread died with an old process.
         status, error = "error", INTERRUPTED_ERROR
     video_id = row.get("video_id") or youtube_id(row.get("url"))
@@ -72,6 +80,8 @@ def from_row(row: dict[str, Any], clip_count: int) -> dict[str, Any]:
         "clipCount": clip_count,
         "progress": {},
         "createdAt": row.get("created_at"),
+        "language": row.get("language_used"),
+        "languageNote": row.get("language_note"),
     }
 
 

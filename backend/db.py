@@ -99,6 +99,33 @@ def list_clips_for_job(job_id: str) -> list[dict[str, Any]]:
         return []
 
 
+def save_transcript(
+    job_id: str, language: str, source: str, segments: list[dict[str, Any]],
+    loudness: list[float] | None = None,
+) -> None:
+    """Store a job's transcript. Unlike the job/clip writes above, a failure
+    raises: nudging and regenerating clips later depends on this row, so a
+    job without it must not be reported as done."""
+    client = get_client()
+    if client is None:
+        return
+    row: dict[str, Any] = {"job_id": job_id, "language": language, "source": source, "segments": segments}
+    if loudness is not None:
+        row["loudness"] = loudness
+    client.table("transcripts").upsert(row).execute()
+
+
+def get_transcript(job_id: str) -> dict[str, Any] | None:
+    client = get_client()
+    if client is None:
+        return None
+    try:
+        return _first(client.table("transcripts").select("*").eq("job_id", job_id).limit(1).execute())
+    except Exception as e:  # noqa: BLE001
+        print(f"[supabase] get_transcript failed: {e}")
+        return None
+
+
 def get_clip(clip_id: str) -> dict[str, Any] | None:
     client = get_client()
     if client is None:
@@ -118,6 +145,16 @@ def update_clip(clip_id: str, fields: dict[str, Any]) -> None:
         client.table("clips").update(fields).eq("id", clip_id).execute()
     except Exception as e:  # noqa: BLE001
         print(f"[supabase] update_clip failed: {e}")
+
+
+def update_clip_checked(clip_id: str, fields: dict[str, Any]) -> None:
+    """Like update_clip, but raises on a Supabase error instead of logging
+    and carrying on: used where silently losing the write (e.g. a caption
+    edit) is worse than telling the caller to try again."""
+    client = get_client()
+    if client is None:
+        return
+    client.table("clips").update(fields).eq("id", clip_id).execute()
 
 
 def list_clips(team_id: str, limit: int = 100) -> list[dict[str, Any]]:

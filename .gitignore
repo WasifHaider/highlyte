@@ -5,7 +5,7 @@ data/clips/*
 !data/clips/.gitkeep
 data/cache/*
 !data/cache/.gitkeep
-pip_install.log
+*.log
 .env
 .hermes/
 frontend/node_modules/
@@ -18,3 +18,7 @@ renderer/public/fixture.mp4
 
 # SSH keys
 *.pem
+
+# Spike audio, transcripts and reports (throwaway)
+data/spike/
+.superdesign/tmp/

@@ -1,7 +1,9 @@
-"""Everything that happens to one highlight after it's picked: cut its
+"""Everything that happens to one clip after it's picked: cut its
 padded 16:9 segment, time its words, analyse faces, upload the segment,
 and describe the result as a ClipSpec. The renderer (Remotion) draws the
-final 9:16 short from that spec; no finished video is made here.
+final 9:16 short from that spec; no finished video is made here. The
+segment carries an 8 s spare window either side of the clip, so a later
+nudge or "include the next sentence" edit never needs a re-cut.
 """
 from __future__ import annotations
 
@@ -11,19 +13,33 @@ from typing import Callable
 
 from .. import storage
 from ..spec import ClipSpec, Source
-from . import cut, face_detect, reframe, words
-from .highlight import Clip
+from . import cut, face_detect, reframe, shots, words
+from .selection import Clip
 from .transcript import TranscriptSegment
 
-# Extra source video kept either side of the clip, so the renderer and
-# any later trim editing have a little room without re-cutting.
-SEGMENT_PAD_S = 1.0
+# Spare source video either side of the clip: nudges and "include the
+# next sentence" stay inside it, so they never need a re-cut.
+SEGMENT_PAD_S = 8.0
+
+# A face must show within this long of the clip start, or the clip gets a
+# "No face at start" QA flag.
+FACE_START_S = 1.0
 
 
 @dataclass
 class PreparedClip:
     spec: ClipSpec
     storage_key: str | None
+    face_at_start: bool | None = None
+    filename: str | None = None
+
+
+def clip_filename(idx: int, revision: int = 0) -> str:
+    """The segment's file name (and R2 key suffix). Revision 0 keeps the
+    original clip_{idx}.mp4, so clips made before Swap/Regenerate existed
+    still resolve; a replacement gets its own name, so preparing it never
+    touches the file or object the current clip still points at."""
+    return f"clip_{idx}.mp4" if revision <= 0 else f"clip_{idx}_r{revision}.mp4"
 
 
 def segment_bounds(clip_start: float, clip_end: float, video_duration: float) -> tuple[float, float]:
@@ -42,16 +58,13 @@ def prepare_clip(
     video_path: str,
     video_duration: float,
     segments: list[TranscriptSegment],
-    transcript_source: str,
-    audio_path: str,
     clips_dir: str,
     models_dir: str,
-    groq_key: str | None,
-    prompt: str | None,
     on_step: Callable[[str], None],
+    revision: int = 0,
 ) -> PreparedClip:
     clip_id = f"{job_id}-{idx}"
-    filename = f"clip_{idx}.mp4"
+    filename = clip_filename(idx, revision)
     local_path = os.path.join(clips_dir, job_id, filename)
     seg_start, seg_end = segment_bounds(clip.start, clip.end, video_duration)
     offset = clip.start - seg_start
@@ -62,17 +75,16 @@ def prepare_clip(
     width, height, fps = cut.probe_video(local_path)
 
     on_step("timing captions")
-    clip_word_list, approx = words.clip_words(
-        segments, transcript_source, audio_path, clip.start, clip.end, clip.emphasis,
-        groq_key=groq_key, prompt=prompt,
-    )
+    clip_word_list = words.clip_words(segments, seg_start, seg_end, clip.emphasis)
 
     on_step("framing")
+    face_at_start: bool | None = None
     try:
-        frames, times = face_detect.sample_detections(local_path, face_detect.ensure_model(models_dir))
-        # Keep only samples inside the clip itself, re-based to its start.
-        kept = [(round(t - offset, 3), f) for t, f in zip(times, frames) if offset <= t <= offset + duration]
-        reframe_result = reframe.analyze([f for _, f in kept], [t for t, _ in kept])
+        frames, times, thumbs = face_detect.sample_detections(local_path, face_detect.ensure_model(models_dir))
+        opening = [f for t, f in zip(times, frames) if offset <= t <= offset + FACE_START_S]
+        face_at_start = any(len(f) > 0 for f in opening) if opening else None
+        cuts = shots.cut_times(thumbs, times)
+        reframe_result = reframe.analyze(frames, times, cuts)
     except Exception as e:  # noqa: BLE001
         print(f"[reframe] face analysis failed for {clip_id}, using fit: {e}")
         reframe_result = reframe.fallback()
@@ -89,14 +101,15 @@ def prepare_clip(
             print(f"[r2] upload failed for {job_id}/{filename}, keeping local copy: {e}")
 
     spec = ClipSpec(
+        version=2,
         clipId=clip_id,
-        source=Source(url="", width=width, height=height, fps=fps),
+        source=Source(url="", width=width, height=height, fps=fps, duration=round(seg_end - seg_start, 3)),
         start=round(offset, 3),
         end=round(offset + duration, 3),
         words=clip_word_list,
-        wordsApprox=approx,
+        wordsApprox=False,
         hookTitle=clip.hook_title,
         viralityScore=max(0.0, min(10.0, round(clip.score, 1))),
         reframe=reframe_result,
     )
-    return PreparedClip(spec=spec, storage_key=storage_key)
+    return PreparedClip(spec=spec, storage_key=storage_key, face_at_start=face_at_start, filename=filename)

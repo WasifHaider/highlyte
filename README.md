@@ -5,28 +5,38 @@ Handles episodes that mix English with Roman-script Hindi/Urdu.
 
 ## Architecture
 
-- `backend/` — FastAPI app. Pipeline: yt-dlp ingest -> transcript (YouTube
-  captions, else local faster-whisper) -> heuristic/LLM highlight scoring ->
-  ffmpeg cuts. Job/clip metadata persisted to Supabase Postgres, and logins
-  go through Supabase Auth (required, see below). Clip files stay on local
-  disk under `data/clips/` unless R2 is configured.
+- `backend/` — FastAPI app. Pipeline: yt-dlp ingest -> transcript (language
+  check, VAD chunks, Whisper via Groq else local faster-whisper, then glossary
+  and spelling fixes) -> LLM clip selection (needs `GROQ_KEY`; a job without
+  it ends in "selection failed" with a Retry button) -> ffmpeg cuts.
+  Job/clip metadata persisted to Supabase Postgres, and logins go through
+  Supabase Auth (required, see below). Clip files stay on local disk under
+  `data/clips/` unless R2 is configured.
 - `frontend/` — Vue 3 + Vite SPA (Pinia store, Vue Router, axios). Polls job
   status and renders the highlight list.
-- `supabase/schema.sql` — jobs/clips tables + indexes. Run in the Supabase
-  SQL editor for your project.
+- `supabase/migrations/` — the database schema as ordered migration files,
+  applied with the Supabase CLI (see "Database migrations" below).
 
 ## Roman Urdu/Hindi transcription
 
-The fallback ASR path (`backend/pipeline/transcript.py`) uses
-`faster-whisper` (free, local, CPU-capable) with `language="en"` and a
-Roman-Urdu/Hindi `initial_prompt` seed. This keeps Whisper decoding
-code-switched speech in Latin letters instead of switching to
-Devanagari/Nastaliq script or silently translating to English. See the
-docstring in that file for the mechanism and hard constraints (do not set
-`language="ur"`/`"hi"`, do not strip the seed prompt).
+Every job asks for the spoken language: **Hinglish** (default) or
+**English**. Three short samples are checked with Whisper first; clear
+English audio switches to English captions and clear Hindi/Urdu speech
+switches to Hinglish, and the job page says so when that happens.
 
-YouTube captions are tried first (fast, free, no model download); Whisper
-only runs when captions are unavailable/disabled.
+Transcription (`backend/pipeline/transcript.py`) normalises the audio,
+splits it into chunks of at most two minutes at silences (Silero VAD
+bundled with faster-whisper), and runs Whisper with `language="en"` on
+each chunk: Groq when `GROQ_KEY` is set, local faster-whisper otherwise or
+when Groq fails. Hinglish chunks get a Roman Urdu/Hindi seed prompt so
+Whisper writes Roman letters instead of switching script or translating.
+A glossary (`backend/pipeline/data/glossary.json`) and a house spelling
+list (`spelling.json`) are then applied in code; both are plain JSON and
+can grow without code changes. The transcript is stored in the
+`transcripts` table.
+
+Hindi mode plus transliteration was tested and rejected; see "Spike
+results" in `docs/superpowers/specs/2026-09-25-hinglish-v1-roadmap.md`.
 
 ## Setup
 
@@ -55,11 +65,39 @@ the backend's httpOnly login cookies travel with every request.
 
 ### Supabase (required)
 1. Create a project at supabase.com.
-2. Run `supabase/schema.sql` in the SQL editor.
+2. Apply the migrations: `npx supabase db push --db-url "<connection string>"`
+   (see "Database migrations" below for which connection string).
 3. Put `SUPABASE_URL` and `SUPABASE_KEY` (the service-role key) in `.env` at
    the repo root.
 Accounts live in Supabase Auth, so without these set login, signup and every
 project endpoint answer 503 "Accounts need Supabase".
+
+### Database migrations
+Schema changes live in `supabase/migrations/` as timestamped SQL files.
+Supabase records which ones a database has applied, so each file runs once
+and nothing is ever re-run by hand.
+
+- **Change the schema:** `npx supabase migration new <name>` creates an empty
+  file; write only the change in it (`alter table jobs add column ...`).
+  Never edit a migration that has already been applied.
+- **Production:** the deploy workflow runs `supabase db push` before the new
+  backend starts, on every push to master that touches
+  `supabase/migrations/`. It needs the `SUPABASE_DB_URL` GitHub secret: the
+  **Session pooler** connection string from the Supabase dashboard
+  (Connect → Session pooler), with the database password filled in. The
+  direct `db.<ref>.supabase.co` host is IPv6-only and GitHub runners can't
+  reach it.
+- **By hand:** `npx supabase db push --db-url "<same string>" --dry-run`
+  lists what would be applied; drop `--dry-run` to apply.
+- The first migration, `20260924000000_baseline.sql`, is the old
+  `schema.sql`. Every statement in it is idempotent, so it applies safely to
+  the existing production database.
+- The deploy workflow always applies new migrations before the new backend
+  starts (see "Production" above), so a caption-editing column like
+  `words_original` is there before the code that reads it runs. Locally,
+  apply migrations the same way before starting the backend:
+  `npx supabase db push --db-url "$DBURL"` (caption editing needs the
+  `words_original` column).
 
 ## Team accounts
 
@@ -83,6 +121,18 @@ frame on a blurred background), with animated word-by-word captions and
 an optional hook title. The clip page previews every change live in the
 browser; the final mp4 is rendered on AWS Lambda with
 [Remotion](https://www.remotion.dev) only when you export.
+
+Layouts follow the camera: face analysis detects cuts (a jump in a tiny
+grayscale thumbnail between samples) and tracks faces per shot. Split
+shows the left person on top and the right person below only during
+wide two-person shots; close-ups show one person full-frame. Clips made
+before this change keep their old behaviour until the video is re-run.
+After changing anything in `renderer/src`, re-run `npm run deploy:site`
+so Lambda exports use the same layout as the preview.
+
+The render cache key now includes the caption words, so the first export
+of each existing clip after this change renders once more even if nothing
+else about it changed.
 
 - `renderer/` — the Remotion composition (layouts, caption presets, hook
   title). The same code runs in the browser preview and on Lambda.
@@ -124,20 +174,50 @@ MISMATCH line at startup if they differ.
 cd renderer && npm test
 ```
 
+## Fixing a clip
+
+The clip card offers fast edits without re-running the whole video.
+
+- **Trim:** ±0.5 s nudges per edge, or step to the previous/next sentence.
+  Reset to undo. Clips stay 8–60 s and cannot trim further than 8 s either
+  side of the original cut.
+- **Swap scene:** replaces the clip with a saved runner-up moment from clip
+  selection. Uses no Groq tokens; runs in the background.
+- **Regenerate:** re-ranks about 120 s either side of the clip with one small
+  Groq call (needs `GROQ_KEY`). Runs in the background.
+- **SRT:** download captions for the clip via `GET /api/clips/{id}/captions.srt`,
+  and the renders zip includes `highlyte-<clipId>.srt` beside each mp4.
+
+Both swap and regenerate run one at a time per video; a clip being replaced
+cannot be edited or exported until it finishes. A swapped or regenerated clip
+resets caption edits and trim. It keeps the caption preset, accent colour and
+caption position; its layout and hook title come from the new moment. If the
+action fails, the old clip is left exactly as it was.
+
+Clips made before this change (spec v1) cannot be trimmed. Re-run the video
+to make new v2 clips that support trimming.
+
+Exports follow trims: the render cache key includes the bounds, so existing
+cache entries miss once. After deploying `supabase/migrations/20260927120000_fix_in_place.sql`,
+run `npm run deploy:site` in `renderer/` so Lambda exports can draw spec v2.
+
 ## How it works
 
 1. **Ingest** — pull the audio via `yt-dlp`, cached by video ID.
-2. **Transcript** — YouTube captions first; local faster-whisper fallback
-   with Roman Urdu/Hindi decoding (see above).
-3. **Highlight detection** — chunk the transcript into ~45s windows, score
-   each for "meaningful" content (heuristic scorer by default; optional
-   LLM scorer if `GROQ_KEY` is set), keep the top ones.
+2. **Transcript** — language check, VAD chunks, Whisper (Groq, else local
+   faster-whisper), then glossary and spelling fixes in code.
+3. **Clip selection** — an LLM (Groq, needs `GROQ_KEY`) picks candidate
+   ranges from the transcript's thought units; cut points are then snapped
+   in code, hard-rejected, scored and packed. Without `GROQ_KEY` the job
+   ends in "selection failed" with a Retry button once one is set.
+   `scripts/select_dry_run.py` runs this against a stored transcript and
+   prints what it picks, without preparing clips.
 4. **Cutting** — `ffmpeg -c copy` (fast path) or re-encode fallback.
 5. **Frontend** — poll job status, render clip list with play/select/export.
 
 ## Open questions (carried over from original scope)
 
 - [x] Output format: vertical 9:16 shorts (Phase 1)
-- [ ] Caption quality check before trusting auto-captions over Whisper
-- [ ] LLM highlight scoring model choice, if/when the heuristic scorer isn't
-      good enough
+- [x] Caption quality check before trusting auto-captions over Whisper (dropped: every job now uses Whisper)
+- [x] LLM highlight scoring model choice (settled: Groq's `openai/gpt-oss-20b`,
+      the old heuristic scorer retired — see clip-selection design)

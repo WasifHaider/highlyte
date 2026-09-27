@@ -11,6 +11,7 @@ on:
       - "Dockerfile"
       - ".dockerignore"
       - "deploy/**"
+      - "supabase/migrations/**"
       - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
@@ -23,7 +24,33 @@ env:
   ECR_REPOSITORY: highlyte-backend
 
 jobs:
+  # Apply new database migrations before the new backend starts, so code
+  # that needs a new column never runs against the old schema. Supabase
+  # records which migrations are applied; already-applied ones are skipped.
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.118.0
+
+      - name: Apply migrations
+        env:
+          # Session pooler connection string (Supabase dashboard -> Connect ->
+          # Session pooler). The direct db.<ref>.supabase.co host is IPv6-only
+          # and GitHub runners cannot reach it.
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::SUPABASE_DB_URL secret is not set"
+            exit 1
+          fi
+          supabase db push --db-url "$SUPABASE_DB_URL" --yes
+
   deploy:
+    needs: migrate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

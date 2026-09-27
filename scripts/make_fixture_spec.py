@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from backend.spec import ClipSpec  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "renderer", "src", "__fixtures__", "clip-spec.json")
+OUT_V2 = os.path.join(os.path.dirname(__file__), "..", "renderer", "src", "__fixtures__", "clip-spec-v2.json")
 
 TEXT = (
     "Honestly this was the moment everything changed for us. "
@@ -40,6 +41,7 @@ def build() -> ClipSpec:
     left = [{"t": t / 5, "cx": 0.30, "cy": 0.42, "w": 0.12, "h": 0.22} for t in range(0, 41)]
     right = [{"t": t / 5, "cx": 0.70, "cy": 0.40, "w": 0.11, "h": 0.21} for t in range(0, 41)]
     return ClipSpec.model_validate({
+        "version": 1,
         "clipId": "fixture0000-0",
         "source": {"url": "fixture.mp4", "width": 1920, "height": 1080, "fps": 30},
         "start": 1.0,
@@ -52,6 +54,44 @@ def build() -> ClipSpec:
             "auto": "speaker",
             "faces": [{"id": 0, "track": left}, {"id": 1, "track": right}],
             "speakerTimeline": [{"t": 0.0, "faceId": 0}, {"t": 4.0, "faceId": 1}],
+            "shots": [{"start": 0.0, "end": 4.0, "kind": "two", "faceIds": [0, 1]}, {"start": 4.0, "end": 8.0, "kind": "one", "faceIds": [1]}],
+        },
+    })
+
+
+def build_v2() -> ClipSpec:
+    """The same clip as a v2 spec: word/track/speaker/shot times cover the
+    whole cut file (every v1 time shifted by +2.0 s, the segment's spare
+    lead-in), plus two words outside the clip itself."""
+    tokens = TEXT.split()
+    step = 8.0 / len(tokens)
+    words = [
+        {
+            "text": tok,
+            "start": round(i * step + 2.0, 3),
+            "end": round((i + 1) * step - 0.02 + 2.0, 3),
+            "emphasis": tok.lower() in EMPHASIS,
+        }
+        for i, tok in enumerate(tokens)
+    ]
+    words = [{"text": "Pehle.", "start": 0.5, "end": 1.0}] + words + [{"text": "Baad.", "start": 10.6, "end": 11.2}]
+    left = [{"t": t / 5, "cx": 0.30, "cy": 0.42, "w": 0.12, "h": 0.22} for t in range(0, 61)]
+    right = [{"t": t / 5, "cx": 0.70, "cy": 0.40, "w": 0.11, "h": 0.21} for t in range(0, 61)]
+    return ClipSpec.model_validate({
+        "version": 2,
+        "clipId": "fixture0000-0",
+        "source": {"url": "fixture.mp4", "width": 1920, "height": 1080, "fps": 30, "duration": 12.0},
+        "start": 2.0,
+        "end": 10.0,
+        "words": words,
+        "wordsApprox": False,
+        "hookTitle": "The moment everything changed",
+        "viralityScore": 8.2,
+        "reframe": {
+            "auto": "speaker",
+            "faces": [{"id": 0, "track": left}, {"id": 1, "track": right}],
+            "speakerTimeline": [{"t": 2.0, "faceId": 0}, {"t": 6.0, "faceId": 1}],
+            "shots": [{"start": 2.0, "end": 6.0, "kind": "two", "faceIds": [0, 1]}, {"start": 6.0, "end": 10.0, "kind": "one", "faceIds": [1]}],
         },
     })
 
@@ -62,3 +102,7 @@ if __name__ == "__main__":
         json.dump(build().model_dump(), f, indent=2)
         f.write("\n")
     print(f"wrote {OUT}")
+    with open(OUT_V2, "w", encoding="utf-8") as f:
+        json.dump(build_v2().model_dump(), f, indent=2)
+        f.write("\n")
+    print(f"wrote {OUT_V2}")
