@@ -1,16 +1,25 @@
-/* Highlyte design tokens — Cyprus (deep teal) / Sand theme */
+/* Highlyte design tokens: minimal teal (.superdesign/design-system.md). */
 :root {
-  --bg: #F0EDE4;
+  --bg: #FFFFFF;
+  --bg-subtle: #F7F6F2;
   --surface: #FFFFFF;
-  --border: #D8DCD4;
-  --ink: #004741;
-  --ink-soft: rgba(0,71,65,0.62);
-  --ink-faint: rgba(0,71,65,0.4);
+  --border: #E6E6E1;
+  --ink: #14201F;
+  --ink-soft: #5B6664;
+  --ink-faint: #9AA3A1;
   --accent: #004741;
-  --accent-soft: rgba(0,71,65,0.1);
+  --accent-hover: #00362F;
+  --accent-soft: rgba(0,71,65,0.08);
   --accent-text: #004741;
-  --font-serif: 'Newsreader', serif;
+  --danger: #B42318;
+  --danger-soft: #FEF3F2;
+  --warning: #B54708;
+  --warning-soft: #FFFAEB;
   --font-sans: 'Public Sans', sans-serif;
+  --font-brand: 'Sora', sans-serif;
+  --radius: 8px;
+  --radius-card: 12px;
+  --ease: 140ms ease-out;
 }
 
 * { box-sizing: border-box; }
@@ -21,7 +30,68 @@ html, body, #app {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
 }
+
+a { color: var(--accent); }
+.tabular { font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-soft); }
+.faint { color: var(--ink-faint); }
+
+.page { max-width: 1120px; margin: 0 auto; padding: 32px 24px 96px; }
+@media (max-width: 640px) { .page { padding: 24px 16px 96px; } }
+.page-title { font-size: 22px; line-height: 28px; font-weight: 600; margin: 0; }
+.section-title { font-size: 15px; line-height: 22px; font-weight: 600; margin: 0; }
+.field-label { font-size: 12.5px; font-weight: 500; color: var(--ink); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 36px; padding: 0 14px; border-radius: var(--radius); border: 1px solid transparent;
+  font: 600 13.5px/1 var(--font-sans); cursor: pointer; text-decoration: none;
+  transition: background var(--ease), border-color var(--ease), color var(--ease);
+}
+.btn:disabled { cursor: not-allowed; opacity: .55; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-secondary { background: var(--surface); color: var(--ink); border-color: var(--border); }
+.btn-secondary:hover:not(:disabled) { background: var(--bg-subtle); }
+.btn-ghost { background: transparent; color: var(--ink-soft); }
+.btn-ghost:hover:not(:disabled) { color: var(--ink); background: var(--bg-subtle); }
+.btn-sm { height: 28px; padding: 0 8px; font-size: 12px; font-weight: 500; border-radius: 6px; }
+
+.input, .select {
+  height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: #fff; color: var(--ink); font: 400 14px var(--font-sans); outline: none;
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+.select { padding: 0 8px; }
+.input:focus, .select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.input:disabled, .select:disabled { background: var(--bg-subtle); color: var(--ink-faint); }
+
+.chip {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px;
+  background: var(--bg-subtle); color: var(--ink-soft); font-size: 12px; white-space: nowrap;
+}
+.chip-warning { background: var(--warning-soft); color: var(--warning); }
+.chip-accent { background: var(--accent-soft); color: var(--accent); }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); transition: border-color var(--ease); }
+.card:hover { border-color: var(--ink-faint); }
+
+.segmented { display: inline-flex; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius); padding: 2px; gap: 2px; }
+.segmented button {
+  border: 1px solid transparent; background: transparent; color: var(--ink-soft);
+  font: 600 12.5px var(--font-sans); padding: 0 10px; height: 30px; border-radius: 6px; cursor: pointer;
+}
+.segmented button[aria-pressed="true"] { background: #fff; border-color: var(--border); color: var(--accent); }
+
+.danger-note { background: var(--danger-soft); color: var(--danger); border-radius: var(--radius); padding: 8px 12px; font-size: 13px; }
+.warning-note { background: var(--warning-soft); color: var(--warning); border-radius: var(--radius); padding: 8px 12px; font-size: 13px; }
+.subtle-note { background: var(--bg-subtle); color: var(--ink-soft); border-radius: var(--radius); padding: 8px 12px; font-size: 12.5px; }
+
+@keyframes softPulse { 0%,100% { opacity: 1; } 50% { opacity: .6; } }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 @keyframes dotPulse { 0%,100%{transform:scale(1);opacity:1;} 50%{transform:scale(1.18);opacity:.65;} }
 @keyframes wavePulse { 0%,100%{opacity:.55;} 50%{opacity:1;} }
