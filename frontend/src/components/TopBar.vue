@@ -124,11 +124,19 @@ async function onLogout() {
 }
 .tab:hover { color: var(--ink); background: var(--accent-soft); }
 .tab-active { color: var(--accent-text); background: var(--accent-soft); }
-.right-group { display: flex; align-items: center; gap: 12px; flex: 1; justify-content: flex-end; }
-.linkgroup { display: flex; align-items: center; flex: 1; max-width: 400px; }
+.right-group { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; justify-content: flex-end; }
+/* Input, language switch and Generate read as one control: shared borders,
+   squared inner corners, one height. min-width: 0 lets the input shrink so
+   the group never spills under the account button. */
+.linkgroup { display: flex; align-items: stretch; flex: 1; min-width: 0; max-width: 480px; height: 36px; }
 @media (max-width: 1024px) { .linkgroup { display: none; } }
-.link-input { flex: 1; border-radius: var(--radius) 0 0 var(--radius); }
-.link-generate { border-radius: 0 var(--radius) var(--radius) 0; }
+.link-input { flex: 1; min-width: 120px; height: 36px; border-radius: var(--radius) 0 0 var(--radius); }
+.linkgroup .segmented {
+  flex-shrink: 0; align-items: center; height: 36px; border-radius: 0; border-left: 0; border-right: 0;
+}
+.linkgroup .segmented button { height: 30px; }
+.link-generate { flex-shrink: 0; height: 36px; border-radius: 0 var(--radius) var(--radius) 0; }
+.link-generate:disabled { opacity: 1; background: var(--accent); color: rgba(255,255,255,.7); }
 .account { position: relative; flex-shrink: 0; }
 .account-menu {
   position: absolute; right: 0; top: calc(100% + 6px); min-width: 200px; padding: 10px;
