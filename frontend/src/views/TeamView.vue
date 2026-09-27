@@ -18,7 +18,7 @@
             <th class="col-action"></th>
           </tr>
         </thead>
-        <tbody>
+        <TransitionGroup name="rise" tag="tbody">
           <tr v-for="u in users" :key="u.id">
             <td class="cell-email" data-label="Email">{{ u.email }}</td>
             <td data-label="Role">
@@ -29,7 +29,7 @@
               <button v-if="u.role !== 'admin'" type="button" class="btn btn-ghost btn-sm" :disabled="removingId === u.id" @click="remove(u)">Remove</button>
             </td>
           </tr>
-        </tbody>
+        </TransitionGroup>
       </table>
     </div>
 
@@ -42,20 +42,24 @@
         </label>
         <button type="submit" class="btn btn-primary" :disabled="adding">{{ adding ? 'Adding…' : 'Add user' }}</button>
       </form>
-      <div v-if="addError" class="danger-note" role="alert">{{ addError }}</div>
+      <Transition name="fade">
+        <div v-if="addError" class="danger-note" role="alert">{{ addError }}</div>
+      </Transition>
 
-      <div v-if="created" class="created card" role="status">
-        <div class="created-title">User added</div>
-        <div class="creds">
-          <div><span>Email</span><code>{{ created.email }}</code></div>
-          <div><span>Password</span><code>{{ created.password }}</code></div>
+      <Transition name="fade">
+        <div v-if="created" class="created card" role="status">
+          <div class="created-title">User added</div>
+          <div class="creds">
+            <div><span>Email</span><code>{{ created.email }}</code></div>
+            <div><span>Password</span><code>{{ created.password }}</code></div>
+          </div>
+          <div class="created-actions">
+            <button type="button" class="btn btn-secondary btn-sm" @click="copyCreds">{{ copied ? 'Copied' : 'Copy login' }}</button>
+            <button type="button" class="btn btn-ghost btn-sm" @click="closeCreated">Done</button>
+          </div>
+          <p class="subtle-note">This password is shown only once. Copy it now and send it to the user.</p>
         </div>
-        <div class="created-actions">
-          <button type="button" class="btn btn-secondary btn-sm" @click="copyCreds">{{ copied ? 'Copied' : 'Copy login' }}</button>
-          <button type="button" class="btn btn-ghost btn-sm" @click="closeCreated">Done</button>
-        </div>
-        <p class="subtle-note">This password is shown only once. Copy it now and send it to the user.</p>
-      </div>
+      </Transition>
     </div>
   </div>
 </template>

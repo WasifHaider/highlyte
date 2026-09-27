@@ -3,10 +3,12 @@
     <div class="preview">
       <RemotionPreview v-if="clip.spec" :spec="previewSpec" :clip-style="clip.style" />
       <div v-else class="no-preview">No vertical preview for this clip. Re-run the video to generate one.</div>
-      <div v-if="clip.pendingAction" class="pending-overlay">
-        <svg class="spinner" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></svg>
-        <span class="pending-pill">{{ pendingText }}</span>
-      </div>
+      <Transition name="fade">
+        <div v-if="clip.pendingAction" class="pending-overlay">
+          <svg class="spinner" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></svg>
+          <span class="pending-pill">{{ pendingText }}</span>
+        </div>
+      </Transition>
     </div>
 
     <div class="body">
@@ -59,27 +61,31 @@
         </a>
       </div>
 
-      <div v-if="clip.actionError" class="danger-note action-error">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
-        {{ clip.actionError }}
-      </div>
+      <Transition name="fade">
+        <div v-if="clip.actionError" class="danger-note action-error">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+          {{ clip.actionError }}
+        </div>
+      </Transition>
 
-      <div v-if="render" class="render-status" :class="render.status">
-        <template v-if="render.status === 'queued'">Waiting to render…</template>
-        <template v-else-if="render.status === 'rendering'">
-          Rendering {{ Math.round(render.progress || 0) }}%
-          <div class="progress-bar"><div class="progress-bar-fill" :style="{ width: (render.progress || 0) + '%' }"></div></div>
-        </template>
-        <template v-else-if="render.status === 'done'">
-          <a class="download-link" :href="clipDownloadUrl(render.downloadUrl)">Download mp4</a>
-        </template>
-        <template v-else>
-          <div class="danger-note">
-            Render failed: {{ render.error }}
-          </div>
-          <button class="btn btn-ghost btn-sm retry" @click="jobStore.retryRender(clip.id)">Retry</button>
-        </template>
-      </div>
+      <Transition name="fade">
+        <div v-if="render" class="render-status" :class="render.status">
+          <template v-if="render.status === 'queued'">Waiting to render…</template>
+          <template v-else-if="render.status === 'rendering'">
+            Rendering {{ Math.round(render.progress || 0) }}%
+            <div class="progress-bar"><div class="progress-bar-fill" :style="{ width: (render.progress || 0) + '%' }"></div></div>
+          </template>
+          <template v-else-if="render.status === 'done'">
+            <a class="download-link" :href="clipDownloadUrl(render.downloadUrl)">Download mp4</a>
+          </template>
+          <template v-else>
+            <div class="danger-note">
+              Render failed: {{ render.error }}
+            </div>
+            <button class="btn btn-ghost btn-sm retry" @click="jobStore.retryRender(clip.id)">Retry</button>
+          </template>
+        </div>
+      </Transition>
     </div>
   </div>
 </template>

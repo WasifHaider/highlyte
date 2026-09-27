@@ -68,13 +68,14 @@ const progressText = computed(() => {
 .step-marker {
   width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
+  transition: background 200ms ease-out, border-color 200ms ease-out;
 }
 .step-marker.pending { border: 1px solid var(--border); background: #fff; }
 .step-marker.active { border: 2px solid var(--accent); background: #fff; animation: softPulse 1.6s ease-in-out infinite; }
 .step-marker.active .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .step-marker.done { background: var(--accent); border: 1px solid var(--accent); }
 .step-marker.done .check { color: #fff; font-size: 11px; line-height: 1; }
-.step-label { font-size: 14px; flex: 1; min-width: 0; }
+.step-label { font-size: 14px; flex: 1; min-width: 0; transition: color 200ms ease-out; }
 .step-label.pending { color: var(--ink-faint); }
 .step-label.active, .step-label.done { color: var(--ink); }
 .step-progress-text { font-size: 12.5px; color: var(--ink-soft); flex-shrink: 0; }
@@ -82,7 +83,7 @@ const progressText = computed(() => {
   margin-left: 32px; margin-top: 2px;
   height: 4px; border-radius: 2px; background: var(--border); overflow: hidden;
 }
-.progress-bar-fill { height: 100%; background: var(--accent); transition: width .3s ease; }
+.progress-bar-fill { height: 100%; background: var(--accent); transition: width 300ms ease-out; }
 .step-progress-quote {
   margin-left: 32px; margin-top: 4px;
   font-size: 12px; color: var(--ink-faint); font-style: italic;

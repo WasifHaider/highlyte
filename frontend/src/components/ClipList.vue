@@ -25,9 +25,13 @@
       >Style all</button>
     </div>
 
-    <StyleAllBar v-if="showStyleAll" />
+    <div v-if="hasVerticalClips" class="collapse" :class="{ open: showStyleAll }">
+      <div class="collapse-inner" :inert="!showStyleAll">
+        <StyleAllBar />
+      </div>
+    </div>
 
-    <div class="clip-grid">
+    <TransitionGroup name="rise" tag="div" class="clip-grid">
       <ClipCard
         v-for="clip in jobStore.clips"
         :key="clip.id"
@@ -35,7 +39,7 @@
         :is-selected="!!jobStore.selected[clip.id]"
         @toggle="jobStore.toggleClip(clip.id)"
       />
-    </div>
+    </TransitionGroup>
   </div>
 </template>
 

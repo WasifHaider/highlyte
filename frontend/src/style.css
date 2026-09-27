@@ -49,9 +49,10 @@ a { color: var(--accent); }
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 36px; padding: 0 14px; border-radius: var(--radius); border: 1px solid transparent;
   font: 600 13.5px/1 var(--font-sans); cursor: pointer; text-decoration: none;
-  transition: background var(--ease), border-color var(--ease), color var(--ease);
+  transition: background var(--ease), border-color var(--ease), color var(--ease), box-shadow var(--ease), transform 80ms ease-out;
 }
 .btn:disabled { cursor: not-allowed; opacity: .55; }
+.btn:active:not(:disabled) { transform: translateY(1px); }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 .btn-secondary { background: var(--surface); color: var(--ink); border-color: var(--border); }
@@ -63,7 +64,7 @@ a { color: var(--accent); }
 .input, .select {
   height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius);
   background: #fff; color: var(--ink); font: 400 14px var(--font-sans); outline: none;
-  transition: border-color var(--ease), box-shadow var(--ease);
+  transition: border-color var(--ease), box-shadow var(--ease), background var(--ease), color var(--ease);
 }
 .select { padding: 0 8px; }
 /* Teal keyboard focus ring everywhere instead of the browser's black one;
@@ -77,12 +78,13 @@ a { color: var(--accent); }
 .chip {
   display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px;
   background: var(--bg-subtle); color: var(--ink-soft); font-size: 12px; white-space: nowrap;
+  transition: background var(--ease), color var(--ease);
 }
 .chip-warning { background: var(--warning-soft); color: var(--warning); }
 .chip-accent { background: var(--accent-soft); color: var(--accent); }
 .chip-danger { background: var(--danger-soft); color: var(--danger); }
 
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); transition: border-color var(--ease); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); transition: border-color var(--ease), box-shadow var(--ease); }
 .card-interactive:hover { border-color: var(--ink-faint); }
 
 .segmented { display: inline-flex; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius); padding: 2px; gap: 2px; }
@@ -102,3 +104,31 @@ a { color: var(--accent); }
 @keyframes dotPulse { 0%,100%{transform:scale(1);opacity:1;} 50%{transform:scale(1.18);opacity:.65;} }
 @keyframes wavePulse { 0%,100%{opacity:.55;} 50%{opacity:1;} }
 @keyframes toastIn { from{opacity:0;transform:translate(-50%,8px);} to{opacity:1;transform:translate(-50%,0);} }
+
+/* Motion: subtle and quick (design system). Vue <Transition name="…">. */
+.fade-enter-active, .fade-leave-active { transition: opacity 160ms ease-out; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+.pop-enter-active, .pop-leave-active { transition: opacity 140ms ease-out, transform 140ms ease-out; }
+.pop-enter-from, .pop-leave-to { opacity: 0; transform: translateY(-4px) scale(.98); }
+
+.rise-enter-active { transition: opacity 200ms ease-out, transform 200ms cubic-bezier(.2,.8,.2,1); }
+.rise-leave-active { transition: opacity 120ms ease-out; }
+.rise-enter-from { opacity: 0; transform: translateY(6px); }
+.rise-leave-to { opacity: 0; }
+.rise-move { transition: transform 200ms cubic-bezier(.2,.8,.2,1); }
+
+.slide-right-enter-active, .slide-right-leave-active { transition: transform 200ms cubic-bezier(.2,.8,.2,1), opacity 200ms ease-out; }
+.slide-right-enter-from, .slide-right-leave-to { transform: translateX(16px); opacity: 0; }
+
+.slide-up-enter-active, .slide-up-leave-active { transition: transform 220ms cubic-bezier(.2,.8,.2,1), opacity 180ms ease-out; }
+.slide-up-enter-from, .slide-up-leave-to { transform: translateY(24px); opacity: 0; }
+
+/* Height expand for collapsible sections: wrap content in .collapse > .collapse-inner and toggle .open. */
+.collapse { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 200ms ease-out, opacity 160ms ease-out; opacity: 0; }
+.collapse.open { grid-template-rows: 1fr; opacity: 1; }
+.collapse > .collapse-inner { overflow: hidden; min-height: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

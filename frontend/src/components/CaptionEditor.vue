@@ -5,22 +5,27 @@
       <span v-if="edited" class="status faint">Edited</span>
     </div>
 
-    <button v-if="!open" class="btn btn-secondary btn-sm" @click="start">Edit captions</button>
-    <button v-if="!open && edited" class="btn btn-ghost btn-sm" :disabled="busy" @click="reset">Reset to original</button>
-
-    <template v-if="open">
-      <div class="lines">
-        <label v-for="line in lines" :key="line.index" class="line">
-          <span class="time faint tabular mono">{{ clock(line.start - (props.start ?? 0)) }}</span>
-          <input class="input" :value="textOf(line)" type="text" @input="texts[line.index] = $event.target.value" />
-        </label>
+    <Transition name="fade" mode="out-in">
+      <div v-if="!open" key="closed" class="captions-toggle">
+        <button class="btn btn-secondary btn-sm" @click="start">Edit captions</button>
+        <button v-if="edited" class="btn btn-ghost btn-sm" :disabled="busy" @click="reset">Reset to original</button>
       </div>
-      <div class="row">
-        <button class="btn-save" :disabled="busy || saveDisabled" @click="save">{{ busy ? 'Saving…' : 'Save changes' }}</button>
-        <button class="btn btn-ghost btn-sm" :disabled="busy" @click="cancel">Cancel</button>
+      <div v-else key="open" class="lines-wrap">
+        <div class="lines">
+          <label v-for="line in lines" :key="line.index" class="line">
+            <span class="time faint tabular mono">{{ clock(line.start - (props.start ?? 0)) }}</span>
+            <input class="input" :value="textOf(line)" type="text" @input="texts[line.index] = $event.target.value" />
+          </label>
+        </div>
+        <div class="row">
+          <button class="btn-save" :disabled="busy || saveDisabled" @click="save">{{ busy ? 'Saving…' : 'Save changes' }}</button>
+          <button class="btn btn-ghost btn-sm" :disabled="busy" @click="cancel">Cancel</button>
+        </div>
       </div>
-    </template>
-    <div v-if="error" class="danger-note error">{{ error }}</div>
+    </Transition>
+    <Transition name="fade">
+      <div v-if="error" class="danger-note error">{{ error }}</div>
+    </Transition>
   </div>
 </template>
 
@@ -149,6 +154,8 @@ async function reset() {
 .captions-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
 .field-label { font-size: 12.5px; font-weight: 500; }
 .status { font-size: 11px; }
+.captions-toggle { display: flex; gap: 8px; align-items: center; }
+.lines-wrap { display: flex; flex-direction: column; gap: 8px; }
 .row { display: flex; gap: 8px; margin-top: 4px; }
 .lines { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; padding-right: 4px; }
 .line { display: flex; align-items: center; gap: 8px; }

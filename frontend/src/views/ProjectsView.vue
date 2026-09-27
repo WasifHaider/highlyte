@@ -27,9 +27,9 @@
       <p class="muted">No projects yet.</p>
       <router-link to="/" class="btn btn-primary">Paste a link</router-link>
     </div>
-    <div v-else class="grid">
+    <TransitionGroup v-else name="rise" tag="div" class="grid">
       <ProjectCard v-for="p in projects" :key="p.id" :project="p" />
-    </div>
+    </TransitionGroup>
   </div>
 </template>
 

@@ -1,88 +1,92 @@
 <template>
-  <aside
-    v-if="clip && clip.spec"
-    class="edit-panel"
-    aria-labelledby="edit-panel-title"
-    :role="isMobile ? 'dialog' : undefined"
-    :aria-modal="isMobile ? 'true' : undefined"
-  >
-    <div class="panel-inner">
-      <div class="panel-header">
-        <div class="panel-heading">
-          <h2 id="edit-panel-title" class="panel-title">Edit clip</h2>
-          <div class="panel-subtitle faint tabular">{{ clip.startLabel }}–{{ clip.endLabel }}</div>
-        </div>
-        <button ref="closeBtn" class="close-btn" @click="jobStore.closeEditor()" aria-label="Close edit panel">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
-        </button>
-      </div>
-
-      <div class="panel-body">
-        <label class="field">
-          <span class="field-label">Hook title</span>
-          <input type="text" class="input" :value="clip.style.hookTitle || ''" maxlength="80" :disabled="!!clip.pendingAction"
-            @input="set({ hookTitle: $event.target.value || null })" />
-        </label>
-        <label class="check">
-          <input type="checkbox" :checked="clip.style.showHook" :disabled="!!clip.pendingAction" @change="set({ showHook: $event.target.checked })" />
-          <span class="muted">Show hook title</span>
-        </label>
-
-        <div class="grid-2">
-          <label class="field" for="edit-layout-select">
-            <span class="field-label">Layout</span>
-            <UiSelect
-              id="edit-layout-select"
-              :model-value="clip.style.layout"
-              :options="layoutOptions"
-              :disabled="!!clip.pendingAction"
-              @update:model-value="v => set({ layout: v })"
-            />
-          </label>
-          <label class="field" for="edit-captions-select">
-            <span class="field-label">Captions</span>
-            <UiSelect
-              id="edit-captions-select"
-              :model-value="clip.style.captionPreset"
-              :options="captionOptions"
-              :disabled="!!clip.pendingAction"
-              @update:model-value="v => set({ captionPreset: v })"
-            />
-          </label>
-          <label class="field" for="edit-position-select">
-            <span class="field-label">Position</span>
-            <UiSelect
-              id="edit-position-select"
-              :model-value="clip.style.captionPosition"
-              :options="positionOptions"
-              :disabled="clip.style.layout === 'split' || !!clip.pendingAction"
-              @update:model-value="v => set({ captionPosition: v })"
-            />
-          </label>
-          <div class="field">
-            <span class="field-label">Accent colour</span>
-            <UiColorField
-              aria-label="Accent colour"
-              :model-value="clip.style.accent"
-              :disabled="!!clip.pendingAction"
-              @update:model-value="v => set({ accent: v })"
-            />
+  <Transition :name="isMobile ? 'slide-up' : 'slide-right'">
+    <aside
+      v-if="clip && clip.spec"
+      class="edit-panel"
+      aria-labelledby="edit-panel-title"
+      :role="isMobile ? 'dialog' : undefined"
+      :aria-modal="isMobile ? 'true' : undefined"
+    >
+      <div class="panel-inner">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2 id="edit-panel-title" class="panel-title">Edit clip</h2>
+            <div class="panel-subtitle faint tabular">{{ clip.startLabel }}–{{ clip.endLabel }}</div>
           </div>
+          <button ref="closeBtn" class="close-btn" @click="jobStore.closeEditor()" aria-label="Close edit panel">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
         </div>
 
-        <div v-if="clip.spec.wordsApprox" class="approx-note faint">Approximate caption sync</div>
+        <Transition name="fade" mode="out-in">
+          <div class="panel-body" :key="clip.id">
+            <label class="field">
+              <span class="field-label">Hook title</span>
+              <input type="text" class="input" :value="clip.style.hookTitle || ''" maxlength="80" :disabled="!!clip.pendingAction"
+                @input="set({ hookTitle: $event.target.value || null })" />
+            </label>
+            <label class="check">
+              <input type="checkbox" :checked="clip.style.showHook" :disabled="!!clip.pendingAction" @change="set({ showHook: $event.target.checked })" />
+              <span class="muted">Show hook title</span>
+            </label>
 
-        <hr class="divider" />
+            <div class="grid-2">
+              <label class="field" for="edit-layout-select">
+                <span class="field-label">Layout</span>
+                <UiSelect
+                  id="edit-layout-select"
+                  :model-value="clip.style.layout"
+                  :options="layoutOptions"
+                  :disabled="!!clip.pendingAction"
+                  @update:model-value="v => set({ layout: v })"
+                />
+              </label>
+              <label class="field" for="edit-captions-select">
+                <span class="field-label">Captions</span>
+                <UiSelect
+                  id="edit-captions-select"
+                  :model-value="clip.style.captionPreset"
+                  :options="captionOptions"
+                  :disabled="!!clip.pendingAction"
+                  @update:model-value="v => set({ captionPreset: v })"
+                />
+              </label>
+              <label class="field" for="edit-position-select">
+                <span class="field-label">Position</span>
+                <UiSelect
+                  id="edit-position-select"
+                  :model-value="clip.style.captionPosition"
+                  :options="positionOptions"
+                  :disabled="clip.style.layout === 'split' || !!clip.pendingAction"
+                  @update:model-value="v => set({ captionPosition: v })"
+                />
+              </label>
+              <div class="field">
+                <span class="field-label">Accent colour</span>
+                <UiColorField
+                  aria-label="Accent colour"
+                  :model-value="clip.style.accent"
+                  :disabled="!!clip.pendingAction"
+                  @update:model-value="v => set({ accent: v })"
+                />
+              </div>
+            </div>
 
-        <div :class="{ 'controls-disabled': clip.pendingAction }">
-          <CaptionEditor :key="clip.id" :clip-id="clip.id" :words="clip.spec.words" :edited="!!clip.captionsEdited"
-            :start="clip.spec.version === 2 ? clip.spec.start : null" :end="clip.spec.version === 2 ? clip.spec.end : null"
-            :revision="clip.revision || 0" :pending="!!clip.pendingAction"
-            @draft="w => jobStore.setCaptionDraft(clip.id, w)" />
-        </div>
+            <div v-if="clip.spec.wordsApprox" class="approx-note faint">Approximate caption sync</div>
+
+            <hr class="divider" />
+
+            <div :class="{ 'controls-disabled': clip.pendingAction }">
+              <CaptionEditor :key="clip.id" :clip-id="clip.id" :words="clip.spec.words" :edited="!!clip.captionsEdited"
+                :start="clip.spec.version === 2 ? clip.spec.start : null" :end="clip.spec.version === 2 ? clip.spec.end : null"
+                :revision="clip.revision || 0" :pending="!!clip.pendingAction"
+                @draft="w => jobStore.setCaptionDraft(clip.id, w)" />
+            </div>
+          </div>
+        </Transition>
       </div>
-    </div>
-  </aside>
+    </aside>
+  </Transition>
 </template>
 
 <script setup>

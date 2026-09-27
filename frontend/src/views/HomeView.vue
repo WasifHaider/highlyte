@@ -29,7 +29,9 @@
           </button>
         </div>
       </div>
-      <p v-if="generateError" class="danger-note hero-error">{{ generateError }}</p>
+      <Transition name="fade">
+        <p v-if="generateError" class="danger-note hero-error">{{ generateError }}</p>
+      </Transition>
     </section>
 
     <section v-if="loading || error || projects.length" class="recent">
@@ -41,9 +43,9 @@
       <p v-else-if="error" class="muted state-msg">
         {{ error }} <button class="btn btn-ghost btn-sm" @click="reload">Retry</button>
       </p>
-      <div v-else class="grid">
+      <TransitionGroup v-else name="rise" tag="div" class="grid">
         <ProjectCard v-for="p in projects" :key="p.id" :project="p" />
-      </div>
+      </TransitionGroup>
     </section>
   </div>
 </template>

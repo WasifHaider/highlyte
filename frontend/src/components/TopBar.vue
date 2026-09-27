@@ -45,10 +45,12 @@
             <span class="account-label">{{ auth.me?.team.name || 'Account' }}</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
           </button>
-          <div v-if="menuOpen" class="account-menu card" role="menu">
-            <div class="account-email faint">{{ auth.me?.user.email }}</div>
-            <button class="btn btn-ghost logout" role="menuitem" @click="onLogout">Log out</button>
-          </div>
+          <Transition name="pop">
+            <div v-if="menuOpen" class="account-menu card" role="menu">
+              <div class="account-email faint">{{ auth.me?.user.email }}</div>
+              <button class="btn btn-ghost logout" role="menuitem" @click="onLogout">Log out</button>
+            </div>
+          </Transition>
         </div>
       </div>
     </div>
