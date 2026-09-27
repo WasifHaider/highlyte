@@ -95,6 +95,7 @@ export const useJobStore = defineStore('job', {
       this._revisions = {}
       this.editingClipId = null
       this.captionDrafts = {}
+      this.clearSaveTracking()
       this.startPolling()
       return job_id
     },
@@ -236,6 +237,17 @@ export const useJobStore = defineStore('job', {
     // after a change to the (non-reactive) save-tracking maps above.
     _bumpSaveActivity() {
       this._saveActivityTick++
+    },
+    // Clears the module-level failedSaves bookkeeping (and bumps the tick so
+    // `clipSaveFailed` re-evaluates) whenever a new job is loaded or the
+    // store is reset: those clip ids are about to be replaced or discarded,
+    // so a stale "not saved" warning must not survive onto the next job or
+    // the next signed-in account. Mirrors where editingClipId/captionDrafts
+    // are reset (submitUrl here, startForId in JobView.vue, $reset from
+    // TopBar.vue's logout).
+    clearSaveTracking() {
+      failedSaves.clear()
+      this._bumpSaveActivity()
     },
     // Applies one style to every clip that has a vertical preview. A layout
     // a clip can't use (a face layout with no faces found) falls back to

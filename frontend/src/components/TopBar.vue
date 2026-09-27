@@ -77,6 +77,7 @@ async function onLogout() {
   await auth.logout()
   jobStore.stopPolling()
   jobStore.$reset() // don't show this account's clips to the next person
+  jobStore.clearSaveTracking()
   router.replace('/login')
 }
 </script>

@@ -25,7 +25,7 @@
             <td class="col-action"></td>
           </tr>
         </tbody>
-        <TransitionGroup v-else name="rise" tag="tbody">
+        <TransitionGroup v-else name="rise" tag="tbody" appear>
           <tr v-for="u in users" :key="u.id">
             <td class="cell-email" data-label="Email">{{ u.email }}</td>
             <td data-label="Role">

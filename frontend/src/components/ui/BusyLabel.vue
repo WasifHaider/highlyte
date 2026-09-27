@@ -2,7 +2,7 @@
   <span class="busy-label">
     <span class="cell" :aria-hidden="busy ? 'true' : undefined">{{ idle }}</span>
     <span class="cell busy-cell" :aria-hidden="busy ? undefined : 'true'">
-      <UiSpinner :size="spinnerSize" />{{ busyText }}
+      <UiSpinner v-if="busy" :size="spinnerSize" />{{ busyText }}
     </span>
   </span>
 </template>

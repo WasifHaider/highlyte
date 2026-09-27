@@ -31,7 +31,7 @@
       </div>
     </div>
 
-    <TransitionGroup name="rise" tag="div" class="clip-grid">
+    <TransitionGroup name="rise" tag="div" class="clip-grid" appear>
       <ClipCard
         v-for="clip in jobStore.clips"
         :key="clip.id"

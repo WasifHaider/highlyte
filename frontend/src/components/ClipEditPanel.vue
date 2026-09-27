@@ -39,9 +39,10 @@
 
             <div class="grid-2">
               <label class="field" for="edit-layout-select">
-                <span class="field-label">Layout</span>
+                <span class="field-label" id="edit-layout-label">Layout</span>
                 <UiSelect
                   id="edit-layout-select"
+                  labelledby="edit-layout-label"
                   :model-value="clip.style.layout"
                   :options="layoutOptions"
                   :disabled="!!clip.pendingAction"
@@ -49,9 +50,10 @@
                 />
               </label>
               <label class="field" for="edit-captions-select">
-                <span class="field-label">Captions</span>
+                <span class="field-label" id="edit-captions-label">Captions</span>
                 <UiSelect
                   id="edit-captions-select"
+                  labelledby="edit-captions-label"
                   :model-value="clip.style.captionPreset"
                   :options="captionOptions"
                   :disabled="!!clip.pendingAction"
@@ -59,9 +61,10 @@
                 />
               </label>
               <label class="field" for="edit-position-select">
-                <span class="field-label">Position</span>
+                <span class="field-label" id="edit-position-label">Position</span>
                 <UiSelect
                   id="edit-position-select"
+                  labelledby="edit-position-label"
                   :model-value="clip.style.captionPosition"
                   :options="positionOptions"
                   :disabled="clip.style.layout === 'split' || !!clip.pendingAction"
@@ -69,9 +72,9 @@
                 />
               </label>
               <div class="field">
-                <span class="field-label">Accent colour</span>
+                <span class="field-label" id="edit-accent-label">Accent colour</span>
                 <UiColorField
-                  aria-label="Accent colour"
+                  labelledby="edit-accent-label"
                   :model-value="clip.style.accent"
                   :disabled="!!clip.pendingAction"
                   @update:model-value="v => set({ accent: v })"

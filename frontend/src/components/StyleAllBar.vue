@@ -2,16 +2,16 @@
   <div class="style-all">
     <div class="fields">
       <div class="field">
-        <span class="field-label">Layout</span>
-        <UiSelect v-model="form.layout" :options="layoutOptions" aria-label="Layout" />
+        <span class="field-label" id="style-all-layout-label">Layout</span>
+        <UiSelect v-model="form.layout" :options="layoutOptions" labelledby="style-all-layout-label" />
       </div>
       <div class="field">
-        <span class="field-label">Captions</span>
-        <UiSelect v-model="form.captionPreset" :options="captionOptions" aria-label="Captions" />
+        <span class="field-label" id="style-all-captions-label">Captions</span>
+        <UiSelect v-model="form.captionPreset" :options="captionOptions" labelledby="style-all-captions-label" />
       </div>
       <div class="field color">
-        <span class="field-label">Accent colour</span>
-        <UiColorField v-model="form.accent" aria-label="Accent colour" />
+        <span class="field-label" id="style-all-accent-label">Accent colour</span>
+        <UiColorField v-model="form.accent" labelledby="style-all-accent-label" />
       </div>
       <label class="check">
         <input v-model="form.showHook" type="checkbox" /> Show hook title

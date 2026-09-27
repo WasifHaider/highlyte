@@ -74,13 +74,20 @@ function draw() {
   }))
 }
 
+let rafId1 = null
+let rafId2 = null
+
 onMounted(() => {
   root = createRoot(host.value)
   draw()
-  requestAnimationFrame(() => requestAnimationFrame(markReady))
+  rafId1 = requestAnimationFrame(() => {
+    rafId2 = requestAnimationFrame(markReady)
+  })
 })
 watch(() => [props.spec, props.clipStyle], draw, { deep: true })
 onBeforeUnmount(() => {
+  if (rafId1 != null) cancelAnimationFrame(rafId1)
+  if (rafId2 != null) cancelAnimationFrame(rafId2)
   detachFrameListener()
   root?.unmount()
   root = null

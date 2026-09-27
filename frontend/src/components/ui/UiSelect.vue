@@ -8,11 +8,12 @@
       :disabled="disabled"
       aria-haspopup="listbox"
       :aria-expanded="open"
-      :aria-label="ariaLabel"
+      :aria-label="labelledby ? undefined : ariaLabel"
+      :aria-labelledby="triggerLabelledby"
       @click="toggle"
       @keydown="onTriggerKey"
     >
-      <span class="ui-select-value">{{ selected?.label ?? '' }}</span>
+      <span :id="valueId" class="ui-select-value">{{ selected?.label ?? '' }}</span>
       <svg class="ui-select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
     </button>
     <Teleport to="body">
@@ -26,6 +27,7 @@
           role="listbox"
           tabindex="-1"
           :aria-activedescendant="activeId"
+          :aria-labelledby="labelledby"
           @keydown="onListKey"
         >
           <li
@@ -60,6 +62,7 @@ const props = defineProps({
   disabled: { type: Boolean, default: false },
   ariaLabel: { type: String, default: undefined },
   id: { type: String, default: undefined },
+  labelledby: { type: String, default: undefined },
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -70,6 +73,10 @@ const active = ref(-1)
 const selected = computed(() => props.options.find(o => o.value === props.modelValue))
 const optionId = i => `ui-select-${uid}-${i}`
 const activeId = computed(() => (active.value >= 0 ? optionId(active.value) : undefined))
+const valueId = `ui-select-${uid}-value`
+// Screen readers otherwise only hear the field name (aria-label); pairing it
+// with the value span announces "<label>, <current value>" instead.
+const triggerLabelledby = computed(() => (props.labelledby ? `${props.labelledby} ${valueId}` : undefined))
 
 async function show() {
   if (props.disabled) return
@@ -120,7 +127,14 @@ function onListKey(e) {
     const opt = props.options[active.value]
     if (opt) choose(opt)
   } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close() }
-  else if (e.key === 'Tab') close(false)
+  else if (e.key === 'Tab') {
+    // Don't preventDefault: refocusing the trigger synchronously here (before
+    // the browser runs Tab's default action) means the default action then
+    // continues from the trigger's position in the page, landing on the
+    // control before/after it instead of falling off the end of <body> (the
+    // teleported list's real DOM location).
+    close()
+  }
 }
 </script>
 

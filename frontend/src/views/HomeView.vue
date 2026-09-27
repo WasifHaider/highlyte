@@ -45,7 +45,7 @@
       <div v-else-if="loading" class="grid" aria-busy="true">
         <SkeletonCard v-for="i in HOME_SKELETON_COUNT" :key="i" variant="project" />
       </div>
-      <TransitionGroup v-else name="rise" tag="div" class="grid">
+      <TransitionGroup v-else name="rise" tag="div" class="grid" appear>
         <ProjectCard v-for="p in projects" :key="p.id" :project="p" />
       </TransitionGroup>
     </section>
