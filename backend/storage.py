@@ -22,6 +22,7 @@ that key:
 from __future__ import annotations
 
 import os
+import time
 from functools import lru_cache
 
 from dotenv import load_dotenv
@@ -36,6 +37,18 @@ R2_BUCKET = os.environ.get("R2_BUCKET")
 R2_PUBLIC_BASE_URL = os.environ.get("R2_PUBLIC_BASE_URL")
 
 PRESIGNED_URL_TTL_S = 3600  # 1 hour
+# A cached presigned URL is handed out again only while it has at least
+# this long left, so a client (or a Lambda render) never starts on one
+# about to expire.
+PRESIGNED_URL_MIN_LEFT_S = 15 * 60
+# Objects never change under a key (a replaced clip gets a new file name),
+# so browsers may keep them.
+MEDIA_CACHE_CONTROL = "private, max-age=86400"
+
+# key -> (url, expires_at). One URL per key for most of its life: a fresh
+# signature per request makes every URL look like a new file to the
+# browser, so a remounted preview re-downloads the whole segment.
+_presigned: dict[str, tuple[str, float]] = {}
 
 
 @lru_cache(maxsize=1)
@@ -63,6 +76,11 @@ def clip_key(job_id: str, filename: str) -> str:
     return f"{job_id}/{filename}"
 
 
+def thumb_filename(clip_filename: str) -> str:
+    """clip_2.mp4 -> clip_2.jpg: the card poster sits next to its segment."""
+    return clip_filename.rsplit(".", 1)[0] + ".jpg"
+
+
 def upload_clip(local_path: str, key: str) -> None:
     """Upload `local_path` to the bucket at `key`. Raises on failure —
     caller decides whether to keep the local file as a fallback (see
@@ -85,7 +103,18 @@ def upload_clip(local_path: str, key: str) -> None:
         ExtraArgs={
             "ContentType": "video/mp4",
             "ContentDisposition": f'attachment; filename="{filename}"',
+            "CacheControl": MEDIA_CACHE_CONTROL,
         },
+    )
+
+
+def upload_thumb(local_path: str, key: str) -> None:
+    client = get_client()
+    if client is None:
+        return
+    client.upload_file(
+        local_path, R2_BUCKET, key,
+        ExtraArgs={"ContentType": "image/jpeg", "CacheControl": MEDIA_CACHE_CONTROL},
     )
 
 
@@ -108,11 +137,17 @@ def clip_url(key: str) -> str | None:
     client = get_client()
     if client is None:
         return None
-    return client.generate_presigned_url(
+    now = time.time()
+    cached = _presigned.get(key)
+    if cached is not None and cached[1] - now > PRESIGNED_URL_MIN_LEFT_S:
+        return cached[0]
+    url = client.generate_presigned_url(
         "get_object",
         Params={"Bucket": R2_BUCKET, "Key": key},
         ExpiresIn=PRESIGNED_URL_TTL_S,
     )
+    _presigned[key] = (url, now + PRESIGNED_URL_TTL_S)
+    return url
 
 
 def delete_clip(key: str) -> None:

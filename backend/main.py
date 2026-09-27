@@ -62,6 +62,8 @@ app.include_router(accounts.router)
 
 RENDERER_PACKAGE_JSON = os.path.join(BASE_DIR, "renderer", "package.json")
 MAX_ZIP_RENDERS = 20
+# How long a browser may reuse /api/clips's redirect to a presigned R2 URL.
+CLIP_REDIRECT_MAX_AGE_S = 600
 
 
 class GenerateRequest(BaseModel):
@@ -289,6 +291,9 @@ def _with_source_url(record: dict[str, Any]) -> dict[str, Any]:
         download_url = out["downloadUrl"]
         revision = record.get("revision") or 0
         out["spec"]["source"]["url"] = f"{download_url}?r={revision}" if revision > 0 else download_url
+        # The card's poster, next to the segment (clip_2.mp4 -> clip_2.jpg).
+        # Clips cut before posters existed 404 here; the card falls back.
+        out["thumbUrl"] = storage.thumb_filename(download_url)
     return out
 
 
@@ -654,9 +659,14 @@ def get_clip(job_id: str, filename: str, member: Member = Depends(current_member
         if storage.clip_exists(key):
             url = storage.clip_url(key)
             if url is not None:
-                return RedirectResponse(url)
+                # Lets the browser reuse the redirect for a few minutes
+                # instead of asking again per video element; kept below a
+                # cached presigned URL's minimum remaining life.
+                return RedirectResponse(url, headers={"Cache-Control": f"private, max-age={CLIP_REDIRECT_MAX_AGE_S}"})
     if not os.path.exists(path):
         raise HTTPException(404, "clip not found")
+    if filename.endswith(".jpg"):
+        return FileResponse(path, media_type="image/jpeg")
     return FileResponse(path, media_type="video/mp4", filename=filename)
 
 
@@ -872,11 +882,19 @@ def _delete_clip_media(job_id: str, filename: str, storage_key: str | None) -> N
                 os.remove(path)
     except Exception as e:  # noqa: BLE001
         print(f"[clips] couldn't delete {job_id}/{filename}: {e}")
+    try:
+        if validation.CLIP_FILENAME_RE.fullmatch(filename or ""):
+            thumb = os.path.join(CLIPS_DIR, job_id, storage.thumb_filename(filename))
+            if os.path.exists(thumb):
+                os.remove(thumb)
+    except Exception as e:  # noqa: BLE001
+        print(f"[clips] couldn't delete poster for {job_id}/{filename}: {e}")
     if storage_key:
-        try:
-            storage.delete_clip(storage_key)
-        except Exception as e:  # noqa: BLE001
-            print(f"[r2] couldn't delete {storage_key}: {e}")
+        for key in (storage_key, storage.thumb_filename(storage_key)):
+            try:
+                storage.delete_clip(key)
+            except Exception as e:  # noqa: BLE001
+                print(f"[r2] couldn't delete {key}: {e}")
 
 
 def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:

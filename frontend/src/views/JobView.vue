@@ -109,6 +109,7 @@ function startForId(id) {
   jobStore.selected = {}
   jobStore.renders = {}
   jobStore.editingClipId = null
+  jobStore.previewClipId = null
   jobStore.captionDrafts = {}
   jobStore.clearSaveTracking()
   jobStore.startPolling()

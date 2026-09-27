@@ -20,7 +20,12 @@ def _patch_media(monkeypatch, detect):
         open(out, "wb").close()
         return out
 
+    def fake_thumb(src, at_s, out):
+        open(out, "wb").close()
+        return out
+
     monkeypatch.setattr(cut, "cut_clip", fake_cut)
+    monkeypatch.setattr(cut, "make_thumbnail", fake_thumb)
     monkeypatch.setattr(cut, "probe_video", lambda p: (1920, 1080, 30.0))
     monkeypatch.setattr(face_detect, "ensure_model", lambda d: "model")
     monkeypatch.setattr(face_detect, "sample_detections", detect)
@@ -122,6 +127,7 @@ def test_prepare_clip_revision_writes_its_own_file_and_key(tmp_path, monkeypatch
     uploads = []
     monkeypatch.setattr(clipprep.storage, "is_enabled", lambda: True)
     monkeypatch.setattr(clipprep.storage, "upload_clip", lambda path, key: uploads.append((os.path.basename(path), key)))
+    monkeypatch.setattr(clipprep.storage, "upload_thumb", lambda path, key: uploads.append((os.path.basename(path), key)))
     old = os.path.join(tmp_path, "abc123def456", "clip_0.mp4")
     os.makedirs(os.path.dirname(old))
     open(old, "wb").write(b"old")
@@ -132,5 +138,31 @@ def test_prepare_clip_revision_writes_its_own_file_and_key(tmp_path, monkeypatch
     )
     assert prepared.filename == "clip_0_r2.mp4"
     assert prepared.storage_key == "abc123def456/clip_0_r2.mp4"
-    assert uploads == [("clip_0_r2.mp4", "abc123def456/clip_0_r2.mp4")]
+    assert uploads == [("clip_0_r2.mp4", "abc123def456/clip_0_r2.mp4"), ("clip_0_r2.jpg", "abc123def456/clip_0_r2.jpg")]
+    assert not os.path.exists(os.path.join(tmp_path, "abc123def456", "clip_0_r2.jpg"))  # uploaded, so not kept
     assert open(old, "rb").read() == b"old"  # the current clip's file is untouched
+
+
+def test_prepare_clip_makes_a_poster_at_the_clip_start(tmp_path, monkeypatch):
+    _patch_media(monkeypatch, lambda *a, **k: ([], [], []))
+    calls = []
+
+    def fake_thumb(src, at_s, out):
+        calls.append((os.path.basename(src), at_s, os.path.basename(out)))
+        open(out, "wb").close()
+        return out
+
+    monkeypatch.setattr(cut, "make_thumbnail", fake_thumb)
+    _prepare(tmp_path)
+    assert calls == [("clip_0.mp4", 8.0, "clip_0.jpg")]
+    assert os.path.exists(os.path.join(tmp_path, "abc123def456", "clip_0.jpg"))  # R2 off: served from disk
+
+
+def test_prepare_clip_survives_a_poster_failure(tmp_path, monkeypatch):
+    _patch_media(monkeypatch, lambda *a, **k: ([], [], []))
+
+    def boom(*a, **k):
+        raise RuntimeError("ffmpeg failed")
+
+    monkeypatch.setattr(cut, "make_thumbnail", boom)
+    assert _prepare(tmp_path).spec.clipId == "abc123def456-0"
