@@ -29,7 +29,7 @@
           </button>
         </div>
       </div>
-      <p v-if="jobStore.error" class="danger-note hero-error">{{ jobStore.error }}</p>
+      <p v-if="generateError" class="danger-note hero-error">{{ generateError }}</p>
     </section>
 
     <section v-if="loading || error || projects.length" class="recent">
@@ -52,12 +52,10 @@
 import ProjectCard from '../components/ProjectCard.vue'
 import { useProjects } from '../composables/useProjects'
 import { useGenerate } from '../composables/useGenerate'
-import { useJobStore } from '../stores/jobStore'
 
 const RECENT_LIMIT = 6
 const { projects, loading, error, reload } = useProjects(() => ({ limit: RECENT_LIMIT }))
-const { url, language, submitting, LANGUAGES, onGenerate } = useGenerate()
-const jobStore = useJobStore()
+const { url, language, submitting, error: generateError, LANGUAGES, onGenerate } = useGenerate()
 </script>
 
 <style scoped>

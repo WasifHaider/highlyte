@@ -143,5 +143,12 @@ async function onLogout() {
   .brand-group { gap: 12px; }
   .brand-label { display: none; }
   .tab { padding: 0 8px; font-size: 12.5px; }
+  /* An admin with a long team name must still fit: brand mark (28) + gap (12)
+     + Home/Projects/Team tabs (~46 + 75 + 46 with 4px gaps = ~175) = ~215,
+     + topbar-inner gap (8) + account button (padding 8+8 + label 64 + icon
+     14 + btn gap 6 + border 2 = ~102) = ~325px, inside the 343px available
+     at a 375px viewport (375 - 2*16 .topbar padding). */
+  .account .btn { padding: 0 8px; }
+  .account-label { max-width: 64px; }
 }
 </style>

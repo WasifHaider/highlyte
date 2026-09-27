@@ -14,21 +14,27 @@ export function useGenerate() {
   const url = ref('')
   const language = ref('hinglish')
   const submitting = ref(false)
+  // Own error state so the Home hero never shows a stale jobStore.error left
+  // behind by a different page (e.g. JobView never clears jobStore.error).
+  const error = ref(null)
   const router = useRouter()
   const jobStore = useJobStore()
 
   async function onGenerate() {
     if (!url.value || submitting.value) return
     submitting.value = true
+    error.value = null
     try {
       const jobId = await jobStore.submitUrl(url.value, language.value)
       router.push({ name: 'job', params: { id: jobId } })
     } catch (e) {
-      jobStore.error = e?.message || 'Failed to start job'
+      const message = e?.message || 'Failed to start job'
+      error.value = message
+      jobStore.error = message
     } finally {
       submitting.value = false
     }
   }
 
-  return { url, language, submitting, LANGUAGES, onGenerate }
+  return { url, language, submitting, error, LANGUAGES, onGenerate }
 }
