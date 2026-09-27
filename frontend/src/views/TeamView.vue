@@ -37,7 +37,7 @@
       <h2 class="section-title">Add a user</h2>
       <form class="add-user" @submit.prevent="add">
         <label class="field">
-          <span class="field-label">Email</span>
+          <span class="field-label">Add a user by email</span>
           <input v-model.trim="newEmail" type="email" class="input" placeholder="name@company.com" required />
         </label>
         <button type="submit" class="btn btn-primary" :disabled="adding">{{ adding ? 'Adding…' : 'Add user' }}</button>
