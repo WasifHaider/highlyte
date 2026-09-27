@@ -1,13 +1,14 @@
 <template>
   <div class="captions-edit">
+    <div class="captions-header">
+      <span class="field-label">Captions</span>
+      <span v-if="edited" class="status faint">Edited</span>
+    </div>
+
     <button v-if="!open" class="btn btn-secondary btn-sm" @click="start">Edit captions</button>
     <button v-if="!open && edited" class="btn btn-ghost btn-sm" :disabled="busy" @click="reset">Reset to original</button>
 
     <template v-if="open">
-      <div class="captions-header">
-        <span class="field-label">Captions</span>
-        <span class="status faint">{{ edited ? 'Edited' : 'Approx. sync' }}</span>
-      </div>
       <div class="lines">
         <label v-for="line in lines" :key="line.index" class="line">
           <span class="time faint tabular mono">{{ clock(line.start - (props.start ?? 0)) }}</span>
@@ -151,7 +152,7 @@ async function reset() {
 .row { display: flex; gap: 8px; margin-top: 4px; }
 .lines { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; padding-right: 4px; }
 .line { display: flex; align-items: center; gap: 8px; }
-.time { width: 40px; flex-shrink: 0; padding-top: 6px; }
+.time { width: 40px; flex-shrink: 0; }
 .mono { font-family: monospace; }
 .line .input { flex: 1; min-width: 0; height: 28px; padding: 0 8px; font-size: 13px; }
 .btn-save {

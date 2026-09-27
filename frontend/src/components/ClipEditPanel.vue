@@ -59,7 +59,7 @@
         <hr class="divider" />
 
         <div :class="{ 'controls-disabled': clip.pendingAction }">
-          <CaptionEditor :clip-id="clip.id" :words="clip.spec.words" :edited="!!clip.captionsEdited"
+          <CaptionEditor :key="clip.id" :clip-id="clip.id" :words="clip.spec.words" :edited="!!clip.captionsEdited"
             :start="clip.spec.version === 2 ? clip.spec.start : null" :end="clip.spec.version === 2 ? clip.spec.end : null"
             :revision="clip.revision || 0" :pending="!!clip.pendingAction"
             @draft="w => jobStore.setCaptionDraft(clip.id, w)" />
@@ -70,7 +70,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import CaptionEditor from './CaptionEditor.vue'
 import { LAYOUTS, PRESETS, layoutAllowed } from '../utils/clipStyle'
@@ -88,7 +88,16 @@ function onKeydown(e) {
   if (e.key === 'Escape' && jobStore.editingClipId) jobStore.closeEditor()
 }
 onMounted(() => window.addEventListener('keydown', onKeydown))
-onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown)
+  document.body.style.overflow = ''
+})
+
+// Below 1024px the panel is a full-screen sheet over the page, not a side
+// column, so the page behind it must not scroll while it's open.
+watch(clip, (value) => {
+  document.body.style.overflow = value && window.innerWidth < 1024 ? 'hidden' : ''
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -127,7 +136,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 @media (max-width: 1023px) {
   .edit-panel {
     position: fixed; inset: 0; top: 0; height: 100vh; width: 100%;
-    z-index: 35; border-left: none;
+    z-index: 60; border-left: none;
   }
 }
 </style>

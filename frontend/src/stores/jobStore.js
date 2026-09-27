@@ -137,6 +137,10 @@ export const useJobStore = defineStore('job', {
       this.selected[clipId] = !this.selected[clipId]
     },
     openEditor(clipId) {
+      // Switching to a different clip must not carry the previous clip's
+      // unsaved caption draft along: its preview would keep showing stale
+      // text, and a Save on the new clip would never touch it again.
+      if (this.editingClipId && this.editingClipId !== clipId) delete this.captionDrafts[this.editingClipId]
       this.editingClipId = clipId
     },
     closeEditor() {
