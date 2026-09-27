@@ -12,10 +12,13 @@
           <div class="panel-heading">
             <h2 id="edit-panel-title" class="panel-title">Edit clip</h2>
             <div class="panel-subtitle faint tabular">{{ clip.startLabel }}–{{ clip.endLabel }}</div>
-            <Transition name="fade">
-              <div v-if="saving" class="save-status faint" role="status">Saving…</div>
-              <div v-else-if="showSaved" class="save-status faint" role="status">Saved</div>
-            </Transition>
+            <div class="save-status faint" :class="{ danger: showSaved && saveFailed }" role="status">
+              <Transition name="fade" mode="out-in">
+                <span v-if="saving" key="saving">Saving…</span>
+                <span v-else-if="showSaved" key="result">{{ saveFailed ? 'Not saved' : 'Saved' }}</span>
+                <span v-else key="idle"></span>
+              </Transition>
+            </div>
           </div>
           <button ref="closeBtn" class="close-btn" @click="jobStore.closeEditor()" aria-label="Close edit panel">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -113,6 +116,7 @@ const closeBtn = ref(null)
 // the store's existing (debounced) save-tracking maps; purely additive, it
 // doesn't touch save behaviour.
 const saving = computed(() => !!clip.value && jobStore.savingClip(clip.value.id))
+const saveFailed = computed(() => !!clip.value && jobStore.clipSaveFailed(clip.value.id))
 const showSaved = ref(false)
 let savedTimer = null
 watch(saving, (isSaving, wasSaving) => {
@@ -201,7 +205,8 @@ watch(clip, (newClip, oldClip) => {
 .panel-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
 .panel-title { font-size: 15px; font-weight: 600; margin: 0; }
 .panel-subtitle { font-size: 12.5px; margin-top: 4px; }
-.save-status { font-size: 12px; margin-top: 4px; }
+.save-status { font-size: 12px; margin-top: 4px; min-height: 15px; }
+.save-status.danger { color: var(--danger); }
 .close-btn {
   border: none; background: transparent; color: var(--ink-faint); cursor: pointer; padding: 2px;
   display: inline-flex; align-items: center; justify-content: center;

@@ -53,11 +53,11 @@
       >{{ isEditing ? 'Editing' : 'Edit' }}</button>
 
       <div class="actions-row">
-        <button class="btn btn-secondary btn-sm action-btn" :disabled="swapDisabled || startingSwap" :title="swapTitle" @click="onSwap">
-          <UiSpinner v-if="startingSwap" size="12" />Swap scene
+        <button class="btn btn-secondary btn-sm" :disabled="swapDisabled || startingSwap" :title="swapTitle" @click="onSwap">
+          <BusyLabel :busy="startingSwap" idle="Swap scene" busy-text="Swap scene" spinner-size="12" />
         </button>
-        <button class="btn btn-secondary btn-sm action-btn" :disabled="regenerateDisabled || startingRegenerate" :title="regenerateTitle" @click="onRegenerate">
-          <UiSpinner v-if="startingRegenerate" size="12" />Regenerate
+        <button class="btn btn-secondary btn-sm" :disabled="regenerateDisabled || startingRegenerate" :title="regenerateTitle" @click="onRegenerate">
+          <BusyLabel :busy="startingRegenerate" idle="Regenerate" busy-text="Regenerate" spinner-size="12" />
         </button>
         <a class="btn-ghost srt-link" :href="clipSrtUrl(clip.id)" download>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 21h14"/></svg>
@@ -100,7 +100,7 @@ import { useJobStore } from '../stores/jobStore'
 import { clipDownloadUrl, clipSrtUrl } from '../services/highlyteApi'
 import RemotionPreview from './RemotionPreview.vue'
 import TrimControls from './TrimControls.vue'
-import UiSpinner from './ui/UiSpinner.vue'
+import BusyLabel from './ui/BusyLabel.vue'
 import { captionLines, lineText } from '@renderer/captions/edit'
 import { toClipTime } from '@renderer/lib/timeline'
 
@@ -203,7 +203,6 @@ async function onRegenerate() {
 .edit-btn { width: 100%; }
 .edit-btn.editing { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
 .actions-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.action-btn { min-width: 96px; }
 .srt-link {
   margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
   font-size: 12.5px; font-weight: 500; color: var(--ink-soft); text-decoration: none; padding: 4px 6px; border-radius: 6px;

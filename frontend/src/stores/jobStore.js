@@ -20,6 +20,10 @@ const queuedStyles = new Map() // clipId -> style to save when the timer fires
 const queuedBounds = new Map() // clipId -> {start, end} to save when the timer fires
 const styleSaves = new Map() // clipId -> Promise<void> of the save in flight
 const boundsSaves = new Map() // clipId -> Promise<string|null> (error message or null)
+// clipId -> true if the clip's most recent style/bounds save errored.
+// Cleared as soon as a new save is queued for that clip (the user editing
+// again clears the warning), set in the existing error paths below.
+const failedSaves = new Map()
 
 function track(saves, clipId, promise, onChange) {
   const p = promise.finally(() => {
@@ -72,6 +76,12 @@ export const useJobStore = defineStore('job', {
     savingClip: (state) => (clipId) => {
       state._saveActivityTick // register the reactive dependency
       return queuedStyles.has(clipId) || queuedBounds.has(clipId) || styleSaves.has(clipId) || boundsSaves.has(clipId)
+    },
+    // Whether the clip's most recent style/bounds save (not counting one
+    // queued since) ended in an error.
+    clipSaveFailed: (state) => (clipId) => {
+      state._saveActivityTick // register the reactive dependency
+      return !!failedSaves.get(clipId)
     },
   },
   actions: {
@@ -183,6 +193,7 @@ export const useJobStore = defineStore('job', {
       // Saving is debounced so typing in the hook title isn't a request per key.
       clearTimeout(this._styleTimers[clipId])
       queuedStyles.set(clipId, clip.style)
+      failedSaves.delete(clipId)
       this._bumpSaveActivity()
       this._styleTimers[clipId] = setTimeout(() => this._saveStyleNow(clipId), STYLE_SAVE_DELAY_MS)
     },
@@ -197,6 +208,7 @@ export const useJobStore = defineStore('job', {
       this._bumpSaveActivity()
       return track(styleSaves, clipId, saveClipStyle(clipId, style).then(() => {}, e => {
         this.error = e?.response?.data?.detail || 'Failed to save clip style'
+        failedSaves.set(clipId, true)
       }), () => this._bumpSaveActivity())
     },
     // Same for the trim; resolves to an error message, or null once saved.
@@ -210,6 +222,7 @@ export const useJobStore = defineStore('job', {
       return track(boundsSaves, clipId, apiSaveBounds(clipId, bounds).then(() => null, e => {
         const message = apiErrorMessage(e, 'Failed to save the trim')
         this.error = message
+        failedSaves.set(clipId, true)
         return message
       }), () => this._bumpSaveActivity())
     },
@@ -269,6 +282,7 @@ export const useJobStore = defineStore('job', {
       delete this.renders[clipId]
       clearTimeout(this._boundsTimers[clipId])
       queuedBounds.set(clipId, bounds)
+      failedSaves.delete(clipId)
       this._bumpSaveActivity()
       this._boundsTimers[clipId] = setTimeout(() => this._saveBoundsNow(clipId), BOUNDS_SAVE_DELAY_MS)
     },

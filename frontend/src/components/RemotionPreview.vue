@@ -29,10 +29,23 @@ const ready = ref(false)
 // happen before the viewer presses play. So whichever comes first wins: the
 // player's own first frameupdate, or two animation frames after mount (long
 // enough for React/Remotion's first paint, short enough not to look stuck).
+// The callback ref below re-fires on every draw() (a new inline function each
+// time, so React re-invokes it even for the same underlying instance), so
+// both the instance and the listener are tracked to detach cleanly instead of
+// piling up duplicate listeners.
+let playerInstance = null
 let firstFrameListener = null
+
+function detachFrameListener() {
+  if (playerInstance && firstFrameListener) {
+    playerInstance.removeEventListener('frameupdate', firstFrameListener)
+  }
+  firstFrameListener = null
+}
 
 function markReady() {
   ready.value = true
+  detachFrameListener()
 }
 
 // React must receive plain objects, not Vue's reactive proxies.
@@ -52,10 +65,11 @@ function draw() {
     acknowledgeRemotionLicense: true,
     style: { width: '100%' },
     ref: (instance) => {
-      if (instance && !firstFrameListener) {
-        firstFrameListener = () => markReady()
-        instance.addEventListener('frameupdate', firstFrameListener)
-      }
+      if (!instance) return
+      playerInstance = instance
+      if (ready.value || firstFrameListener) return
+      firstFrameListener = () => markReady()
+      instance.addEventListener('frameupdate', firstFrameListener)
     },
   }))
 }
@@ -67,6 +81,7 @@ onMounted(() => {
 })
 watch(() => [props.spec, props.clipStyle], draw, { deep: true })
 onBeforeUnmount(() => {
+  detachFrameListener()
   root?.unmount()
   root = null
 })

@@ -37,8 +37,7 @@
             >{{ opt.label }}</button>
           </div>
           <button class="btn btn-primary link-generate" :disabled="submitting || !url" @click="onGenerate">
-            <UiSpinner v-if="submitting" size="13" />
-            {{ submitting ? 'Starting…' : 'Generate' }}
+            <BusyLabel :busy="submitting" idle="Generate" busy-text="Starting…" />
           </button>
         </div>
         <div class="account">
@@ -64,7 +63,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useGenerate } from '../composables/useGenerate'
 import { useAuthStore } from '../stores/authStore'
 import { useJobStore } from '../stores/jobStore'
-import UiSpinner from './ui/UiSpinner.vue'
+import BusyLabel from './ui/BusyLabel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -139,7 +138,7 @@ async function onLogout() {
   flex-shrink: 0; align-items: center; height: 36px; border-radius: 0; border-left: 0; border-right: 0;
 }
 .linkgroup .segmented button { height: 30px; }
-.link-generate { flex-shrink: 0; height: 36px; min-width: 96px; border-radius: 0 var(--radius) var(--radius) 0; }
+.link-generate { flex-shrink: 0; height: 36px; border-radius: 0 var(--radius) var(--radius) 0; }
 .link-generate:disabled { opacity: 1; background: var(--accent); color: rgba(255,255,255,.7); }
 .account { position: relative; flex-shrink: 0; }
 .account-menu {

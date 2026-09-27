@@ -37,9 +37,8 @@
               <p class="sf-title">Clip selection didn't finish</p>
               <p class="sf-msg">{{ jobStore.job.error }}</p>
               <p class="sf-sub">The transcript is saved, so a retry skips the download and transcription.</p>
-              <button class="btn btn-primary retry-btn" :disabled="retrying" @click="onRetry">
-                <UiSpinner v-if="retrying" size="13" />
-                {{ retrying ? 'Retrying…' : 'Retry selection' }}
+              <button class="btn btn-primary" :disabled="retrying" @click="onRetry">
+                <BusyLabel :busy="retrying" idle="Retry selection" busy-text="Retrying…" />
               </button>
             </div>
           </Transition>
@@ -70,7 +69,7 @@ import ClipList from '../components/ClipList.vue'
 import ExportBar from '../components/ExportBar.vue'
 import ClipEditPanel from '../components/ClipEditPanel.vue'
 import SkeletonCard from '../components/ui/SkeletonCard.vue'
-import UiSpinner from '../components/ui/UiSpinner.vue'
+import BusyLabel from '../components/ui/BusyLabel.vue'
 
 const props = defineProps({ id: { type: String, required: true } })
 const jobStore = useJobStore()
@@ -139,7 +138,6 @@ watch(() => props.id, (newId) => startForId(newId))
 .sf-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
 .sf-msg { margin: 0; font-size: 14px; color: var(--ink-soft); }
 .sf-sub { margin: 0 0 8px; font-size: 12.5px; color: var(--ink-faint); }
-.retry-btn { min-width: 140px; }
 .selection-note { margin: 0 0 32px; display: inline-block; }
 .job-layout { display: flex; }
 /* While a clip is being edited, keep the clips column where it was and let

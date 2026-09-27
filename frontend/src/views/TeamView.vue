@@ -47,9 +47,8 @@
           <span class="field-label">Add a user by email</span>
           <input v-model.trim="newEmail" type="email" class="input" placeholder="name@company.com" required />
         </label>
-        <button type="submit" class="btn btn-primary add-user-btn" :disabled="adding">
-          <UiSpinner v-if="adding" size="13" />
-          {{ adding ? 'Adding…' : 'Add user' }}
+        <button type="submit" class="btn btn-primary" :disabled="adding">
+          <BusyLabel :busy="adding" idle="Add user" busy-text="Adding…" />
         </button>
       </form>
       <Transition name="fade">
@@ -79,7 +78,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '../stores/authStore'
 import { addTeamUser, apiErrorMessage, listTeamUsers, removeTeamUser } from '../services/highlyteApi'
 import { relativeTime } from '../utils/time'
-import UiSpinner from '../components/ui/UiSpinner.vue'
+import BusyLabel from '../components/ui/BusyLabel.vue'
 
 const COPIED_MESSAGE_MS = 2000
 const TEAM_SKELETON_ROWS = 3
@@ -175,7 +174,6 @@ onUnmounted(() => clearTimeout(copiedTimer))
 .add-user { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 16px; }
 .field { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 5px; }
 .field .input { width: 100%; }
-.add-user-btn { min-width: 96px; }
 
 .danger-note { margin-top: 10px; }
 

@@ -24,9 +24,8 @@
               @click="language = opt.value"
             >{{ opt.label }}</button>
           </div>
-          <button class="btn btn-primary hero-generate" :disabled="submitting || !url" @click="onGenerate">
-            <UiSpinner v-if="submitting" size="13" />
-            {{ submitting ? 'Starting…' : 'Generate' }}
+          <button class="btn btn-primary" :disabled="submitting || !url" @click="onGenerate">
+            <BusyLabel :busy="submitting" idle="Generate" busy-text="Starting…" />
           </button>
         </div>
       </div>
@@ -56,7 +55,7 @@
 <script setup>
 import ProjectCard from '../components/ProjectCard.vue'
 import SkeletonCard from '../components/ui/SkeletonCard.vue'
-import UiSpinner from '../components/ui/UiSpinner.vue'
+import BusyLabel from '../components/ui/BusyLabel.vue'
 import { useProjects } from '../composables/useProjects'
 import { useGenerate } from '../composables/useGenerate'
 
@@ -78,7 +77,6 @@ const { url, language, submitting, error: generateError, LANGUAGES, onGenerate }
 }
 .hero-input { width: 100%; }
 .hero-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.hero-generate { min-width: 96px; }
 .hero-error { max-width: 560px; margin: 12px auto 0; text-align: left; }
 
 .recent { margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--border); }

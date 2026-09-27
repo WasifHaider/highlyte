@@ -16,8 +16,7 @@
       </label>
       <div v-if="error" class="danger-note" role="alert">{{ error }}</div>
       <button type="submit" class="btn btn-primary" :disabled="busy">
-        <UiSpinner v-if="busy" size="13" />
-        {{ busy ? 'Logging in…' : 'Log in' }}
+        <BusyLabel :busy="busy" idle="Log in" busy-text="Logging in…" />
       </button>
       <p class="note">Users: ask your team admin for your login.</p>
       <p class="switch">New team? <router-link to="/signup">Create a team</router-link></p>
@@ -32,7 +31,7 @@ import '../styles/auth.css'
 import { useAuthStore } from '../stores/authStore'
 import { apiErrorMessage } from '../services/highlyteApi'
 import { safeNext } from '../utils/authRedirect'
-import UiSpinner from '../components/ui/UiSpinner.vue'
+import BusyLabel from '../components/ui/BusyLabel.vue'
 
 const route = useRoute()
 const router = useRouter()
