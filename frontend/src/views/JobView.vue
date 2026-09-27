@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <div class="page" :class="{ editing: !!jobStore.editingClipId }">
     <div class="job-layout">
       <div class="job-main">
         <div v-if="jobStore.error" class="danger-note">{{ jobStore.error }}</div>
@@ -108,5 +108,17 @@ watch(() => props.id, (newId) => startForId(newId))
 .sf-sub { margin: 0 0 8px; font-size: 12.5px; color: var(--ink-faint); }
 .selection-note { margin: 0 0 32px; display: inline-block; }
 .job-layout { display: flex; }
+/* While a clip is being edited, keep the clips column where it was and let
+   the edit panel take the space to its right, out to the window edge,
+   instead of squeezing the column from inside the centred 1120px page. */
+@media (min-width: 1024px) {
+  .page.editing {
+    max-width: none;
+    margin-left: max(0px, calc((100% - 1120px) / 2));
+    margin-right: 0;
+    padding-right: 0;
+  }
+  .page.editing .job-main { max-width: 1072px; }
+}
 .job-main { flex: 1; min-width: 0; }
 </style>
