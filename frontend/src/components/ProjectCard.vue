@@ -1,5 +1,5 @@
 <template>
-  <router-link :to="{ name: 'job', params: { id: project.id } }" class="card project-card">
+  <router-link :to="{ name: 'job', params: { id: project.id } }" class="card card-interactive project-card">
     <div class="thumb">
       <img v-if="project.thumbnailUrl && !imgFailed" :src="project.thumbnailUrl" alt="" loading="lazy" @error="imgFailed = true" />
       <div v-else class="thumb-placeholder" aria-hidden="true"><span class="play"></span></div>
@@ -13,10 +13,15 @@
           <span class="chip">Processing</span>
           <span class="note muted">{{ project.progress?.note || '' }}</span>
         </template>
-        <span v-else-if="project.status === 'done'" class="chip">
+        <span v-else-if="project.status === 'done'" class="chip chip-accent">
           Done · {{ project.clipCount }} clip{{ project.clipCount === 1 ? '' : 's' }}
         </span>
-        <span v-else class="chip chip-warning" :title="project.error || ''">{{ project.status === 'selection_failed' ? 'Needs retry' : 'Failed' }}</span>
+        <span
+          v-else
+          class="chip"
+          :class="project.status === 'selection_failed' ? 'chip-warning' : 'chip-danger'"
+          :title="project.error || ''"
+        >{{ project.status === 'selection_failed' ? 'Needs retry' : 'Failed' }}</span>
         <span class="time faint tabular">{{ relativeTime(project.createdAt) }}</span>
       </div>
       <div v-if="processing && project.progress?.percent != null" class="progress-bar">

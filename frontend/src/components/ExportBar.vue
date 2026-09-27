@@ -60,6 +60,7 @@ const zipUrl = computed(() => {
 .zip-short { display: none; }
 .export-btn { height: 32px; border-radius: 999px; padding: 0 16px; white-space: nowrap; }
 @media (max-width: 480px) {
+  .export-pill { gap: 10px; padding: 10px 12px; }
   .zip-full { display: none; }
   .zip-short { display: inline; }
   .selection-label { overflow: hidden; text-overflow: ellipsis; }

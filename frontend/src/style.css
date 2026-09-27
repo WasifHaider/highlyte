@@ -75,9 +75,10 @@ a { color: var(--accent); }
 }
 .chip-warning { background: var(--warning-soft); color: var(--warning); }
 .chip-accent { background: var(--accent-soft); color: var(--accent); }
+.chip-danger { background: var(--danger-soft); color: var(--danger); }
 
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); transition: border-color var(--ease); }
-.card:hover { border-color: var(--ink-faint); }
+.card-interactive:hover { border-color: var(--ink-faint); }
 
 .segmented { display: inline-flex; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius); padding: 2px; gap: 2px; }
 .segmented button {

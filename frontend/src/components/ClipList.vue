@@ -1,13 +1,28 @@
 <template>
   <div>
     <div class="grid-header">
-      <div class="select-all" @click="jobStore.toggleSelectAll()">
+      <div
+        class="select-all"
+        role="checkbox"
+        :aria-checked="jobStore.allSelected"
+        tabindex="0"
+        aria-label="Select all"
+        @click="jobStore.toggleSelectAll()"
+        @keydown.space.prevent="jobStore.toggleSelectAll()"
+        @keydown.enter.prevent="jobStore.toggleSelectAll()"
+      >
         <div class="checkbox" :class="{ checked: jobStore.allSelected }">
           <svg v-if="jobStore.allSelected" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
         </div>
         <span class="header-title">Highlights</span>
       </div>
-      <button v-if="hasVerticalClips" class="btn btn-ghost btn-sm" @click="showStyleAll = !showStyleAll">Style all</button>
+      <button
+        v-if="hasVerticalClips"
+        class="btn btn-ghost btn-sm style-all-btn"
+        :class="{ open: showStyleAll }"
+        :aria-expanded="showStyleAll"
+        @click="showStyleAll = !showStyleAll"
+      >Style all</button>
     </div>
 
     <StyleAllBar v-if="showStyleAll" />
@@ -45,6 +60,7 @@ const showStyleAll = ref(false)
 }
 .checkbox.checked { background: var(--accent); border-color: var(--accent); }
 .header-title { font-size: 14px; font-weight: 600; }
+.style-all-btn.open { background: var(--accent-soft); color: var(--accent-text); }
 .clip-grid {
   display: grid; gap: 24px; grid-template-columns: repeat(3, minmax(0, 1fr));
 }

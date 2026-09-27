@@ -140,7 +140,10 @@ onUnmounted(() => clearTimeout(copiedTimer))
 .page { max-width: 760px; }
 .page-head .sub { margin: 6px 0 0; }
 .section { margin-top: 40px; }
-.section:first-of-type { margin-top: 32px; }
+/* .section:first-of-type never matched: .page-head is the first div sibling,
+   so no .section div is ever :first-of-type. Target the section that
+   actually comes right after the page head instead. */
+.page-head + .section { margin-top: 32px; }
 
 .members { width: 100%; border-collapse: collapse; margin-top: 16px; }
 .members th {

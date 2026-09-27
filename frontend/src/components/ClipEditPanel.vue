@@ -1,12 +1,18 @@
 <template>
-  <aside v-if="clip && clip.spec" class="edit-panel">
+  <aside
+    v-if="clip && clip.spec"
+    class="edit-panel"
+    aria-labelledby="edit-panel-title"
+    :role="isMobile ? 'dialog' : undefined"
+    :aria-modal="isMobile ? 'true' : undefined"
+  >
     <div class="panel-inner">
       <div class="panel-header">
         <div class="panel-heading">
-          <h2 class="panel-title">Edit clip</h2>
+          <h2 id="edit-panel-title" class="panel-title">Edit clip</h2>
           <div class="panel-subtitle faint tabular">{{ clip.startLabel }}–{{ clip.endLabel }}</div>
         </div>
-        <button class="close-btn" @click="jobStore.closeEditor()" aria-label="Close edit panel">
+        <button ref="closeBtn" class="close-btn" @click="jobStore.closeEditor()" aria-label="Close edit panel">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
@@ -70,7 +76,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import CaptionEditor from './CaptionEditor.vue'
 import { LAYOUTS, PRESETS, layoutAllowed } from '../utils/clipStyle'
@@ -79,6 +85,7 @@ import { toClipTime } from '@renderer/lib/timeline'
 const jobStore = useJobStore()
 const clip = computed(() => jobStore.clips.find(c => c.id === jobStore.editingClipId))
 const clipTime = computed(() => toClipTime(clip.value.spec))
+const closeBtn = ref(null)
 
 function set(patch) {
   jobStore.updateStyle(clip.value.id, patch)
@@ -93,21 +100,40 @@ function onKeydown(e) {
 // a media query listener (not just a clip watcher) so resizing the viewport
 // across the breakpoint while the sheet is open updates the lock too.
 const mobileSheetQuery = window.matchMedia('(max-width: 1023px)')
+const isMobile = ref(mobileSheetQuery.matches)
 function updateScrollLock() {
   document.body.style.overflow = clip.value && mobileSheetQuery.matches ? 'hidden' : ''
 }
+function updateIsMobile() {
+  isMobile.value = mobileSheetQuery.matches
+}
+
+// The triggering Edit button (ClipCard) is whatever had focus right before
+// the panel opened; storing it here lets close() hand focus back to it.
+let previouslyFocused = null
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   mobileSheetQuery.addEventListener('change', updateScrollLock)
+  mobileSheetQuery.addEventListener('change', updateIsMobile)
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
   mobileSheetQuery.removeEventListener('change', updateScrollLock)
+  mobileSheetQuery.removeEventListener('change', updateIsMobile)
   document.body.style.overflow = ''
 })
 
-watch(clip, updateScrollLock, { immediate: true })
+watch(clip, (newClip, oldClip) => {
+  updateScrollLock()
+  if (newClip && !oldClip) {
+    previouslyFocused = document.activeElement
+    nextTick(() => closeBtn.value?.focus())
+  } else if (!newClip && oldClip) {
+    previouslyFocused?.focus?.()
+    previouslyFocused = null
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -145,7 +171,8 @@ watch(clip, updateScrollLock, { immediate: true })
 
 @media (max-width: 1023px) {
   .edit-panel {
-    position: fixed; inset: 0; top: 0; height: 100vh; width: 100%;
+    position: fixed; inset: 0; top: 0; width: 100%;
+    height: 100vh; height: 100dvh;
     z-index: 60; border-left: none;
   }
 }

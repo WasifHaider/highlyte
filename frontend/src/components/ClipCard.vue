@@ -1,5 +1,5 @@
 <template>
-  <div class="card clip-card" :class="{ editing: isEditing }">
+  <div class="card card-interactive clip-card" :class="{ editing: isEditing }">
     <div class="preview">
       <RemotionPreview v-if="clip.spec" :spec="previewSpec" :clip-style="clip.style" />
       <div v-else class="no-preview">No vertical preview for this clip. Re-run the video to generate one.</div>
@@ -13,7 +13,17 @@
       <TrimControls v-if="clip.spec" :clip="clip" />
 
       <div class="meta-row">
-        <div class="checkbox" :class="{ checked: isSelected }" @click="$emit('toggle')">
+        <div
+          class="checkbox"
+          :class="{ checked: isSelected }"
+          role="checkbox"
+          :aria-checked="isSelected"
+          tabindex="0"
+          aria-label="Select clip"
+          @click="$emit('toggle')"
+          @keydown.space.prevent="$emit('toggle')"
+          @keydown.enter.prevent="$emit('toggle')"
+        >
           <svg v-if="isSelected" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
         </div>
         <span class="clip-range tabular">{{ clip.startLabel }}–{{ clip.endLabel }}</span>
@@ -35,6 +45,7 @@
         v-if="clip.spec"
         class="btn btn-secondary btn-sm edit-btn"
         :class="{ editing: isEditing }"
+        :aria-pressed="isEditing"
         :disabled="!!clip.pendingAction"
         @click="toggleEdit"
       >{{ isEditing ? 'Editing' : 'Edit' }}</button>

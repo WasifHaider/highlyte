@@ -97,6 +97,7 @@ watch(() => props.id, (newId) => startForId(newId))
 </script>
 
 <style scoped>
+.danger-note { margin-bottom: 24px; }
 .lang-note { margin: 12px 0 0; display: inline-block; }
 .selection-failed {
   margin-top: 24px; padding: 20px;

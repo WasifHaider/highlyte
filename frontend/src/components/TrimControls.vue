@@ -6,7 +6,14 @@
         <span class="trim-title">TRIM</span>
         <span class="trim-header-right">
           <span class="trim-length tabular">{{ lengthLabel }}</span>
-          <a v-if="clip.boundsEdited" class="trim-reset" :class="{ disabled }" @click="!disabled && reset()">Reset</a>
+          <button
+            v-if="clip.boundsEdited"
+            type="button"
+            class="trim-reset"
+            :class="{ disabled }"
+            :disabled="disabled"
+            @click="reset()"
+          >Reset</button>
         </span>
       </div>
       <div class="trim-row">
@@ -79,7 +86,10 @@ function reset() {
 .trim-title { font-size: 11px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); }
 .trim-header-right { display: flex; align-items: center; gap: 8px; }
 .trim-length { font-size: 12px; color: var(--ink); }
-.trim-reset { font-size: 12px; color: var(--accent); font-weight: 600; cursor: pointer; }
+.trim-reset {
+  font: 600 12px var(--font-sans); color: var(--accent); cursor: pointer;
+  background: none; border: none; padding: 0;
+}
 .trim-reset.disabled { opacity: .5; cursor: default; pointer-events: none; }
 .trim-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .trim-label { font-size: 11.5px; color: var(--ink-faint); width: 36px; flex-shrink: 0; }
