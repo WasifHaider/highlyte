@@ -7,8 +7,7 @@
 
     <div class="section">
       <h2 class="section-title">Team members</h2>
-      <div v-if="loading" class="state-msg">Loading…</div>
-      <div v-else-if="listError" class="state-msg error">{{ listError }}</div>
+      <div v-if="listError" class="state-msg error">{{ listError }}</div>
       <table v-else class="members">
         <thead>
           <tr>
@@ -18,7 +17,15 @@
             <th class="col-action"></th>
           </tr>
         </thead>
-        <TransitionGroup name="rise" tag="tbody">
+        <tbody v-if="loading" aria-busy="true">
+          <tr v-for="i in TEAM_SKELETON_ROWS" :key="i" class="skeleton-row">
+            <td><div class="bar skeleton bar-email"></div></td>
+            <td><div class="bar skeleton bar-chip"></div></td>
+            <td><div class="bar skeleton bar-date"></div></td>
+            <td class="col-action"></td>
+          </tr>
+        </tbody>
+        <TransitionGroup v-else name="rise" tag="tbody">
           <tr v-for="u in users" :key="u.id">
             <td class="cell-email" data-label="Email">{{ u.email }}</td>
             <td data-label="Role">
@@ -40,7 +47,10 @@
           <span class="field-label">Add a user by email</span>
           <input v-model.trim="newEmail" type="email" class="input" placeholder="name@company.com" required />
         </label>
-        <button type="submit" class="btn btn-primary" :disabled="adding">{{ adding ? 'Adding…' : 'Add user' }}</button>
+        <button type="submit" class="btn btn-primary add-user-btn" :disabled="adding">
+          <UiSpinner v-if="adding" size="13" />
+          {{ adding ? 'Adding…' : 'Add user' }}
+        </button>
       </form>
       <Transition name="fade">
         <div v-if="addError" class="danger-note" role="alert">{{ addError }}</div>
@@ -69,8 +79,10 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '../stores/authStore'
 import { addTeamUser, apiErrorMessage, listTeamUsers, removeTeamUser } from '../services/highlyteApi'
 import { relativeTime } from '../utils/time'
+import UiSpinner from '../components/ui/UiSpinner.vue'
 
 const COPIED_MESSAGE_MS = 2000
+const TEAM_SKELETON_ROWS = 3
 
 const auth = useAuthStore()
 const users = ref([])
@@ -163,6 +175,7 @@ onUnmounted(() => clearTimeout(copiedTimer))
 .add-user { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 16px; }
 .field { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 5px; }
 .field .input { width: 100%; }
+.add-user-btn { min-width: 96px; }
 
 .danger-note { margin-top: 10px; }
 
@@ -176,6 +189,11 @@ onUnmounted(() => clearTimeout(copiedTimer))
 
 .state-msg { font-size: 13.5px; color: var(--ink-soft); padding: 24px 0; }
 .state-msg.error { color: var(--danger); }
+.skeleton-row td { vertical-align: middle; }
+.bar { height: 14px; border-radius: 6px; }
+.bar-email { width: 170px; }
+.bar-chip { width: 50px; height: 20px; border-radius: 999px; }
+.bar-date { width: 80px; }
 
 @media (max-width: 480px) {
   .members thead { display: none; }

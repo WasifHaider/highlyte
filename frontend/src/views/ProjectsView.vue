@@ -18,9 +18,11 @@
       </div>
     </div>
 
-    <div v-if="loading" class="muted state-msg">Loading…</div>
-    <div v-else-if="error" class="muted state-msg">
+    <div v-if="error" class="muted state-msg">
       {{ error }} <button class="btn btn-ghost btn-sm" @click="reload">Retry</button>
+    </div>
+    <div v-else-if="loading" class="grid" aria-busy="true">
+      <SkeletonCard v-for="i in PROJECTS_SKELETON_COUNT" :key="i" variant="project" />
     </div>
     <div v-else-if="projects.length === 0 && filtered" class="muted state-msg">No projects match.</div>
     <div v-else-if="projects.length === 0" class="empty-state">
@@ -36,8 +38,10 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue'
 import ProjectCard from '../components/ProjectCard.vue'
+import SkeletonCard from '../components/ui/SkeletonCard.vue'
 import { useProjects } from '../composables/useProjects'
 
+const PROJECTS_SKELETON_COUNT = 6
 const STATUS_TABS = [
   { value: '', label: 'All' },
   { value: 'processing', label: 'Processing' },

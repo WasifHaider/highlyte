@@ -53,8 +53,12 @@
       >{{ isEditing ? 'Editing' : 'Edit' }}</button>
 
       <div class="actions-row">
-        <button class="btn btn-secondary btn-sm" :disabled="swapDisabled" :title="swapTitle" @click="jobStore.swapClip(clip.id)">Swap scene</button>
-        <button class="btn btn-secondary btn-sm" :disabled="regenerateDisabled" :title="regenerateTitle" @click="jobStore.regenerateClip(clip.id)">Regenerate</button>
+        <button class="btn btn-secondary btn-sm action-btn" :disabled="swapDisabled || startingSwap" :title="swapTitle" @click="onSwap">
+          <UiSpinner v-if="startingSwap" size="12" />Swap scene
+        </button>
+        <button class="btn btn-secondary btn-sm action-btn" :disabled="regenerateDisabled || startingRegenerate" :title="regenerateTitle" @click="onRegenerate">
+          <UiSpinner v-if="startingRegenerate" size="12" />Regenerate
+        </button>
         <a class="btn-ghost srt-link" :href="clipSrtUrl(clip.id)" download>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 21h14"/></svg>
           SRT
@@ -91,11 +95,12 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import { clipDownloadUrl, clipSrtUrl } from '../services/highlyteApi'
 import RemotionPreview from './RemotionPreview.vue'
 import TrimControls from './TrimControls.vue'
+import UiSpinner from './ui/UiSpinner.vue'
 import { captionLines, lineText } from '@renderer/captions/edit'
 import { toClipTime } from '@renderer/lib/timeline'
 
@@ -139,6 +144,28 @@ function toggleEdit() {
   if (isEditing.value) jobStore.closeEditor()
   else jobStore.openEditor(props.clip.id)
 }
+
+// Shows a spinner for the brief window between the click and the store
+// setting clip.pendingAction (the request that starts the replace), on top
+// of the store's own pendingAction overlay that covers the rest of it.
+const startingSwap = ref(false)
+const startingRegenerate = ref(false)
+async function onSwap() {
+  startingSwap.value = true
+  try {
+    await jobStore.swapClip(props.clip.id)
+  } finally {
+    startingSwap.value = false
+  }
+}
+async function onRegenerate() {
+  startingRegenerate.value = true
+  try {
+    await jobStore.regenerateClip(props.clip.id)
+  } finally {
+    startingRegenerate.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -176,6 +203,7 @@ function toggleEdit() {
 .edit-btn { width: 100%; }
 .edit-btn.editing { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
 .actions-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.action-btn { min-width: 96px; }
 .srt-link {
   margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
   font-size: 12.5px; font-weight: 500; color: var(--ink-soft); text-decoration: none; padding: 4px 6px; border-radius: 6px;

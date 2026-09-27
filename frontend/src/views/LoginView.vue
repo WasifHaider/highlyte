@@ -15,7 +15,10 @@
         <input v-model="password" type="password" class="input" autocomplete="current-password" required />
       </label>
       <div v-if="error" class="danger-note" role="alert">{{ error }}</div>
-      <button type="submit" class="btn btn-primary" :disabled="busy">{{ busy ? 'Logging in…' : 'Log in' }}</button>
+      <button type="submit" class="btn btn-primary" :disabled="busy">
+        <UiSpinner v-if="busy" size="13" />
+        {{ busy ? 'Logging in…' : 'Log in' }}
+      </button>
       <p class="note">Users: ask your team admin for your login.</p>
       <p class="switch">New team? <router-link to="/signup">Create a team</router-link></p>
     </form>
@@ -29,6 +32,7 @@ import '../styles/auth.css'
 import { useAuthStore } from '../stores/authStore'
 import { apiErrorMessage } from '../services/highlyteApi'
 import { safeNext } from '../utils/authRedirect'
+import UiSpinner from '../components/ui/UiSpinner.vue'
 
 const route = useRoute()
 const router = useRouter()

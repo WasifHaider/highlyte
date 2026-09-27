@@ -18,7 +18,10 @@
           </label>
         </div>
         <div class="row">
-          <button class="btn-save" :disabled="busy || saveDisabled" @click="save">{{ busy ? 'Saving…' : 'Save changes' }}</button>
+          <button class="btn-save" :disabled="busy || saveDisabled" @click="save">
+            <UiSpinner v-if="busy" size="13" />
+            {{ busy ? 'Saving…' : 'Save changes' }}
+          </button>
           <button class="btn btn-ghost btn-sm" :disabled="busy" @click="cancel">Cancel</button>
         </div>
       </div>
@@ -33,6 +36,7 @@
 import { computed, ref, watch } from 'vue'
 import { captionLines, editLine, lineText } from '@renderer/captions/edit'
 import { useJobStore } from '../stores/jobStore'
+import UiSpinner from './ui/UiSpinner.vue'
 
 const props = defineProps({
   clipId: { type: String, required: true },
@@ -164,6 +168,7 @@ async function reset() {
 .line .input { flex: 1; min-width: 0; height: 28px; padding: 0 8px; font-size: 13px; }
 .btn-save {
   flex: 1; height: 32px; border: none; border-radius: var(--radius); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   background: var(--accent-soft); color: var(--accent-text); font: 600 12.5px var(--font-sans);
 }
 .btn-save:disabled { opacity: .6; cursor: default; }

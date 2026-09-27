@@ -12,6 +12,10 @@
           <div class="panel-heading">
             <h2 id="edit-panel-title" class="panel-title">Edit clip</h2>
             <div class="panel-subtitle faint tabular">{{ clip.startLabel }}–{{ clip.endLabel }}</div>
+            <Transition name="fade">
+              <div v-if="saving" class="save-status faint" role="status">Saving…</div>
+              <div v-else-if="showSaved" class="save-status faint" role="status">Saved</div>
+            </Transition>
           </div>
           <button ref="closeBtn" class="close-btn" @click="jobStore.closeEditor()" aria-label="Close edit panel">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -98,10 +102,33 @@ import UiColorField from './ui/UiColorField.vue'
 import { LAYOUTS, PRESETS, layoutAllowed } from '../utils/clipStyle'
 import { toClipTime } from '@renderer/lib/timeline'
 
+const SAVED_MESSAGE_MS = 1500
+
 const jobStore = useJobStore()
 const clip = computed(() => jobStore.clips.find(c => c.id === jobStore.editingClipId))
 const clipTime = computed(() => toClipTime(clip.value.spec))
 const closeBtn = ref(null)
+
+// Quiet "Saving…"/"Saved" feedback for style and trim changes, derived from
+// the store's existing (debounced) save-tracking maps; purely additive, it
+// doesn't touch save behaviour.
+const saving = computed(() => !!clip.value && jobStore.savingClip(clip.value.id))
+const showSaved = ref(false)
+let savedTimer = null
+watch(saving, (isSaving, wasSaving) => {
+  clearTimeout(savedTimer)
+  if (!isSaving && wasSaving) {
+    showSaved.value = true
+    savedTimer = setTimeout(() => { showSaved.value = false }, SAVED_MESSAGE_MS)
+  } else {
+    showSaved.value = false
+  }
+})
+// A different clip's save state must not leak "Saved" onto the newly opened one.
+watch(clip, () => {
+  clearTimeout(savedTimer)
+  showSaved.value = false
+})
 
 const layoutOptions = computed(() => LAYOUTS.map(l => ({
   value: l.value,
@@ -149,6 +176,7 @@ onUnmounted(() => {
   mobileSheetQuery.removeEventListener('change', updateScrollLock)
   mobileSheetQuery.removeEventListener('change', updateIsMobile)
   document.body.style.overflow = ''
+  clearTimeout(savedTimer)
 })
 
 watch(clip, (newClip, oldClip) => {
@@ -173,6 +201,7 @@ watch(clip, (newClip, oldClip) => {
 .panel-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
 .panel-title { font-size: 15px; font-weight: 600; margin: 0; }
 .panel-subtitle { font-size: 12.5px; margin-top: 4px; }
+.save-status { font-size: 12px; margin-top: 4px; }
 .close-btn {
   border: none; background: transparent; color: var(--ink-faint); cursor: pointer; padding: 2px;
   display: inline-flex; align-items: center; justify-content: center;

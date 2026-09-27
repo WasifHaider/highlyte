@@ -21,11 +21,13 @@ const queuedBounds = new Map() // clipId -> {start, end} to save when the timer 
 const styleSaves = new Map() // clipId -> Promise<void> of the save in flight
 const boundsSaves = new Map() // clipId -> Promise<string|null> (error message or null)
 
-function track(saves, clipId, promise) {
+function track(saves, clipId, promise, onChange) {
   const p = promise.finally(() => {
     if (saves.get(clipId) === p) saves.delete(clipId)
+    onChange?.()
   })
   saves.set(clipId, p)
+  onChange?.()
   return p
 }
 
@@ -45,6 +47,9 @@ export const useJobStore = defineStore('job', {
     _revisions: {},
     editingClipId: null,
     captionDrafts: {},
+    // Bumped on every change to the module-level save-tracking maps below, so
+    // `savingClip` (a getter over those non-reactive Maps) re-evaluates.
+    _saveActivityTick: 0,
   }),
   getters: {
     clips: (state) => state.job?.clips || [],
@@ -61,6 +66,13 @@ export const useJobStore = defineStore('job', {
       .filter(c => state.selected[c.id])
       .map(c => state.renders[c.id])
       .filter(Boolean),
+    // Whether a style or trim save is queued (debounced) or in flight for
+    // this clip. Additive: read-only over the existing save-tracking maps,
+    // it doesn't change save behaviour.
+    savingClip: (state) => (clipId) => {
+      state._saveActivityTick // register the reactive dependency
+      return queuedStyles.has(clipId) || queuedBounds.has(clipId) || styleSaves.has(clipId) || boundsSaves.has(clipId)
+    },
   },
   actions: {
     async submitUrl(url, language = 'hinglish') {
@@ -171,6 +183,7 @@ export const useJobStore = defineStore('job', {
       // Saving is debounced so typing in the hook title isn't a request per key.
       clearTimeout(this._styleTimers[clipId])
       queuedStyles.set(clipId, clip.style)
+      this._bumpSaveActivity()
       this._styleTimers[clipId] = setTimeout(() => this._saveStyleNow(clipId), STYLE_SAVE_DELAY_MS)
     },
     // Sends a queued style save right away (if any) and waits for it and for
@@ -181,9 +194,10 @@ export const useJobStore = defineStore('job', {
       const style = queuedStyles.get(clipId)
       if (style === undefined) return styleSaves.get(clipId) || Promise.resolve()
       queuedStyles.delete(clipId)
+      this._bumpSaveActivity()
       return track(styleSaves, clipId, saveClipStyle(clipId, style).then(() => {}, e => {
         this.error = e?.response?.data?.detail || 'Failed to save clip style'
-      }))
+      }), () => this._bumpSaveActivity())
     },
     // Same for the trim; resolves to an error message, or null once saved.
     _saveBoundsNow(clipId) {
@@ -192,17 +206,23 @@ export const useJobStore = defineStore('job', {
       const bounds = queuedBounds.get(clipId)
       if (bounds === undefined) return boundsSaves.get(clipId) || Promise.resolve(null)
       queuedBounds.delete(clipId)
+      this._bumpSaveActivity()
       return track(boundsSaves, clipId, apiSaveBounds(clipId, bounds).then(() => null, e => {
         const message = apiErrorMessage(e, 'Failed to save the trim')
         this.error = message
         return message
-      }))
+      }), () => this._bumpSaveActivity())
     },
     // Drops a queued trim save without sending it.
     _cancelBounds(clipId) {
       clearTimeout(this._boundsTimers[clipId])
       delete this._boundsTimers[clipId]
-      queuedBounds.delete(clipId)
+      if (queuedBounds.delete(clipId)) this._bumpSaveActivity()
+    },
+    // Bumps the reactive counter `savingClip` depends on, so it re-evaluates
+    // after a change to the (non-reactive) save-tracking maps above.
+    _bumpSaveActivity() {
+      this._saveActivityTick++
     },
     // Applies one style to every clip that has a vertical preview. A layout
     // a clip can't use (a face layout with no faces found) falls back to
@@ -249,6 +269,7 @@ export const useJobStore = defineStore('job', {
       delete this.renders[clipId]
       clearTimeout(this._boundsTimers[clipId])
       queuedBounds.set(clipId, bounds)
+      this._bumpSaveActivity()
       this._boundsTimers[clipId] = setTimeout(() => this._saveBoundsNow(clipId), BOUNDS_SAVE_DELAY_MS)
     },
     async resetBounds(clipId) {

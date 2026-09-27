@@ -7,6 +7,20 @@
             <div v-if="jobStore.error" class="danger-note">{{ jobStore.error }}</div>
           </Transition>
 
+          <div v-if="!jobStore.job && !jobStore.error" class="job-skeleton" aria-busy="true">
+            <span class="visually-hidden">Loading clips…</span>
+            <div class="video-row-skeleton">
+              <div class="thumb skeleton"></div>
+              <div class="lines">
+                <div class="bar text-80 skeleton"></div>
+                <div class="bar text-40 skeleton"></div>
+              </div>
+            </div>
+            <div class="clip-grid">
+              <SkeletonCard v-for="i in 3" :key="i" variant="clip" />
+            </div>
+          </div>
+
           <VideoCard
             v-if="jobStore.job?.videoMeta"
             :meta="jobStore.job.videoMeta"
@@ -23,7 +37,8 @@
               <p class="sf-title">Clip selection didn't finish</p>
               <p class="sf-msg">{{ jobStore.job.error }}</p>
               <p class="sf-sub">The transcript is saved, so a retry skips the download and transcription.</p>
-              <button class="btn btn-primary" :disabled="retrying" @click="onRetry">
+              <button class="btn btn-primary retry-btn" :disabled="retrying" @click="onRetry">
+                <UiSpinner v-if="retrying" size="13" />
                 {{ retrying ? 'Retrying…' : 'Retry selection' }}
               </button>
             </div>
@@ -54,6 +69,8 @@ import ProcessingSteps from '../components/ProcessingSteps.vue'
 import ClipList from '../components/ClipList.vue'
 import ExportBar from '../components/ExportBar.vue'
 import ClipEditPanel from '../components/ClipEditPanel.vue'
+import SkeletonCard from '../components/ui/SkeletonCard.vue'
+import UiSpinner from '../components/ui/UiSpinner.vue'
 
 const props = defineProps({ id: { type: String, required: true } })
 const jobStore = useJobStore()
@@ -122,6 +139,7 @@ watch(() => props.id, (newId) => startForId(newId))
 .sf-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
 .sf-msg { margin: 0; font-size: 14px; color: var(--ink-soft); }
 .sf-sub { margin: 0 0 8px; font-size: 12.5px; color: var(--ink-faint); }
+.retry-btn { min-width: 140px; }
 .selection-note { margin: 0 0 32px; display: inline-block; }
 .job-layout { display: flex; }
 /* While a clip is being edited, keep the clips column where it was and let
@@ -137,4 +155,21 @@ watch(() => props.id, (newId) => startForId(newId))
   .page.editing .job-main { max-width: 1072px; }
 }
 .job-main { flex: 1; min-width: 0; }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.job-skeleton { margin-bottom: 24px; }
+.video-row-skeleton { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.video-row-skeleton .thumb { width: 80px; height: 45px; flex-shrink: 0; }
+.video-row-skeleton .lines { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.video-row-skeleton .bar { height: 14px; border-radius: 6px; }
+.video-row-skeleton .text-80 { width: 80%; max-width: 360px; }
+.video-row-skeleton .text-40 { width: 40%; max-width: 180px; }
+/* Mirrors ClipList's .clip-grid so the loading skeleton lines up with the
+   real grid that replaces it once the first status arrives. */
+.clip-grid { display: grid; gap: 24px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1024px) { .clip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .clip-grid { grid-template-columns: 1fr; } }
 </style>

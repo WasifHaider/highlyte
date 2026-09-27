@@ -23,7 +23,10 @@
         <input v-model="confirm" type="password" class="input" autocomplete="new-password" required />
       </label>
       <div v-if="error" class="danger-note" role="alert">{{ error }}</div>
-      <button type="submit" class="btn btn-primary" :disabled="busy">{{ busy ? 'Creating…' : 'Create team' }}</button>
+      <button type="submit" class="btn btn-primary" :disabled="busy">
+        <UiSpinner v-if="busy" size="13" />
+        {{ busy ? 'Creating…' : 'Create team' }}
+      </button>
       <p class="note">Only the team admin signs up. You'll add your users from the Team page.</p>
       <p class="switch">Already have a login? <router-link to="/login">Log in</router-link></p>
     </form>
@@ -36,6 +39,7 @@ import { useRouter } from 'vue-router'
 import '../styles/auth.css'
 import { useAuthStore } from '../stores/authStore'
 import { apiErrorMessage } from '../services/highlyteApi'
+import UiSpinner from '../components/ui/UiSpinner.vue'
 
 const MIN_PASSWORD = 8
 

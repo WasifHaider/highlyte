@@ -24,7 +24,8 @@
               @click="language = opt.value"
             >{{ opt.label }}</button>
           </div>
-          <button class="btn btn-primary" :disabled="submitting || !url" @click="onGenerate">
+          <button class="btn btn-primary hero-generate" :disabled="submitting || !url" @click="onGenerate">
+            <UiSpinner v-if="submitting" size="13" />
             {{ submitting ? 'Starting…' : 'Generate' }}
           </button>
         </div>
@@ -39,10 +40,12 @@
         <h2 class="section-title">Recent projects</h2>
         <router-link to="/projects" class="btn btn-ghost btn-sm">View all</router-link>
       </div>
-      <p v-if="loading" class="muted state-msg">Loading…</p>
-      <p v-else-if="error" class="muted state-msg">
+      <p v-if="error" class="muted state-msg">
         {{ error }} <button class="btn btn-ghost btn-sm" @click="reload">Retry</button>
       </p>
+      <div v-else-if="loading" class="grid" aria-busy="true">
+        <SkeletonCard v-for="i in HOME_SKELETON_COUNT" :key="i" variant="project" />
+      </div>
       <TransitionGroup v-else name="rise" tag="div" class="grid">
         <ProjectCard v-for="p in projects" :key="p.id" :project="p" />
       </TransitionGroup>
@@ -52,10 +55,13 @@
 
 <script setup>
 import ProjectCard from '../components/ProjectCard.vue'
+import SkeletonCard from '../components/ui/SkeletonCard.vue'
+import UiSpinner from '../components/ui/UiSpinner.vue'
 import { useProjects } from '../composables/useProjects'
 import { useGenerate } from '../composables/useGenerate'
 
 const RECENT_LIMIT = 6
+const HOME_SKELETON_COUNT = 4
 const { projects, loading, error, reload } = useProjects(() => ({ limit: RECENT_LIMIT }))
 const { url, language, submitting, error: generateError, LANGUAGES, onGenerate } = useGenerate()
 </script>
@@ -72,6 +78,7 @@ const { url, language, submitting, error: generateError, LANGUAGES, onGenerate }
 }
 .hero-input { width: 100%; }
 .hero-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.hero-generate { min-width: 96px; }
 .hero-error { max-width: 560px; margin: 12px auto 0; text-align: left; }
 
 .recent { margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--border); }
