@@ -43,6 +43,8 @@ export const useJobStore = defineStore('job', {
     _styleTimers: {},
     _boundsTimers: {},
     _revisions: {},
+    editingClipId: null,
+    captionDrafts: {},
   }),
   getters: {
     clips: (state) => state.job?.clips || [],
@@ -69,6 +71,8 @@ export const useJobStore = defineStore('job', {
       this.selected = {}
       this.renders = {}
       this._revisions = {}
+      this.editingClipId = null
+      this.captionDrafts = {}
       this.startPolling()
       return job_id
     },
@@ -131,6 +135,19 @@ export const useJobStore = defineStore('job', {
     },
     toggleClip(clipId) {
       this.selected[clipId] = !this.selected[clipId]
+    },
+    openEditor(clipId) {
+      this.editingClipId = clipId
+    },
+    closeEditor() {
+      if (this.editingClipId) delete this.captionDrafts[this.editingClipId]
+      this.editingClipId = null
+    },
+    // The caption editor's unsaved text, so the clip's card preview can
+    // show it live while the editor sits in the side panel.
+    setCaptionDraft(clipId, words) {
+      if (words) this.captionDrafts[clipId] = words
+      else delete this.captionDrafts[clipId]
     },
     toggleSelectAll() {
       const target = !this.allSelected

@@ -1,27 +1,28 @@
 <template>
   <div class="style-all">
-    <div class="bar-title">Style all clips</div>
     <div class="fields">
       <label class="field">
-        <span>Layout</span>
-        <select v-model="form.layout">
+        <span class="field-label">Layout</span>
+        <select class="select" v-model="form.layout">
           <option v-for="l in LAYOUTS" :key="l.value" :value="l.value">{{ l.label }}</option>
         </select>
       </label>
       <label class="field">
-        <span>Captions</span>
-        <select v-model="form.captionPreset">
+        <span class="field-label">Captions</span>
+        <select class="select" v-model="form.captionPreset">
           <option v-for="p in PRESETS" :key="p.value" :value="p.value">{{ p.label }}</option>
         </select>
       </label>
       <label class="field color">
-        <span>Accent colour</span>
-        <input v-model="form.accent" type="color" />
+        <span class="field-label">Accent colour</span>
+        <div class="color-box">
+          <input v-model="form.accent" type="color" />
+        </div>
       </label>
       <label class="check">
         <input v-model="form.showHook" type="checkbox" /> Show hook title
       </label>
-      <button class="apply" @click="apply">Apply to all</button>
+      <button class="btn btn-primary btn-sm apply" @click="apply">Apply to all</button>
     </div>
     <div class="hint">
       <template v-if="appliedCount">Applied to {{ appliedCount }} clip{{ appliedCount === 1 ? '' : 's' }}.</template>
@@ -58,20 +59,17 @@ onUnmounted(() => clearTimeout(timer))
 </script>
 
 <style scoped>
-.style-all { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 20px; }
-.bar-title { font-weight: 600; font-size: 14px; margin-bottom: 10px; }
+.style-all { background: var(--bg-subtle); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
 .fields { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
-.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-soft); min-width: 150px; }
-.field select {
-  font-family: var(--font-sans); font-size: 13.5px; color: var(--ink);
-  border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; background: #fff;
-}
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
 .field.color { min-width: 0; }
-.field input[type="color"] { width: 48px; height: 34px; border: 1px solid var(--border); border-radius: 8px; padding: 2px; background: #fff; }
-.check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); padding-bottom: 8px; }
-.apply {
-  border: none; border-radius: 8px; padding: 9px 16px; font-size: 13.5px; font-weight: 600;
-  font-family: var(--font-sans); color: #fff; background: var(--accent); cursor: pointer;
+.color-box {
+  display: flex; align-items: center; height: 36px; border: 1px solid var(--border); border-radius: 8px;
+  padding: 0 8px; background: #fff;
 }
-.hint { margin-top: 10px; font-size: 12px; color: var(--ink-faint); }
+.color-box input[type="color"] { width: 24px; height: 24px; border: none; padding: 0; background: none; cursor: pointer; }
+.check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); padding-bottom: 8px; }
+.check input[type="checkbox"] { accent-color: var(--accent); }
+.apply { margin-left: 4px; }
+.hint { margin-top: 10px; font-size: 12.5px; color: var(--ink-faint); }
 </style>

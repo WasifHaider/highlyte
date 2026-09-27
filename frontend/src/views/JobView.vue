@@ -1,6 +1,6 @@
 <template>
   <div class="page">
-    <div v-if="jobStore.error" class="error-banner">{{ jobStore.error }}</div>
+    <div v-if="jobStore.error" class="danger-note">{{ jobStore.error }}</div>
 
     <VideoCard
       v-if="jobStore.job?.videoMeta"
@@ -9,7 +9,7 @@
     />
 
     <ProcessingSteps v-if="jobStore.isProcessing" :status="jobStore.job.status" :progress="jobStore.progress" />
-    <p v-if="jobStore.job?.languageNote" class="lang-note">{{ jobStore.job.languageNote }}</p>
+    <p v-if="jobStore.job?.languageNote" class="subtle-note lang-note">{{ jobStore.job.languageNote }}</p>
 
     <div v-if="jobStore.selectionFailed" class="selection-failed">
       <p class="sf-title">Clip selection didn't finish</p>
@@ -20,9 +20,13 @@
       </button>
     </div>
 
-    <p v-if="jobStore.isDone && jobStore.job?.selectionNote" class="selection-note">{{ jobStore.job.selectionNote }}</p>
+    <p v-if="jobStore.isDone && jobStore.job?.selectionNote" class="subtle-note selection-note">{{ jobStore.job.selectionNote }}</p>
 
-    <ClipList v-if="jobStore.isDone" />
+    <div class="job-layout">
+      <div class="job-main">
+        <ClipList v-if="jobStore.isDone" />
+      </div>
+    </div>
   </div>
 
   <ExportBar v-if="jobStore.isDone" />
@@ -73,6 +77,8 @@ function startForId(id) {
   jobStore.error = null
   jobStore.selected = {}
   jobStore.renders = {}
+  jobStore.editingClipId = null
+  jobStore.captionDrafts = {}
   jobStore.startPolling()
 }
 
@@ -85,21 +91,7 @@ watch(() => props.id, (newId) => startForId(newId))
 </script>
 
 <style scoped>
-.page {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 40px 24px 160px;
-}
-.error-banner {
-  background: #FBEAE3;
-  border: 1px solid #E8B79E;
-  color: #9C3B14;
-  border-radius: 10px;
-  padding: 12px 16px;
-  margin-bottom: 24px;
-  font-size: 13.5px;
-}
-.lang-note { margin: 12px 0 0; font-size: 13px; color: var(--ink-soft); }
+.lang-note { margin: 12px 0 0; display: inline-block; }
 .selection-failed {
   margin-top: 24px; padding: 20px; border: 1px solid var(--border); border-radius: 12px;
   background: var(--surface); display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
@@ -112,8 +104,7 @@ watch(() => props.id, (newId) => startForId(newId))
   font-family: var(--font-sans); color: #fff; background: var(--accent); cursor: pointer;
 }
 .sf-retry:disabled { opacity: .6; cursor: default; }
-.selection-note {
-  margin: 16px 0 0; padding: 10px 14px; border-radius: 8px; font-size: 13px;
-  color: var(--ink-soft); background: var(--accent-soft);
-}
+.selection-note { margin: 0 0 32px; display: inline-block; }
+.job-layout { display: flex; }
+.job-main { flex: 1; min-width: 0; }
 </style>

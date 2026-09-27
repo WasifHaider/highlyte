@@ -1,17 +1,18 @@
 <template>
   <div>
-    <StyleAllBar v-if="hasVerticalClips" />
-    <div class="results-header">
-      <div class="results-title">Highlights</div>
+    <div class="grid-header">
       <div class="select-all" @click="jobStore.toggleSelectAll()">
         <div class="checkbox" :class="{ checked: jobStore.allSelected }">
-          <span v-if="jobStore.allSelected">✓</span>
+          <svg v-if="jobStore.allSelected" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
         </div>
-        Select all
+        <span class="header-title">Highlights</span>
       </div>
+      <button v-if="hasVerticalClips" class="btn btn-ghost btn-sm" @click="showStyleAll = !showStyleAll">Style all</button>
     </div>
 
-    <div class="clip-list">
+    <StyleAllBar v-if="showStyleAll" />
+
+    <div class="clip-grid">
       <ClipCard
         v-for="clip in jobStore.clips"
         :key="clip.id"
@@ -24,25 +25,29 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import ClipCard from './ClipCard.vue'
 import StyleAllBar from './StyleAllBar.vue'
 
 const jobStore = useJobStore()
 const hasVerticalClips = computed(() => jobStore.clips.some(c => c.spec))
+const showStyleAll = ref(false)
 </script>
 
 <style scoped>
-.results-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 18px; flex-wrap: wrap; gap: 8px; }
-.results-title { font-family: var(--font-serif); font-size: 26px; font-weight: 500; }
-.select-all { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--ink-soft); }
+.grid-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 8px; flex-wrap: wrap; }
+.select-all { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .checkbox {
   width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px; color: #fff;
+  display: flex; align-items: center; justify-content: center; color: #fff;
   background: #fff; border: 1.5px solid var(--border);
 }
 .checkbox.checked { background: var(--accent); border-color: var(--accent); }
-.clip-list { display: flex; flex-direction: column; gap: 16px; }
+.header-title { font-size: 14px; font-weight: 600; }
+.clip-grid {
+  display: grid; gap: 24px; grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 1024px) { .clip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .clip-grid { grid-template-columns: 1fr; } }
 </style>

@@ -2,31 +2,34 @@
   <div class="trim-controls">
     <div v-if="!trimmable" class="note">Re-run the video to trim this clip.</div>
     <template v-else>
+      <div class="trim-header">
+        <span class="trim-title">TRIM</span>
+        <span class="trim-header-right">
+          <span class="trim-length tabular">{{ lengthLabel }}</span>
+          <a v-if="clip.boundsEdited" class="trim-reset" :class="{ disabled }" @click="!disabled && reset()">Reset</a>
+        </span>
+      </div>
       <div class="trim-row">
-        <span class="trim-label">Start:</span>
-        <button class="trim-btn" :disabled="disabled || !startBack.ok" :title="startBack.ok ? '' : startBack.reason"
+        <span class="trim-label">Start</span>
+        <button class="btn btn-secondary btn-sm" :disabled="disabled || !startBack.ok" :title="startBack.ok ? '' : startBack.reason"
           @click="apply(startBack)">◀ Sentence</button>
-        <button class="trim-btn" :disabled="disabled || !startMinus.ok" :title="startMinus.ok ? '' : startMinus.reason"
+        <button class="btn btn-secondary btn-sm" :disabled="disabled || !startMinus.ok" :title="startMinus.ok ? '' : startMinus.reason"
           @click="apply(startMinus)">−0.5 s</button>
-        <button class="trim-btn" :disabled="disabled || !startPlus.ok" :title="startPlus.ok ? '' : startPlus.reason"
+        <button class="btn btn-secondary btn-sm" :disabled="disabled || !startPlus.ok" :title="startPlus.ok ? '' : startPlus.reason"
           @click="apply(startPlus)">+0.5 s</button>
-        <button class="trim-btn" :disabled="disabled || !startFwd.ok" :title="startFwd.ok ? '' : startFwd.reason"
+        <button class="btn btn-secondary btn-sm" :disabled="disabled || !startFwd.ok" :title="startFwd.ok ? '' : startFwd.reason"
           @click="apply(startFwd)">Sentence ▶</button>
       </div>
       <div class="trim-row">
-        <span class="trim-label">End:</span>
-        <button class="trim-btn" :disabled="disabled || !endBack.ok" :title="endBack.ok ? '' : endBack.reason"
+        <span class="trim-label">End</span>
+        <button class="btn btn-secondary btn-sm" :disabled="disabled || !endBack.ok" :title="endBack.ok ? '' : endBack.reason"
           @click="apply(endBack)">◀ Sentence</button>
-        <button class="trim-btn" :disabled="disabled || !endMinus.ok" :title="endMinus.ok ? '' : endMinus.reason"
+        <button class="btn btn-secondary btn-sm" :disabled="disabled || !endMinus.ok" :title="endMinus.ok ? '' : endMinus.reason"
           @click="apply(endMinus)">−0.5 s</button>
-        <button class="trim-btn" :disabled="disabled || !endPlus.ok" :title="endPlus.ok ? '' : endPlus.reason"
+        <button class="btn btn-secondary btn-sm" :disabled="disabled || !endPlus.ok" :title="endPlus.ok ? '' : endPlus.reason"
           @click="apply(endPlus)">+0.5 s</button>
-        <button class="trim-btn" :disabled="disabled || !endFwd.ok" :title="endFwd.ok ? '' : endFwd.reason"
+        <button class="btn btn-secondary btn-sm" :disabled="disabled || !endFwd.ok" :title="endFwd.ok ? '' : endFwd.reason"
           @click="apply(endFwd)">Sentence ▶</button>
-      </div>
-      <div class="trim-row">
-        <span class="trim-length">{{ lengthLabel }}</span>
-        <a v-if="clip.boundsEdited" class="trim-reset" :class="{ disabled }" @click="!disabled && reset()">Reset</a>
       </div>
     </template>
   </div>
@@ -68,16 +71,17 @@ function reset() {
 </script>
 
 <style scoped>
-.trim-controls { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
-.trim-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.trim-label { font-size: 12px; color: var(--ink-soft); width: 34px; flex-shrink: 0; }
-.trim-btn {
-  border: 1px solid var(--border); background: var(--accent-soft); color: var(--accent-text);
-  border-radius: 6px; padding: 3px 9px; font-size: 12px; font-weight: 600; cursor: pointer;
+.trim-controls {
+  display: flex; flex-direction: column; gap: 8px;
+  padding-bottom: 12px; border-bottom: 1px solid var(--border);
 }
-.trim-btn:disabled { opacity: .5; cursor: default; }
-.trim-length { font-size: 12px; color: var(--ink-faint); }
-.trim-reset { font-size: 12px; color: var(--accent-text); font-weight: 600; cursor: pointer; }
+.trim-header { display: flex; align-items: center; justify-content: space-between; }
+.trim-title { font-size: 11px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); }
+.trim-header-right { display: flex; align-items: center; gap: 8px; }
+.trim-length { font-size: 12px; color: var(--ink); }
+.trim-reset { font-size: 12px; color: var(--accent); font-weight: 600; cursor: pointer; }
 .trim-reset.disabled { opacity: .5; cursor: default; pointer-events: none; }
-.note { font-size: 12px; color: var(--ink-faint); }
+.trim-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.trim-label { font-size: 11.5px; color: var(--ink-faint); width: 36px; flex-shrink: 0; }
+.note { font-size: 12px; color: var(--ink-faint); padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 </style>
