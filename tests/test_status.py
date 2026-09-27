@@ -37,6 +37,7 @@ def test_status_falls_back_to_database(monkeypatch):
     assert clip["hookTitle"] == "Hook"
     assert clip["spec"]["source"]["url"] == "/api/clips/feed00000001/clip_0.mp4"
     assert clip["style"] == {"layout": "fit"}
+    assert clip["thumbUrl"] == "/api/clips/feed00000001/clip_0.jpg"
 
 
 def test_status_reports_interrupted_jobs(monkeypatch):

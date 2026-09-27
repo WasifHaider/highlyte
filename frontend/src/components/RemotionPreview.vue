@@ -19,6 +19,7 @@ import { FPS, OUT_H, OUT_W, durationInFrames } from '@renderer/constants'
 const props = defineProps({
   spec: { type: Object, required: true },
   clipStyle: { type: Object, required: true },
+  autoPlay: { type: Boolean, default: false },
 })
 
 const host = ref(null)
@@ -62,6 +63,7 @@ function draw() {
     compositionWidth: OUT_W,
     compositionHeight: OUT_H,
     controls: true,
+    autoPlay: props.autoPlay,
     acknowledgeRemotionLicense: true,
     style: { width: '100%' },
     ref: (instance) => {

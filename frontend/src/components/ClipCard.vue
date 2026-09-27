@@ -1,7 +1,13 @@
 <template>
   <div class="card card-interactive clip-card" :class="{ editing: isEditing }">
     <div class="preview">
-      <RemotionPreview v-if="clip.spec" :spec="previewSpec" :clip-style="clip.style" />
+      <RemotionPreview v-if="clip.spec && isLive" :spec="previewSpec" :clip-style="clip.style" auto-play />
+      <button v-else-if="clip.spec" type="button" class="poster" aria-label="Play preview" @click="jobStore.showPreview(clip.id)">
+        <img v-if="clip.thumbUrl && !posterFailed" :src="clip.thumbUrl" alt="" loading="lazy" @error="posterFailed = true" />
+        <span class="play" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.9l10.4-6.5a1 1 0 0 0 0-1.8L9.5 4.6A1 1 0 0 0 8 5.5Z"/></svg>
+        </span>
+      </button>
       <div v-else class="no-preview">No vertical preview for this clip. Re-run the video to generate one.</div>
       <Transition name="fade">
         <div v-if="clip.pendingAction" class="pending-overlay">
@@ -95,7 +101,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import { clipDownloadUrl, clipSrtUrl } from '../services/highlyteApi'
 import RemotionPreview from './RemotionPreview.vue'
@@ -139,6 +145,11 @@ const regenerateDisabled = computed(() => anyPending.value)
 const regenerateTitle = computed(() => anyPending.value ? 'Another clip is being replaced. Wait for it to finish.' : '')
 const pendingText = computed(() => props.clip.pendingAction === 'swap' ? 'Swapping in another moment…' : 'Regenerating this clip…')
 const isEditing = computed(() => jobStore.editingClipId === props.clip.id)
+// Only the played or edited clip mounts a Player (see previewClipId).
+const isLive = computed(() => isEditing.value || jobStore.previewClipId === props.clip.id)
+const posterFailed = ref(false)
+// A swapped or regenerated clip gets a new poster file; try it afresh.
+watch(() => props.clip.thumbUrl, () => { posterFailed.value = false })
 
 function toggleEdit() {
   if (isEditing.value) jobStore.closeEditor()
@@ -172,6 +183,17 @@ async function onRegenerate() {
 .clip-card { overflow: hidden; display: flex; flex-direction: column; }
 .clip-card.editing { border-color: var(--accent); border-width: 2px; }
 .preview { aspect-ratio: 9 / 16; background: #000; position: relative; }
+.poster {
+  position: absolute; inset: 0; width: 100%; padding: 0; border: 0; cursor: pointer;
+  background: #000; display: flex; align-items: center; justify-content: center;
+}
+.poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.poster .play {
+  position: relative; width: 52px; height: 52px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; padding-left: 3px;
+  background: rgba(0,0,0,0.55); color: #fff; transition: transform 0.15s ease, background 0.15s ease;
+}
+.poster:hover .play, .poster:focus-visible .play { transform: scale(1.08); background: var(--accent); }
 .no-preview {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
   padding: 16px; background: var(--bg-subtle); color: var(--ink-faint); font-size: 12px;

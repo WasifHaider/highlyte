@@ -50,6 +50,10 @@ export const useJobStore = defineStore('job', {
     _boundsTimers: {},
     _revisions: {},
     editingClipId: null,
+    // The one clip card with a live Player; the rest show a poster. Every
+    // Player preloads its whole source segment (several video elements
+    // each), so mounting one per card made every clip compete for bandwidth.
+    previewClipId: null,
     captionDrafts: {},
     // Bumped on every change to the module-level save-tracking maps below, so
     // `savingClip` (a getter over those non-reactive Maps) re-evaluates.
@@ -94,6 +98,7 @@ export const useJobStore = defineStore('job', {
       this.renders = {}
       this._revisions = {}
       this.editingClipId = null
+      this.previewClipId = null
       this.captionDrafts = {}
       this.clearSaveTracking()
       this.startPolling()
@@ -111,6 +116,7 @@ export const useJobStore = defineStore('job', {
         // The Player needs an absolute URL; the API returns its own path.
         for (const c of data.clips || []) {
           if (c.spec?.source?.url?.startsWith('/')) c.spec.source.url = clipDownloadUrl(c.spec.source.url)
+          if (c.thumbUrl?.startsWith('/')) c.thumbUrl = clipDownloadUrl(c.thumbUrl)
         }
         this.job = data
         if (data.status === 'error') {
@@ -165,6 +171,10 @@ export const useJobStore = defineStore('job', {
       // text, and a Save on the new clip would never touch it again.
       if (this.editingClipId && this.editingClipId !== clipId) delete this.captionDrafts[this.editingClipId]
       this.editingClipId = clipId
+      this.previewClipId = clipId
+    },
+    showPreview(clipId) {
+      this.previewClipId = clipId
     },
     closeEditor() {
       if (this.editingClipId) delete this.captionDrafts[this.editingClipId]

@@ -246,7 +246,7 @@ def test_swap_writes_a_new_revision_and_drops_the_old_media(env, monkeypatch, tm
     assert fields["revision"] == 1
     assert (job_dir / "clip_0_r1.mp4").exists()
     assert not (job_dir / "clip_0.mp4").exists()
-    assert deleted == [f"{JOB}/clip_0.mp4"]
+    assert deleted == [f"{JOB}/clip_0.mp4", f"{JOB}/clip_0.jpg"]  # segment and its poster
     # The new name is served by the clip route.
     r = client.get(f"/api/clips/{JOB}/clip_0_r1.mp4")
     assert r.status_code == 200 and r.content == b"new"
@@ -262,7 +262,7 @@ def test_second_swap_replaces_revision_one_with_revision_two(env, monkeypatch, t
     assert seen["revision"] == 2
     assert job.clips[0]["downloadUrl"] == f"/api/clips/{JOB}/clip_0_r2.mp4"
     assert sorted(p.name for p in job_dir.iterdir()) == ["clip_0_r2.mp4"]
-    assert deleted == [f"{JOB}/clip_0.mp4", f"{JOB}/clip_0_r1.mp4"]
+    assert deleted == [f"{JOB}/clip_0.mp4", f"{JOB}/clip_0.jpg", f"{JOB}/clip_0_r1.mp4", f"{JOB}/clip_0_r1.jpg"]
 
 
 def test_failure_after_prepare_keeps_the_old_media(env, monkeypatch, tmp_path):
@@ -282,7 +282,7 @@ def test_failure_after_prepare_keeps_the_old_media(env, monkeypatch, tmp_path):
     assert (job_dir / "clip_0.mp4").read_bytes() == b"old"
     # The half-made replacement is cleaned up; the old object is not touched.
     assert not (job_dir / "clip_0_r1.mp4").exists()
-    assert deleted == [f"{JOB}/clip_0_r1.mp4"]
+    assert deleted == [f"{JOB}/clip_0_r1.mp4", f"{JOB}/clip_0_r1.jpg"]
     assert [a["reason"] for a in job.alternates] == ["r1", "r2"]
 
 

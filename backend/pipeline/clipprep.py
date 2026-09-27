@@ -50,6 +50,17 @@ def segment_bounds(clip_start: float, clip_end: float, video_duration: float) ->
     return seg_start, seg_end
 
 
+def make_poster(segment_path: str, at_s: float) -> str | None:
+    """The clip card's still image, next to the segment. Best effort: a
+    card without one just shows a plain play button."""
+    out = os.path.join(os.path.dirname(segment_path), storage.thumb_filename(os.path.basename(segment_path)))
+    try:
+        return cut.make_thumbnail(segment_path, at_s, out)
+    except Exception as e:  # noqa: BLE001
+        print(f"[poster] failed for {segment_path}: {e}")
+        return None
+
+
 def prepare_clip(
     *,
     job_id: str,
@@ -73,6 +84,7 @@ def prepare_clip(
     on_step("cutting")
     cut.cut_clip(video_path, seg_start, seg_end, local_path)
     width, height, fps = cut.probe_video(local_path)
+    thumb_path = make_poster(local_path, offset)
 
     on_step("timing captions")
     clip_word_list = words.clip_words(segments, seg_start, seg_end, clip.emphasis)
@@ -99,6 +111,12 @@ def prepare_clip(
             storage_key = key
         except Exception as e:  # noqa: BLE001
             print(f"[r2] upload failed for {job_id}/{filename}, keeping local copy: {e}")
+        if thumb_path is not None:
+            try:
+                storage.upload_thumb(thumb_path, storage.clip_key(job_id, os.path.basename(thumb_path)))
+                os.remove(thumb_path)
+            except Exception as e:  # noqa: BLE001
+                print(f"[r2] poster upload failed for {job_id}/{filename}, keeping local copy: {e}")
 
     spec = ClipSpec(
         version=2,
