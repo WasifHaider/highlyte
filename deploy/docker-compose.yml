@@ -23,8 +23,10 @@ services:
   # one teammate's laptop (a Tailscale exit node) and offers a SOCKS5 proxy
   # on port 1055. The backend tries them in YTDLP_PROXIES order, e.g.
   # YTDLP_PROXIES=socks5://ts-muntazir:1055. Setup: docs/tailscale-download-route.md.
-  # To add a teammate, copy this block, change the name, hostname,
-  # --exit-node and state folder, and append the proxy to YTDLP_PROXIES.
+  # --exit-node must be the laptop's Tailscale IP (100.x.y.z, from the admin
+  # console): the sidecar can't resolve a machine name while starting up.
+  # To add a teammate, copy this block, change the name, hostname, exit-node
+  # variable and state folder, and append the proxy to YTDLP_PROXIES.
   ts-muntazir:
     image: tailscale/tailscale:stable
     restart: unless-stopped
@@ -34,6 +36,6 @@ services:
       TS_USERSPACE: "true"
       TS_STATE_DIR: /var/lib/tailscale
       TS_SOCKS5_SERVER: ":1055"
-      TS_EXTRA_ARGS: "--exit-node=muntazir-laptop --exit-node-allow-lan-access"
+      TS_EXTRA_ARGS: "--exit-node=${MUNTAZIR_EXIT_NODE} --exit-node-allow-lan-access"
     volumes:
       - ./ts/muntazir:/var/lib/tailscale

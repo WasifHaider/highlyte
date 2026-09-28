@@ -38,13 +38,16 @@ On the laptop's row in **Machines**:
 ## 4. EC2
 
 1. In `deploy/docker-compose.yml`, each laptop has a `ts-<name>` sidecar
-   whose `--exit-node=` is the machine name from step 3. Copy the block to
-   add one.
+   whose `--exit-node=` comes from a `<NAME>_EXIT_NODE` variable. It must be
+   the laptop's Tailscale IP (`100.x.y.z`, shown in **Machines**), not its
+   name: the sidecar can't resolve names while starting up. Copy the block
+   to add one.
 2. In `~/highlyte/.env` on the server:
 
    ```
    TS_AUTHKEY=tskey-auth-...
    YTDLP_PROXIES=socks5://ts-muntazir:1055
+   MUNTAZIR_EXIT_NODE=100.x.y.z
    ```
 
    Separate several proxies with commas; the first is tried first.
