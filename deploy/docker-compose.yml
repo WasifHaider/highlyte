@@ -17,3 +17,23 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+
+  # YouTube blocks EC2's IP, so yt-dlp downloads through teammates' home
+  # laptops. Each sidecar joins the tailnet, sends its traffic out through
+  # one teammate's laptop (a Tailscale exit node) and offers a SOCKS5 proxy
+  # on port 1055. The backend tries them in YTDLP_PROXIES order, e.g.
+  # YTDLP_PROXIES=socks5://ts-muntazir:1055. Setup: docs/tailscale-download-route.md.
+  # To add a teammate, copy this block, change the name, hostname,
+  # --exit-node and state folder, and append the proxy to YTDLP_PROXIES.
+  ts-muntazir:
+    image: tailscale/tailscale:stable
+    restart: unless-stopped
+    hostname: hl-proxy-muntazir
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY}
+      TS_USERSPACE: "true"
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SOCKS5_SERVER: ":1055"
+      TS_EXTRA_ARGS: "--exit-node=muntazir-laptop --exit-node-allow-lan-access"
+    volumes:
+      - ./ts/muntazir:/var/lib/tailscale
