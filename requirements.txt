@@ -2,6 +2,9 @@ fastapi==0.115.6
 uvicorn[standard]==0.32.1
 yt-dlp>=2026.8.19
 faster-whisper==1.1.0
+# faster_whisper imports requests without declaring it; huggingface-hub 1.x
+# no longer pulls it in, so it must be listed here.
+requests==2.34.2
 pydantic==2.10.3
 python-multipart==0.0.20
 supabase==2.10.0
