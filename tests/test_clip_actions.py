@@ -45,7 +45,7 @@ def env(monkeypatch):
     monkeypatch.setattr(main.db, "update_clip_checked", lambda cid, f: writes.append((cid, f)))
     monkeypatch.setattr(main.db, "upsert_job", lambda row: None)
     monkeypatch.setattr(main.ingest, "ingest", lambda url, cache_dir, on_progress=None: VideoMeta(
-        video_id="x", title="t", channel="c", duration=900.0, audio_path="a", video_path="v", thumbnail_url=None))
+        video_id="x", title="t", channel="c", duration=900.0, audio_path="a", thumbnail_url=None))
 
     def fake_prepare(**kw):
         with open(FIXTURE_V2, encoding="utf-8") as f:
@@ -179,7 +179,7 @@ def test_swap_recovers_a_job_rebuilt_with_an_orphaned_pending_action(monkeypatch
     monkeypatch.setattr(main.db, "update_clip_checked", lambda cid, f: None)
     monkeypatch.setattr(main.db, "upsert_job", lambda row: None)
     monkeypatch.setattr(main.ingest, "ingest", lambda url, cache_dir, on_progress=None: VideoMeta(
-        video_id="x", title="t", channel="c", duration=900.0, audio_path="a", video_path="v", thumbnail_url=None))
+        video_id="x", title="t", channel="c", duration=900.0, audio_path="a", thumbnail_url=None))
 
     def fake_prepare(**kw):
         with open(FIXTURE_V2, encoding="utf-8") as f:

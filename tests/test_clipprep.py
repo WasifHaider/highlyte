@@ -15,8 +15,8 @@ def test_segment_bounds_pads_and_clamps():
 
 
 def _patch_media(monkeypatch, detect):
-    def fake_cut(src, start, end, out):
-        os.makedirs(os.path.dirname(out), exist_ok=True)
+    def fake_reencode(src, out):
+        assert src.endswith(".src.mp4") and os.path.exists(src)
         open(out, "wb").close()
         return out
 
@@ -24,18 +24,29 @@ def _patch_media(monkeypatch, detect):
         open(out, "wb").close()
         return out
 
-    monkeypatch.setattr(cut, "cut_clip", fake_cut)
+    monkeypatch.setattr(cut, "reencode_segment", fake_reencode)
     monkeypatch.setattr(cut, "make_thumbnail", fake_thumb)
     monkeypatch.setattr(cut, "probe_video", lambda p: (1920, 1080, 30.0))
     monkeypatch.setattr(face_detect, "ensure_model", lambda d: "model")
     monkeypatch.setattr(face_detect, "sample_detections", detect)
 
 
+SECTIONS = []
+
+
+def fake_fetch(start, end, out):
+    SECTIONS.append((start, end))
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    open(out, "wb").write(b"raw")
+    return out
+
+
 def _prepare(tmp_path):
+    SECTIONS.clear()
     clip = Clip(start=11.0, end=25.0, text="t", score=12.3, tag="Key insight", hook_title="Hook", emphasis=["hey"])
     return clipprep.prepare_clip(
         job_id="abc123def456", idx=0, clip=clip,
-        video_path="v.mp4", video_duration=100.0,
+        fetch_section=fake_fetch, video_duration=100.0,
         segments=[Seg(11.2, 11.5, "hey"), Seg(11.5, 11.9, "there")],
         clips_dir=str(tmp_path), models_dir=str(tmp_path),
         on_step=lambda s: None,
@@ -133,7 +144,7 @@ def test_prepare_clip_revision_writes_its_own_file_and_key(tmp_path, monkeypatch
     open(old, "wb").write(b"old")
     clip = Clip(start=11.0, end=25.0, text="t", score=5.0, tag="Key insight")
     prepared = clipprep.prepare_clip(
-        job_id="abc123def456", idx=0, clip=clip, video_path="v.mp4", video_duration=100.0,
+        job_id="abc123def456", idx=0, clip=clip, fetch_section=fake_fetch, video_duration=100.0,
         segments=[], clips_dir=str(tmp_path), models_dir=str(tmp_path), on_step=lambda s: None, revision=2,
     )
     assert prepared.filename == "clip_0_r2.mp4"
@@ -166,3 +177,25 @@ def test_prepare_clip_survives_a_poster_failure(tmp_path, monkeypatch):
 
     monkeypatch.setattr(cut, "make_thumbnail", boom)
     assert _prepare(tmp_path).spec.clipId == "abc123def456-0"
+
+
+def test_prepare_clip_downloads_only_the_padded_section(tmp_path, monkeypatch):
+    _patch_media(monkeypatch, lambda *a, **k: ([], [], []))
+    _prepare(tmp_path)
+    assert SECTIONS == [(3.0, 33.0)]  # clip 11-25 with 8 s either side
+    leftovers = os.listdir(os.path.join(tmp_path, "abc123def456"))
+    assert not any(n.endswith(".src.mp4") for n in leftovers)
+
+
+def test_prepare_clip_removes_raw_download_when_cut_fails(tmp_path, monkeypatch):
+    _patch_media(monkeypatch, lambda *a, **k: ([], [], []))
+
+    def boom(src, out):
+        raise RuntimeError("ffmpeg failed")
+
+    monkeypatch.setattr(cut, "reencode_segment", boom)
+    try:
+        _prepare(tmp_path)
+    except RuntimeError:
+        pass
+    assert not any(n.endswith(".src.mp4") for n in os.listdir(os.path.join(tmp_path, "abc123def456")))

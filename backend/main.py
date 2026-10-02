@@ -367,6 +367,10 @@ def _save_style(record: dict[str, Any], style: ClipStyle) -> dict[str, Any]:
     return record["style"]
 
 
+def _section_fetcher(url: str):
+    return lambda start, end, out_path: ingest.fetch_section(url, start, end, out_path)
+
+
 def _select_and_prepare(job: Job, meta: ingest.VideoMeta, segs: list[Segment], loudness: list[float]) -> None:
     """Pick clips from the transcript, then cut and frame each one. A
     selection that cannot run is not an error: the transcript is kept and
@@ -402,7 +406,7 @@ def _select_and_prepare(job: Job, meta: ingest.VideoMeta, segs: list[Segment], l
 
         prepared = clipprep.prepare_clip(
             job_id=job.id, idx=i, clip=c,
-            video_path=meta.video_path, video_duration=meta.duration,
+            fetch_section=_section_fetcher(job.url), video_duration=meta.duration,
             segments=word_segments,
             clips_dir=CLIPS_DIR, models_dir=MODELS_DIR, on_step=on_step,
         )
@@ -959,7 +963,7 @@ def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:
             return
 
         prepared = clipprep.prepare_clip(
-            job_id=job.id, idx=idx, clip=new_clip, video_path=meta.video_path,
+            job_id=job.id, idx=idx, clip=new_clip, fetch_section=_section_fetcher(job.url),
             video_duration=meta.duration, segments=transcript.word_segments(segs),
             clips_dir=CLIPS_DIR, models_dir=MODELS_DIR, on_step=lambda s: None,
             revision=new_revision,

@@ -4,7 +4,7 @@ YouTube blocks the EC2 server's IP, so production downloads go out through
 teammates' home laptops instead:
 
 ```
-backend (yt-dlp) --SOCKS5--> ts-<name> sidecar --tailnet--> teammate laptop (exit node) --> YouTube
+backend (yt-dlp) --HTTP--> ts-<name> sidecar --tailnet--> teammate laptop (exit node) --> YouTube
 ```
 
 `YTDLP_PROXIES` lists the sidecars in the order to try. A route that YouTube
@@ -46,7 +46,7 @@ On the laptop's row in **Machines**:
 
    ```
    TS_AUTHKEY=tskey-auth-...
-   YTDLP_PROXIES=socks5://ts-muntazir:1055
+   YTDLP_PROXIES=http://ts-muntazir:1056
    MUNTAZIR_EXIT_NODE=100.x.y.z
    ```
 
@@ -62,7 +62,7 @@ docker-compose exec ts-muntazir tailscale status
 The laptop should show as the active exit node.
 
 ```bash
-docker-compose exec backend yt-dlp --proxy socks5://ts-muntazir:1055 --print title "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+docker-compose exec backend yt-dlp --proxy http://ts-muntazir:1056 --print title "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 ```
 
 This should print the video title, not a "not a bot" error.

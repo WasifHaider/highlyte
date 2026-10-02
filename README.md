@@ -203,7 +203,10 @@ run `npm run deploy:site` in `renderer/` so Lambda exports can draw spec v2.
 
 ## How it works
 
-1. **Ingest** — pull the audio via `yt-dlp`, cached by video ID.
+1. **Ingest** — pull only the audio track via `yt-dlp`, cached by video ID.
+   The video is never downloaded whole: each clip downloads just its own
+   part (the clip plus 8 s either side) when it is prepared. Download
+   proxies must be HTTP (`http://…`), because ffmpeg cannot use SOCKS.
 2. **Transcript** — language check, VAD chunks, Whisper (Groq, else local
    faster-whisper), then glossary and spelling fixes in code.
 3. **Clip selection** — an LLM (Groq, needs `GROQ_KEY`) picks candidate

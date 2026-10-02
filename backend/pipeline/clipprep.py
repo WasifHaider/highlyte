@@ -1,5 +1,5 @@
-"""Everything that happens to one clip after it's picked: cut its
-padded 16:9 segment, time its words, analyse faces, upload the segment,
+"""Everything that happens to one clip after it's picked: download its
+padded 16:9 segment (only that part of the video, never the whole thing), time its words, analyse faces, upload the segment,
 and describe the result as a ClipSpec. The renderer (Remotion) draws the
 final 9:16 short from that spec; no finished video is made here. The
 segment carries an 8 s spare window either side of the clip, so a later
@@ -66,7 +66,7 @@ def prepare_clip(
     job_id: str,
     idx: int,
     clip: Clip,
-    video_path: str,
+    fetch_section: Callable[[float, float, str], str],
     video_duration: float,
     segments: list[TranscriptSegment],
     clips_dir: str,
@@ -81,8 +81,20 @@ def prepare_clip(
     offset = clip.start - seg_start
     duration = clip.end - clip.start
 
-    on_step("cutting")
-    cut.cut_clip(video_path, seg_start, seg_end, local_path)
+    on_step("downloading")
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+    raw_path = os.path.join(os.path.dirname(local_path), os.path.splitext(filename)[0] + ".src.mp4")
+    try:
+        # Starts exactly at seg_start (the download re-encodes at the cut),
+        # so `offset` below is where the clip begins inside it.
+        fetch_section(seg_start, seg_end, raw_path)
+        on_step("cutting")
+        # Streaming settings (keyframe every second, index up front) for
+        # the browser preview and Lambda chunks.
+        cut.reencode_segment(raw_path, local_path)
+    finally:
+        if os.path.exists(raw_path):
+            os.remove(raw_path)
     width, height, fps = cut.probe_video(local_path)
     thumb_path = make_poster(local_path, offset)
 

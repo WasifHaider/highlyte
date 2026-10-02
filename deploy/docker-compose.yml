@@ -20,9 +20,9 @@ services:
 
   # YouTube blocks EC2's IP, so yt-dlp downloads through teammates' home
   # laptops. Each sidecar joins the tailnet, sends its traffic out through
-  # one teammate's laptop (a Tailscale exit node) and offers a SOCKS5 proxy
-  # on port 1055. The backend tries them in YTDLP_PROXIES order, e.g.
-  # YTDLP_PROXIES=socks5://ts-muntazir:1055. Setup: docs/tailscale-download-route.md.
+  # one teammate's laptop (a Tailscale exit node) and offers an HTTP proxy
+  # on port 1056 (clip downloads use ffmpeg, which cannot use SOCKS). The backend tries them in YTDLP_PROXIES order, e.g.
+  # YTDLP_PROXIES=http://ts-muntazir:1056. Setup: docs/tailscale-download-route.md.
   # --exit-node must be the laptop's Tailscale IP (100.x.y.z, from the admin
   # console): the sidecar can't resolve a machine name while starting up.
   # To add a teammate, copy this block, change the name, hostname, exit-node
@@ -36,6 +36,7 @@ services:
       TS_USERSPACE: "true"
       TS_STATE_DIR: /var/lib/tailscale
       TS_SOCKS5_SERVER: ":1055"
+      TS_OUTBOUND_HTTP_PROXY_LISTEN: ":1056"
       TS_EXTRA_ARGS: "--exit-node=${MUNTAZIR_EXIT_NODE} --exit-node-allow-lan-access"
     volumes:
       - ./ts/muntazir:/var/lib/tailscale
@@ -49,6 +50,7 @@ services:
       TS_USERSPACE: "true"
       TS_STATE_DIR: /var/lib/tailscale
       TS_SOCKS5_SERVER: ":1055"
+      TS_OUTBOUND_HTTP_PROXY_LISTEN: ":1056"
       TS_EXTRA_ARGS: "--exit-node=${HAMZA_EXIT_NODE} --exit-node-allow-lan-access"
     volumes:
       - ./ts/hamza:/var/lib/tailscale

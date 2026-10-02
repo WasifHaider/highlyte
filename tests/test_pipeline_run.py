@@ -13,7 +13,7 @@ from backend.pipeline.transcript import Transcript
 def _meta() -> VideoMeta:
     return VideoMeta(
         video_id="vid123", title="A Video", channel="A Channel", duration=90.0,
-        audio_path="/tmp/a.wav", video_path="/tmp/a.mp4", thumbnail_url=None,
+        audio_path="/tmp/a.wav", thumbnail_url=None,
     )
 
 

@@ -2,11 +2,10 @@
 from __future__ import annotations
 
 import os
-import subprocess
 from dataclasses import dataclass
 
 import yt_dlp
-from yt_dlp.utils import DownloadError
+from yt_dlp.utils import DownloadError, download_range_func
 
 # YouTube blocks datacenter IPs like EC2's. YTDLP_PROXIES lists SOCKS5
 # proxies (Tailscale sidecars that leave through teammates' home laptops)
@@ -28,6 +27,7 @@ _ROUTE_ERRORS = (
     "timed out",
     "network is unreachable",
     "name resolution",
+    "ffmpeg exited",
 )
 
 # A dead proxy should fail in seconds, not after yt-dlp's default retries.
@@ -57,7 +57,6 @@ class VideoMeta:
     channel: str
     duration: float  # seconds
     audio_path: str
-    video_path: str | None
     # yt-dlp's best thumbnail URL for the video, when it reports one.
     thumbnail_url: str | None = None
 
@@ -78,25 +77,36 @@ def _touch(path: str) -> None:
         pass
 
 
-def _fetch(
-    url: str, cache_dir: str, route: str | None, on_progress: "callable | None"
-) -> tuple[dict, str]:
-    """Read the video's info and download it (unless cached) over one route.
-    Returns (info, path of the cached mp4)."""
+def _base_opts(route: str | None) -> dict:
     base = {"quiet": True, "noplaylist": True, **_ROUTE_OPTS}
     if route:
         base["proxy"] = route
+    return base
+
+
+def _find_audio(cache_dir: str, video_id: str) -> str | None:
+    for name in sorted(os.listdir(cache_dir)):
+        if name.startswith(f"{video_id}.audio.") and not name.endswith((".part", ".ytdl")):
+            return os.path.join(cache_dir, name)
+    return None
+
+
+def _fetch_audio(
+    url: str, cache_dir: str, route: str | None, on_progress: "callable | None"
+) -> tuple[dict, str]:
+    """Read the video's info and download its audio track only (unless
+    cached) over one route. Returns (info, path of the cached audio)."""
+    base = _base_opts(route)
 
     # First pass: extract info only, to get a stable video_id for caching.
     with yt_dlp.YoutubeDL({**base, "skip_download": True}) as ydl:
         info = ydl.extract_info(url, download=False)
 
     video_id = info["id"]
-    out_template = os.path.join(cache_dir, f"{video_id}.%(ext)s")
-    target_video = os.path.join(cache_dir, f"{video_id}.mp4")
-    if os.path.exists(target_video):
-        _touch(target_video)  # marks it as recently used for cache pruning
-        return info, target_video
+    cached = _find_audio(cache_dir, video_id)
+    if cached:
+        _touch(cached)  # marks it as recently used for cache pruning
+        return info, cached
 
     def _hook(d: dict) -> None:
         if on_progress is None:
@@ -112,33 +122,58 @@ def _fetch(
                     note += f" @ {speed / 1024:.0f} KiB/s"
                 on_progress("downloading", pct, note)
             elif d.get("status") == "finished":
-                on_progress("downloading", 100.0, "download complete, muxing…")
+                on_progress("downloading", 100.0, "download complete")
         except Exception:
             pass  # progress reporting must never break the pipeline
 
     ydl_opts = {
         **base,
-        # Prefer H.264 at 1080p or lower: every browser can decode it for
-        # the live preview, and face analysis/cutting stay fast. Falls
-        # back to anything available rather than failing the download.
-        "format": (
-            "bestvideo[vcodec^=avc1][height<=1080][ext=mp4]+bestaudio[ext=m4a]"
-            "/best[vcodec^=avc1][height<=1080][ext=mp4]"
-            "/bestvideo[height<=1080]+bestaudio/best"
-        ),
-        "merge_output_format": "mp4",
-        "outtmpl": out_template,
+        # Audio only: transcription needs nothing else, and the video
+        # for each clip is fetched later, just that clip's part of it.
+        "format": "bestaudio[ext=m4a]/bestaudio",
+        "outtmpl": os.path.join(cache_dir, f"{video_id}.audio.%(ext)s"),
         "progress_hooks": [_hook],
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
-    return info, target_video
+    audio = _find_audio(cache_dir, video_id)
+    if audio is None:
+        raise RuntimeError("audio download finished but no file was found")
+    return info, audio
+
+
+def _with_routes(action: "callable"):
+    """Run action(route) over each configured route in order, moving on
+    only when a route is blocked or offline."""
+    routes = download_routes()
+    failures: list[str] = []
+    for route in routes:
+        try:
+            return action(route)
+        except DownloadError as e:
+            if not _is_route_error(e):
+                raise
+            label = route or "direct"
+            print(f"[ingest] route {label} failed: {e}")
+            failures.append(label)
+    if routes == [None]:
+        raise NoDownloadRoute(
+            "YouTube blocked the download from this server, and no download "
+            "route (YTDLP_PROXIES) is set up."
+        )
+    raise NoDownloadRoute(
+        f"YouTube download failed on all {len(routes)} route(s) "
+        f"({', '.join(failures)}): YouTube blocked them or they are offline. "
+        "Ask a teammate to switch on their laptop (Tailscale exit node), "
+        "then try again."
+    )
 
 
 def ingest(url: str, cache_dir: str, on_progress: "callable | None" = None) -> VideoMeta:
-    """Download the video's audio (for transcription) and keep a reference
-    to a downloadable video/audio file (for cutting). Uses yt-dlp; results
-    are cached by video ID so re-processing the same link is instant.
+    """Download the video's audio track (for transcription) with yt-dlp.
+    Results are cached by video ID so re-processing the same link is
+    instant. The video itself is not downloaded here: each clip's part of
+    it is fetched by fetch_section when the clip is prepared.
 
     If given, `on_progress(stage, percent, note)` is called during
     download (stage="downloading") — lets callers surface live progress
@@ -146,58 +181,54 @@ def ingest(url: str, cache_dir: str, on_progress: "callable | None" = None) -> V
     large podcast file.
     """
     os.makedirs(cache_dir, exist_ok=True)
-
-    routes = download_routes()
-    failures: list[str] = []
-    for route in routes:
-        try:
-            info, target_video = _fetch(url, cache_dir, route, on_progress)
-            break
-        except DownloadError as e:
-            if not _is_route_error(e):
-                raise
-            label = route or "direct"
-            print(f"[ingest] route {label} failed: {e}")
-            failures.append(label)
-    else:
-        if routes == [None]:
-            raise NoDownloadRoute(
-                "YouTube blocked the download from this server, and no download "
-                "route (YTDLP_PROXIES) is set up."
-            )
-        raise NoDownloadRoute(
-            f"YouTube download failed on all {len(routes)} route(s) "
-            f"({', '.join(failures)}): YouTube blocked them or they are offline. "
-            "Ask a teammate to switch on their laptop (Tailscale exit node), "
-            "then try again."
-        )
-    video_id = info["id"]
-    target_audio = os.path.join(cache_dir, f"{video_id}.m4a")
-
-    if os.path.exists(target_audio):
-        _touch(target_audio)
-    else:
-        # Pull the audio track out of the downloaded video for transcription,
-        # rather than a second yt-dlp download.
-        extract_cmd = [
-            "ffmpeg", "-y", "-loglevel", "error",
-            "-i", target_video,
-            "-vn", "-c:a", "aac", "-b:a", "160k",
-            target_audio,
-        ]
-        proc = subprocess.run(extract_cmd, capture_output=True)
-        if proc.returncode != 0:
-            raise RuntimeError(f"ffmpeg audio extraction failed: {proc.stderr.decode(errors='ignore')}")
-
+    info, audio_path = _with_routes(lambda route: _fetch_audio(url, cache_dir, route, on_progress))
     return VideoMeta(
-        video_id=video_id,
+        video_id=info["id"],
         title=info.get("title") or "Untitled",
         channel=info.get("uploader") or info.get("channel") or "Unknown",
         duration=float(info.get("duration") or 0),
-        audio_path=target_audio,
-        video_path=target_video,
+        audio_path=audio_path,
         thumbnail_url=info.get("thumbnail"),
     )
+
+
+# Same preference as before: H.264 at 1080p or lower, which every browser
+# can decode for the live preview.
+_VIDEO_FORMAT = (
+    "bestvideo[vcodec^=avc1][height<=1080][ext=mp4]+bestaudio[ext=m4a]"
+    "/best[vcodec^=avc1][height<=1080][ext=mp4]"
+    "/bestvideo[height<=1080]+bestaudio/best"
+)
+
+
+def _fetch_section(url: str, start: float, end: float, out_path: str, route: str | None) -> None:
+    base = _base_opts(route)
+    out_dir = os.path.dirname(out_path)
+    stem = os.path.splitext(os.path.basename(out_path))[0]
+    opts = {
+        **base,
+        "format": _VIDEO_FORMAT,
+        "merge_output_format": "mp4",
+        "outtmpl": os.path.join(out_dir, f"{stem}.%(ext)s"),
+        "download_ranges": download_range_func(None, [(start, end)]),
+        # Re-encodes at the cut points, so the file starts exactly at
+        # `start` (checked against the full audio: within 0.01 s). Without
+        # it the cut snaps back to the previous keyframe and every caption
+        # time in the clip's spec would be off by that much.
+        "force_keyframes_at_cuts": True,
+    }
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        ydl.download([url])
+    if not os.path.exists(out_path) or os.path.getsize(out_path) == 0:
+        raise RuntimeError("section download finished but no file was found")
+
+
+def fetch_section(url: str, start: float, end: float, out_path: str) -> str:
+    """Download only seconds start..end of the video into out_path (an
+    .mp4), failing over between download routes like ingest does."""
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    _with_routes(lambda route: _fetch_section(url, start, end, out_path, route))
+    return out_path
 
 
 def duration_label(seconds: float) -> str:

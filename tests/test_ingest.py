@@ -17,6 +17,7 @@ class FakeYDL:
 
     outcomes: dict = {}
     calls: list = []
+    downloads: list = []
 
     def __init__(self, opts):
         self.opts = opts
@@ -41,6 +42,7 @@ class FakeYDL:
     def download(self, urls):
         self._run("download")
         path = self.opts["outtmpl"].replace("%(ext)s", "mp4")
+        FakeYDL.downloads.append(self.opts)
         with open(path, "wb") as f:
             f.write(b"video")
 
@@ -49,9 +51,8 @@ class FakeYDL:
 def ydl(monkeypatch, tmp_path):
     FakeYDL.outcomes = {}
     FakeYDL.calls = []
+    FakeYDL.downloads = []
     monkeypatch.setattr(ingest.yt_dlp, "YoutubeDL", FakeYDL)
-    # The audio track already exists, so ingest never shells out to ffmpeg.
-    (tmp_path / "abc.m4a").write_bytes(b"audio")
     return FakeYDL
 
 
@@ -76,7 +77,7 @@ def test_blocked_route_falls_over_to_the_next(monkeypatch, ydl, tmp_path):
     monkeypatch.setenv("YTDLP_PROXIES", "socks5://a:1055,socks5://b:1055,socks5://c:1055")
     ydl.outcomes = {"socks5://a:1055": BOT, "socks5://b:1055": DEAD}
     meta = ingest.ingest("https://youtu.be/abc", str(tmp_path))
-    assert os.path.exists(meta.video_path)
+    assert os.path.exists(meta.audio_path)
     assert ydl.calls == [
         ("socks5://a:1055", "info"),
         ("socks5://b:1055", "info"),
@@ -100,8 +101,34 @@ def test_all_routes_down_gives_a_plain_error(monkeypatch, ydl, tmp_path):
         ingest.ingest("https://youtu.be/abc", str(tmp_path))
 
 
-def test_cached_video_only_fetches_info(monkeypatch, ydl, tmp_path):
+def test_audio_only_is_downloaded(monkeypatch, ydl, tmp_path):
+    monkeypatch.delenv("YTDLP_PROXIES", raising=False)
+    ingest.ingest("https://youtu.be/abc", str(tmp_path))
+    opts = ydl.downloads[0]
+    assert opts["format"].startswith("bestaudio")
+    assert "download_ranges" not in opts
+    assert not (tmp_path / "abc.mp4").exists()
+
+
+def test_section_download_uses_range_and_keyframe_cuts(monkeypatch, ydl, tmp_path):
+    monkeypatch.delenv("YTDLP_PROXIES", raising=False)
+    out = tmp_path / "clips" / "clip_0.src.mp4"
+    ingest.fetch_section("https://youtu.be/abc", 3.0, 33.0, str(out))
+    opts = ydl.downloads[0]
+    assert opts["force_keyframes_at_cuts"] is True
+    assert opts["outtmpl"].endswith("clip_0.src.%(ext)s")
+    assert out.exists()
+
+
+def test_section_download_fails_over_between_routes(monkeypatch, ydl, tmp_path):
+    monkeypatch.setenv("YTDLP_PROXIES", "http://a:1056,http://b:1056")
+    ydl.outcomes = {"http://a:1056": "ERROR: ffmpeg exited with code 1"}
+    ingest.fetch_section("https://youtu.be/abc", 3.0, 33.0, str(tmp_path / "s.mp4"))
+    assert [c[0] for c in ydl.calls] == ["http://a:1056", "http://b:1056"]
+
+
+def test_cached_audio_only_fetches_info(monkeypatch, ydl, tmp_path):
     monkeypatch.setenv("YTDLP_PROXIES", "socks5://a:1055")
-    (tmp_path / "abc.mp4").write_bytes(b"video")
+    (tmp_path / "abc.audio.m4a").write_bytes(b"audio")
     ingest.ingest("https://youtu.be/abc", str(tmp_path))
     assert ydl.calls == [("socks5://a:1055", "info")]
