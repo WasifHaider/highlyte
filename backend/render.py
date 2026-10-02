@@ -28,6 +28,7 @@ from .spec import ClipStyle, Word, render_hash, style_hash
 FPS = 30
 MAX_ACTIVE = 2
 STUCK_AFTER_S = 30 * 60
+MAX_FRAMES_PER_LAMBDA = 200
 THROTTLE_MAX_ATTEMPTS = 5
 THROTTLE_BACKOFF_S = 15
 THROTTLE_MARKERS = ("TooManyRequests", "Rate Exceeded", "ConcurrentInvocationLimitExceeded", "Throttl")
@@ -292,7 +293,9 @@ class LambdaRenderer:
             privacy=Privacy.PRIVATE,
             # About 4 renderer Lambdas per clip (plus the orchestrator), so
             # two concurrent renders fit a new account's 10-Lambda limit.
-            frames_per_lambda=max(60, math.ceil(frames / 4)),
+            # Capped so a long clip gets more, smaller chunks instead of
+            # ones too slow to finish inside the function timeout.
+            frames_per_lambda=min(MAX_FRAMES_PER_LAMBDA, max(60, math.ceil(frames / 4))),
             max_retries=1,
         )
         resp = self.client.render_media_on_lambda(params)

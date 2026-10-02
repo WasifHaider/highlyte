@@ -39,3 +39,16 @@ services:
       TS_EXTRA_ARGS: "--exit-node=${MUNTAZIR_EXIT_NODE} --exit-node-allow-lan-access"
     volumes:
       - ./ts/muntazir:/var/lib/tailscale
+
+  ts-hamza:
+    image: tailscale/tailscale:stable
+    restart: unless-stopped
+    hostname: hl-proxy-hamza
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY}
+      TS_USERSPACE: "true"
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SOCKS5_SERVER: ":1055"
+      TS_EXTRA_ARGS: "--exit-node=${HAMZA_EXIT_NODE} --exit-node-allow-lan-access"
+    volumes:
+      - ./ts/hamza:/var/lib/tailscale
