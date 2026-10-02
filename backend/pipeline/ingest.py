@@ -71,6 +71,13 @@ def _fmt_duration(seconds: float) -> str:
     return f"{m}:{s:02d}"
 
 
+def _touch(path: str) -> None:
+    try:
+        os.utime(path)
+    except OSError:
+        pass
+
+
 def _fetch(
     url: str, cache_dir: str, route: str | None, on_progress: "callable | None"
 ) -> tuple[dict, str]:
@@ -88,6 +95,7 @@ def _fetch(
     out_template = os.path.join(cache_dir, f"{video_id}.%(ext)s")
     target_video = os.path.join(cache_dir, f"{video_id}.mp4")
     if os.path.exists(target_video):
+        _touch(target_video)  # marks it as recently used for cache pruning
         return info, target_video
 
     def _hook(d: dict) -> None:
@@ -166,7 +174,9 @@ def ingest(url: str, cache_dir: str, on_progress: "callable | None" = None) -> V
     video_id = info["id"]
     target_audio = os.path.join(cache_dir, f"{video_id}.m4a")
 
-    if not os.path.exists(target_audio):
+    if os.path.exists(target_audio):
+        _touch(target_audio)
+    else:
         # Pull the audio track out of the downloaded video for transcription,
         # rather than a second yt-dlp download.
         extract_cmd = [

@@ -26,12 +26,17 @@ from . import db, storage
 from .spec import ClipStyle, Word, render_hash, style_hash
 
 FPS = 30
-MAX_ACTIVE = 2
+# Each render uses an orchestrator Lambda plus about 4 chunk Lambdas, and
+# accounts start at a 10-concurrent-Lambda limit, so 1 is the safe default.
+# Raise RENDER_MAX_ACTIVE after AWS grants a higher concurrency quota.
+MAX_ACTIVE = max(1, int(os.environ.get("RENDER_MAX_ACTIVE", "1")))
 STUCK_AFTER_S = 30 * 60
 MAX_FRAMES_PER_LAMBDA = 200
 THROTTLE_MAX_ATTEMPTS = 5
 THROTTLE_BACKOFF_S = 15
-THROTTLE_MARKERS = ("TooManyRequests", "Rate Exceeded", "ConcurrentInvocationLimitExceeded", "Throttl")
+THROTTLE_MARKERS = (
+    "TooManyRequests", "Rate Exceeded", "ConcurrentInvocationLimitExceeded", "Throttl", "Concurrency limit",
+)
 LIVE_STATUSES = ("queued", "rendering", "done")
 
 
@@ -229,7 +234,17 @@ class RenderService:
             return
         if p["fatal"]:
             messages = [str(e.get("message", e)) if isinstance(e, dict) else str(e) for e in p["errors"]]
-            r.status, r.error = "error", ("; ".join(messages) or "render failed")[:500]
+            text = "; ".join(messages)
+            if any(m in text for m in THROTTLE_MARKERS) and r.attempts + 1 < THROTTLE_MAX_ATTEMPTS:
+                # Lambda hit the account's concurrency limit mid-render
+                # (not at start). Queue it again and let _pump retry later.
+                r.attempts += 1
+                r.status, r.progress = "queued", 0.0
+                r.lambda_render_id = r.lambda_bucket = r.started_at = None
+                r.retry_at = self.now() + THROTTLE_BACKOFF_S * r.attempts
+                self.store.put(r)
+                return
+            r.status, r.error = "error", (text or "render failed")[:500]
             self.store.put(r)
             return
         r.progress = round(float(p["overallProgress"]) * 100, 1)

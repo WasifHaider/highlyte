@@ -39,7 +39,8 @@ class Clock:
 
 
 @pytest.fixture
-def setup():
+def setup(monkeypatch):
+    monkeypatch.setattr(render, "MAX_ACTIVE", 2)
     fake = FakeRenderer()
     uploads = []
     clock = Clock()
@@ -70,7 +71,8 @@ def test_identical_style_reuses_render(setup):
     assert len(fake.started) == 2
 
 
-def test_at_most_two_active(setup):
+def test_at_most_two_active(setup, monkeypatch):
+    monkeypatch.setattr(render, "MAX_ACTIVE", 2)
     svc, fake, _, _ = setup
     renders = [svc.request(f"job1-{i}", ClipStyle(layout="fit")) for i in range(3)]
     assert [r.status for r in renders] == ["rendering", "rendering", "queued"]
@@ -252,3 +254,33 @@ def test_check_versions(tmp_path):
     pkg.write_text(json.dumps({"dependencies": {"remotion": "4.0.500"}}))
     problems = render.check_versions(str(pkg), "remotion-render-4-0-400-mem2048mb")
     assert len(problems) == 2
+
+
+def test_default_is_one_active(setup, monkeypatch):
+    monkeypatch.setattr(render, "MAX_ACTIVE", 1)
+    svc, _, _, _ = setup
+    renders = [svc.request(f"job1-{i}", ClipStyle(layout="fit")) for i in range(2)]
+    assert [r.status for r in renders] == ["rendering", "queued"]
+
+
+def test_midrender_concurrency_error_requeues(setup):
+    svc, fake, _, clock = setup
+    r = svc.request("job1-0", ClipStyle(layout="fit"))
+    fake.progress_value = {
+        "overallProgress": 0.1, "done": False, "fatal": True, "outKey": None,
+        "errors": [{"message": "AWS Concurrency limit reached (Original Error: Rate Exceeded.)"}],
+    }
+    svc.refresh(r.id)
+    assert r.status == "queued" and r.attempts == 1 and r.error is None
+    clock.t += 1000
+    fake.progress_value = {"overallProgress": 0.2, "done": False, "fatal": False, "errors": [], "outKey": None}
+    svc.refresh(r.id)
+    assert r.status == "rendering" and len(fake.started) == 2
+
+
+def test_midrender_other_fatal_still_errors(setup):
+    svc, fake, _, _ = setup
+    r = svc.request("job1-0", ClipStyle(layout="fit"))
+    fake.progress_value = {"overallProgress": 0.1, "done": False, "fatal": True, "outKey": None, "errors": [{"message": "boom"}]}
+    svc.refresh(r.id)
+    assert r.status == "error" and r.error == "boom"

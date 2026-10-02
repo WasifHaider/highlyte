@@ -38,6 +38,7 @@ class FakeRenderer:
 
 @pytest.fixture
 def env(monkeypatch):
+    monkeypatch.setattr(render, "MAX_ACTIVE", 2)
     with open(FIXTURE, encoding="utf-8") as f:
         spec = ClipSpec.model_validate(json.load(f)).model_copy(update={"clipId": CLIP_ID})
     record = {

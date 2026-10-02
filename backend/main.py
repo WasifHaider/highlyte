@@ -21,7 +21,7 @@ from pydantic import BaseModel, ValidationError
 
 from . import accounts, captions, db, projects, render, srt, storage
 from .accounts import Member, current_member
-from .pipeline import clipprep, cut, groq_llm, ingest, scoring, selection, transcript
+from .pipeline import cache, clipprep, cut, groq_llm, ingest, scoring, selection, transcript
 from .pipeline.segments import Segment
 from .pipeline.segments import from_dict as segment_from_dict
 from .spec import ClipStyle, Word, default_style, window_duration
@@ -56,6 +56,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def _start_cache_sweeper() -> None:
+    cache.start_sweeper(CACHE_DIR)
+
 
 app.middleware("http")(accounts.session_middleware)
 app.include_router(accounts.router)
