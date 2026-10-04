@@ -8,9 +8,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
 # ffmpeg/ffprobe for cutting; libgl1 + libglib2.0-0 are what OpenCV (pulled
-# in by MediaPipe) needs to import on a slim image.
+# in by MediaPipe) needs to import on a slim image, and libegl1 + libgles2
+# are what MediaPipe's FaceLandmarker loads (without them face analysis
+# fails with "libEGL.so.1: cannot open shared object file").
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg libgl1 libglib2.0-0 ca-certificates \
+    && apt-get install -y --no-install-recommends ffmpeg libgl1 libegl1 libgles2 libglib2.0-0 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # yt-dlp needs a JavaScript runtime to solve YouTube's player challenges.

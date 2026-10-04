@@ -8,6 +8,7 @@ nudge or "include the next sentence" edit never needs a re-cut.
 from __future__ import annotations
 
 import os
+import traceback
 from dataclasses import dataclass
 from typing import Callable
 
@@ -111,6 +112,7 @@ def prepare_clip(
         reframe_result = reframe.analyze(frames, times, cuts)
     except Exception as e:  # noqa: BLE001
         print(f"[reframe] face analysis failed for {clip_id}, using fit: {e}")
+        traceback.print_exc()
         reframe_result = reframe.fallback()
 
     on_step("uploading")
