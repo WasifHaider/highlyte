@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import copy
 import os
+import shutil
 import tempfile
 import threading
 import time
@@ -614,6 +615,80 @@ def list_projects(
     counts = db.count_clips_by_job([r["id"] for r in rows])
     memory = [projects.from_job(job) for job in list(JOBS.values()) if job.team_id == member.team_id]
     return projects.build_projects(memory, rows, counts, q=q, status=status, limit=limit)
+
+
+def _purge_job(job_id: str) -> None:
+    """Delete a job's rows (clips, transcript and renders cascade) and its
+    media in R2 and on local disk. Raises if the database delete fails; the
+    media goes only after that succeeds, so a failure leaves the project
+    intact and a later media failure only costs space."""
+    job = JOBS.get(job_id)
+    rows = db.list_clips_for_job(job_id)
+    keys = {r["storage_key"] for r in rows if r.get("storage_key")}
+    if job is not None:
+        keys |= {c["storageKey"] for c in job.clips if c.get("storageKey")}
+    render_keys = db.list_render_keys_for_job(job_id)
+
+    db.delete_job(job_id)
+    JOBS.pop(job_id, None)
+
+    for key in keys:
+        for k in (key, storage.thumb_filename(key)):
+            storage.delete_clip(k)
+    for key in render_keys:
+        storage.delete_clip(key)
+    shutil.rmtree(os.path.join(CLIPS_DIR, job_id), ignore_errors=True)
+
+
+@app.delete("/api/jobs/{job_id}", status_code=204)
+def delete_project(job_id: str, member: Member = Depends(current_member)) -> Response:
+    """Permanently delete a project: its clips, transcript and exports, plus
+    the media in R2 and on local disk. A video still processing can't be
+    deleted, since its worker would keep writing into it."""
+    check_id(job_id, "job id")
+    _require_job(member, job_id)
+    job = JOBS.get(job_id)
+    if job is not None and job.status in projects.PROCESSING_STATUSES:
+        raise HTTPException(409, "This video is still processing. Wait for it to finish, then delete it.")
+    try:
+        _purge_job(job_id)
+    except Exception as e:  # noqa: BLE001
+        print(f"[supabase] delete_job failed for {job_id}: {e}")
+        raise HTTPException(500, "Couldn't delete the project. Try again.") from e
+    return Response(status_code=204)
+
+
+@app.post("/api/jobs/{job_id}/retry")
+def retry_failed(job_id: str, member: Member = Depends(current_member)) -> dict[str, str]:
+    """Run a failed video again from scratch: starts a new job for the same
+    link and language, then removes the failed one so the list doesn't show
+    both. (A job whose clip selection failed has its own, cheaper retry:
+    POST /api/jobs/{id}/select.)"""
+    check_id(job_id, "job id")
+    _require_job(member, job_id)
+    job = JOBS.get(job_id)
+    if job is not None:
+        status, url, language = job.status, job.url, job.language_requested
+    else:
+        row = db.get_job(job_id) or {}
+        # A row left mid-processing by a dead process is listed as failed.
+        status = "error" if row.get("status") not in ("done", "selection_failed") else row["status"]
+        url, language = row.get("url"), row.get("language_requested")
+    if status != "error":
+        raise HTTPException(409, "Only a failed video can be retried.")
+    if not url:
+        raise HTTPException(409, "This video's link wasn't saved. Submit it again.")
+
+    new_id = uuid.uuid4().hex[:12]
+    new_job = Job(id=new_id, url=url, team_id=member.team_id, created_by=member.user_id,
+                  language_requested=language if language in ("hinglish", "english") else "hinglish")
+    JOBS[new_id] = new_job
+    threading.Thread(target=_run_pipeline, args=(new_job,), daemon=True).start()
+    try:
+        _purge_job(job_id)
+    except Exception as e:  # noqa: BLE001
+        print(f"[retry] couldn't remove failed job {job_id}: {e}")
+    return {"job_id": new_id}
 
 
 @app.get("/api/clips")

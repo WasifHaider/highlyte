@@ -27,6 +27,11 @@
 
         <Transition name="fade" mode="out-in">
           <div class="panel-body" :key="clip.id">
+            <div class="panel-preview">
+              <RemotionPreview :spec="previewSpec" :clip-style="clip.style" auto-play />
+              <div v-if="clip.pendingAction" class="panel-preview-busy" aria-hidden="true"></div>
+            </div>
+
             <label class="field">
               <span class="field-label">Hook title</span>
               <input type="text" class="input" :value="clip.style.hookTitle || ''" maxlength="80" :disabled="!!clip.pendingAction"
@@ -86,6 +91,10 @@
 
             <hr class="divider" />
 
+            <TrimControls :clip="clip" />
+
+            <hr class="divider" />
+
             <div :class="{ 'controls-disabled': clip.pendingAction }">
               <CaptionEditor :key="clip.id" :clip-id="clip.id" :words="clip.spec.words" :edited="!!clip.captionsEdited"
                 :start="clip.spec.version === 2 ? clip.spec.start : null" :end="clip.spec.version === 2 ? clip.spec.end : null"
@@ -103,6 +112,8 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import CaptionEditor from './CaptionEditor.vue'
+import TrimControls from './TrimControls.vue'
+import RemotionPreview from './RemotionPreview.vue'
 import UiSelect from './ui/UiSelect.vue'
 import UiColorField from './ui/UiColorField.vue'
 import { LAYOUTS, PRESETS, layoutAllowed } from '../utils/clipStyle'
@@ -113,6 +124,11 @@ const SAVED_MESSAGE_MS = 1500
 const jobStore = useJobStore()
 const clip = computed(() => jobStore.clips.find(c => c.id === jobStore.editingClipId))
 const clipTime = computed(() => toClipTime(clip.value.spec))
+// Live caption edits preview before they're saved.
+const previewSpec = computed(() => {
+  const draft = jobStore.captionDrafts[clip.value.id]
+  return draft ? { ...clip.value.spec, words: draft } : clip.value.spec
+})
 const closeBtn = ref(null)
 
 // Quiet "Saving…"/"Saved" feedback for style and trim changes, derived from
@@ -220,6 +236,8 @@ watch(clip, (newClip, oldClip) => {
    cross-fade; block clicks on them so a stray click can't land on a field
    that belongs to the clip already being replaced. */
 .panel-body.fade-leave-active { pointer-events: none; }
+.panel-preview { position: relative; width: min(100%, 240px); margin: 0 auto; }
+.panel-preview-busy { position: absolute; inset: 0; border-radius: 10px; background: rgba(255,255,255,0.5); }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; width: 100%; }
 .field-label { font-size: 12.5px; font-weight: 500; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin-top: -12px; }

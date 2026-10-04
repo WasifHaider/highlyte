@@ -84,3 +84,77 @@ def test_project_list_includes_language(monkeypatch):
     monkeypatch.setattr(main.db, "list_jobs", lambda team_id, limit=20: [_row(language_used="english")])
     monkeypatch.setattr(main.db, "count_clips_by_job", lambda ids: {})
     assert client.get("/api/jobs").json()[0]["language"] == "english"
+
+
+def _stub_delete(monkeypatch, calls):
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: _row())
+    monkeypatch.setattr(main.db, "list_clips_for_job", lambda job_id: [{"id": "feed00000001-0", "storage_key": "feed00000001/clip_0.mp4"}])
+    monkeypatch.setattr(main.db, "list_render_keys_for_job", lambda job_id: ["renders/r1.mp4"])
+    monkeypatch.setattr(main.db, "delete_job", lambda job_id: calls.append(("job", job_id)))
+    monkeypatch.setattr(main.storage, "delete_clip", lambda key: calls.append(("r2", key)))
+
+
+def test_delete_project_removes_row_and_media(monkeypatch):
+    calls = []
+    _stub_delete(monkeypatch, calls)
+    res = client.delete("/api/jobs/feed00000001")
+    assert res.status_code == 204
+    assert ("job", "feed00000001") in calls
+    r2 = {k for kind, k in calls if kind == "r2"}
+    assert {"feed00000001/clip_0.mp4", "renders/r1.mp4"} <= r2
+
+
+def test_delete_project_refuses_while_processing(monkeypatch):
+    calls = []
+    _stub_delete(monkeypatch, calls)
+    main.JOBS["feed00000001"] = main.Job(id="feed00000001", url="https://youtu.be/qt6YoGmksCc", status="transcribing", team_id=TEST_TEAM_ID)
+    try:
+        assert client.delete("/api/jobs/feed00000001").status_code == 409
+        assert calls == []
+    finally:
+        main.JOBS.pop("feed00000001", None)
+
+
+def test_delete_project_other_team_is_404(monkeypatch):
+    calls = []
+    _stub_delete(monkeypatch, calls)
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: _row(team_id="someone-else"))
+    assert client.delete("/api/jobs/feed00000001").status_code == 404
+    assert calls == []
+
+
+def test_delete_project_db_failure_keeps_media(monkeypatch):
+    calls = []
+    _stub_delete(monkeypatch, calls)
+
+    def boom(job_id):
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(main.db, "delete_job", boom)
+    assert client.delete("/api/jobs/feed00000001").status_code == 500
+    assert calls == []
+
+
+def test_retry_failed_starts_new_job_and_removes_old(monkeypatch):
+    calls = []
+    _stub_delete(monkeypatch, calls)
+    monkeypatch.setattr(main.db, "get_job", lambda job_id: _row(status="error", language_requested="english"))
+    started = []
+    monkeypatch.setattr(main, "_run_pipeline", lambda job: started.append(job))
+    res = client.post("/api/jobs/feed00000001/retry")
+    assert res.status_code == 200
+    new_id = res.json()["job_id"]
+    try:
+        assert new_id != "feed00000001"
+        assert main.JOBS[new_id].url == "https://youtu.be/qt6YoGmksCc"
+        assert main.JOBS[new_id].language_requested == "english"
+        assert ("job", "feed00000001") in calls
+    finally:
+        main.JOBS.pop(new_id, None)
+
+
+def test_retry_rejects_done_job(monkeypatch):
+    calls = []
+    _stub_delete(monkeypatch, calls)
+    assert client.post("/api/jobs/feed00000001/retry").status_code == 409
+    assert calls == []

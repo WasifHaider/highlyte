@@ -43,6 +43,14 @@ export function listProjects(params = {}) {
   return api.get('/api/jobs', { params }).then(r => r.data)
 }
 
+export function deleteProject(jobId) {
+  return api.delete(`/api/jobs/${jobId}`)
+}
+
+export function retryProject(jobId) {
+  return api.post(`/api/jobs/${jobId}/retry`).then(r => r.data)
+}
+
 export function clipDownloadUrl(path) {
   return `${baseURL}${path}`
 }

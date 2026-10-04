@@ -74,9 +74,7 @@ function toggleStyleAll() {
 .checkbox.checked { background: var(--accent); border-color: var(--accent); }
 .header-title { font-size: 14px; font-weight: 600; }
 .style-all-btn.open { background: var(--accent-soft); color: var(--accent-text); }
-.clip-grid {
-  display: grid; gap: 24px; grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-@media (max-width: 1024px) { .clip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .clip-grid { grid-template-columns: 1fr; } }
+/* One clip per row (Opus-style list); very wide screens get two columns. */
+.clip-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 1500px) { .clip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>

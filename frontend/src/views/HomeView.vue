@@ -46,7 +46,7 @@
         <SkeletonCard v-for="i in HOME_SKELETON_COUNT" :key="i" variant="project" />
       </div>
       <TransitionGroup v-else name="rise" tag="div" class="grid" appear>
-        <ProjectCard v-for="p in projects" :key="p.id" :project="p" />
+        <ProjectCard v-for="p in projects" :key="p.id" :project="p" @deleted="reload" @retried="reload" />
       </TransitionGroup>
     </section>
   </div>

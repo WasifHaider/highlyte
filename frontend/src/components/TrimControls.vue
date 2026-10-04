@@ -80,7 +80,6 @@ function reset() {
 <style scoped>
 .trim-controls {
   display: flex; flex-direction: column; gap: 8px;
-  padding-bottom: 12px; border-bottom: 1px solid var(--border);
 }
 .trim-header { display: flex; align-items: center; justify-content: space-between; }
 .trim-title { font-size: 11px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); }
@@ -93,5 +92,5 @@ function reset() {
 .trim-reset.disabled { opacity: .5; cursor: default; pointer-events: none; }
 .trim-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .trim-label { font-size: 11.5px; color: var(--ink-faint); width: 36px; flex-shrink: 0; }
-.note { font-size: 12px; color: var(--ink-faint); padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.note { font-size: 12px; color: var(--ink-faint); }
 </style>

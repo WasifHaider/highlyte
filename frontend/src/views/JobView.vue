@@ -169,7 +169,6 @@ watch(() => props.id, (newId) => startForId(newId))
 .video-row-skeleton .text-40 { width: 40%; max-width: 180px; }
 /* Mirrors ClipList's .clip-grid so the loading skeleton lines up with the
    real grid that replaces it once the first status arrives. */
-.clip-grid { display: grid; gap: 24px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-@media (max-width: 1024px) { .clip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .clip-grid { grid-template-columns: 1fr; } }
+.clip-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 1500px) { .clip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>

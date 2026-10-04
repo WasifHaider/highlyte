@@ -28,7 +28,9 @@ defineProps({
 <style scoped>
 .skeleton-card { overflow: hidden; display: flex; flex-direction: column; }
 .thumb { aspect-ratio: 16 / 9; }
-.skeleton-card.clip .thumb { aspect-ratio: 9 / 16; }
+.skeleton-card.clip { flex-direction: row; gap: 16px; padding: 14px; }
+.skeleton-card.clip .thumb { aspect-ratio: 9 / 16; width: 112px; flex-shrink: 0; border-radius: 10px; }
+.skeleton-card.clip .body { flex: 1; padding: 0; }
 .body { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .bar { border-radius: 6px; }
 .text-80 { height: 14px; width: 80%; }

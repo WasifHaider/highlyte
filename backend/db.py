@@ -204,6 +204,33 @@ def get_render(render_id: str) -> dict[str, Any] | None:
         return None
 
 
+def list_render_keys_for_job(job_id: str) -> list[str]:
+    """Bucket keys of every finished export of the job's clips, so deleting
+    the job can remove those objects too (the rows go with it by cascade)."""
+    client = get_client()
+    if client is None:
+        return []
+    try:
+        clip_ids = [c["id"] for c in client.table("clips").select("id").eq("job_id", job_id).execute().data or []]
+        if not clip_ids:
+            return []
+        res = client.table("renders").select("storage_key").in_("clip_id", clip_ids).execute()
+        return [r["storage_key"] for r in res.data or [] if r.get("storage_key")]
+    except Exception as e:  # noqa: BLE001
+        print(f"[supabase] list_render_keys_for_job failed: {e}")
+        return []
+
+
+def delete_job(job_id: str) -> None:
+    """Deletes the job; its clips, transcript and renders go with it
+    (on delete cascade). Raises on failure so the caller can report it
+    rather than claim a delete that didn't happen."""
+    client = get_client()
+    if client is None:
+        return
+    client.table("jobs").delete().eq("id", job_id).execute()
+
+
 def count_clips_by_job(job_ids: list[str]) -> dict[str, int]:
     """Clip count per job for the project list, in one query. PostgREST caps
     a response at its max-rows setting (1000 by default), so with more clips
