@@ -73,3 +73,12 @@ route.
 
 - Downloads work only while at least one route's laptop is awake and online.
 - Download speed is capped by that home connection's upload speed.
+- The video is downloaded from YouTube once per job and every clip is cut
+  from that file, so a job makes a handful of requests, not one per clip.
+- Routes take turns. A route YouTube rate-limits (429 / "not a bot") is
+  retried once after a pause, then rested for 10 minutes. An offline route
+  is skipped until it answers a quick check. If none is usable, the job
+  waits up to 15 minutes for one to return, then fails with the real cause.
+- Tuning (server `.env`, all optional): `YTDLP_WAIT_S` (default 900),
+  `YTDLP_RATE_COOLDOWN_S` (600), `YTDLP_CONCURRENCY` (simultaneous
+  YouTube downloads, default 2).

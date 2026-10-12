@@ -21,7 +21,7 @@ services:
   # YouTube blocks EC2's IP, so yt-dlp downloads through teammates' home
   # laptops. Each sidecar joins the tailnet, sends its traffic out through
   # one teammate's laptop (a Tailscale exit node) and offers an HTTP proxy
-  # on port 1056 (clip downloads use ffmpeg, which cannot use SOCKS). The backend tries them in YTDLP_PROXIES order, e.g.
+  # on port 1056. The backend tries them in YTDLP_PROXIES order, e.g.
   # YTDLP_PROXIES=http://ts-muntazir:1056. Setup: docs/tailscale-download-route.md.
   # --exit-node must be the laptop's Tailscale IP (100.x.y.z, from the admin
   # console): the sidecar can't resolve a machine name while starting up.

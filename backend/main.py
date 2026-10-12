@@ -368,8 +368,15 @@ def _save_style(record: dict[str, Any], style: ClipStyle) -> dict[str, Any]:
     return record["style"]
 
 
-def _section_fetcher(url: str):
-    return lambda start, end, out_path: ingest.fetch_section(url, start, end, out_path)
+def _section_source(job: Job, meta: ingest.VideoMeta, report: bool = True) -> ingest.SectionSource:
+    """Clip sections cut from one cached download of the job's video. With
+    `report`, the job's progress shows that download (and any wait for a
+    download route)."""
+    def on_progress(stage: str, percent: float | None, note: str) -> None:
+        job.progress = {"stage": stage, "percent": percent, "note": f"video for clips: {note}"}
+        _persist_job(job, throttle=True)
+
+    return ingest.SectionSource(job.url, CACHE_DIR, meta.video_id, on_progress if report else None)
 
 
 def _select_and_prepare(job: Job, meta: ingest.VideoMeta, segs: list[Segment], loudness: list[float]) -> None:
@@ -407,7 +414,7 @@ def _select_and_prepare(job: Job, meta: ingest.VideoMeta, segs: list[Segment], l
 
         prepared = clipprep.prepare_clip(
             job_id=job.id, idx=i, clip=c,
-            fetch_section=_section_fetcher(job.url), video_duration=meta.duration,
+            fetch_section=_section_source(job, meta), video_duration=meta.duration,
             segments=word_segments,
             clips_dir=CLIPS_DIR, models_dir=MODELS_DIR, on_step=on_step,
         )
@@ -1038,7 +1045,7 @@ def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:
             return
 
         prepared = clipprep.prepare_clip(
-            job_id=job.id, idx=idx, clip=new_clip, fetch_section=_section_fetcher(job.url),
+            job_id=job.id, idx=idx, clip=new_clip, fetch_section=_section_source(job, meta, report=False),
             video_duration=meta.duration, segments=transcript.word_segments(segs),
             clips_dir=CLIPS_DIR, models_dir=MODELS_DIR, on_step=lambda s: None,
             revision=new_revision,
