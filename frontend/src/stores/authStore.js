@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { getMe, login as apiLogin, logout as apiLogout, signup as apiSignup } from '../services/highlyteApi'
+import { getMe, login as apiLogin, logout as apiLogout, setMyGroqKey, signup as apiSignup } from '../services/highlyteApi'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -34,6 +34,10 @@ export const useAuthStore = defineStore('auth', {
       } finally {
         this.me = null
       }
+    },
+    async setGroqKey(groqKey) {
+      const result = await setMyGroqKey(groqKey)
+      if (this.me) this.me.groqKey = result.groqKey
     },
   },
 })

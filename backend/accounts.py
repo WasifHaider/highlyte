@@ -45,12 +45,14 @@ class Member:
     team_id: str
     team_name: str
     role: str  # admin | member
+    groq_key: str | None = None
 
     def to_me(self) -> dict[str, Any]:
         return {
             "user": {"id": self.user_id, "email": self.email},
             "team": {"id": self.team_id, "name": self.team_name},
             "role": self.role,
+            "groqKey": self.groq_key,
         }
 
 
@@ -75,6 +77,15 @@ class LoginRequest(BaseModel):
 
 class AddUserRequest(BaseModel):
     email: str = Field(pattern=EMAIL_PATTERN, max_length=254)
+
+
+class GroqKeyRequest(BaseModel):
+    groqKey: str = Field(max_length=200)
+
+    @field_validator("groqKey")
+    @classmethod
+    def _groq_key(cls, value: str) -> str:
+        return value.strip()
 
 
 _member_cache: dict[str, tuple[float, Member]] = {}
@@ -115,6 +126,7 @@ def _load_member(user: auth.AuthUser) -> Member | None:
         team_id=row["team_id"],
         team_name=(row.get("teams") or {}).get("name") or "",
         role=row["role"],
+        groq_key=row.get("groq_key") or None,
     )
     with _member_lock:
         _member_cache[user.id] = (time.monotonic() + MEMBER_CACHE_TTL_S, member)
@@ -271,6 +283,13 @@ def logout(request: Request) -> Response:
 @router.get("/api/auth/me")
 def me(member: Member = Depends(current_member)) -> dict[str, Any]:
     return member.to_me()
+
+
+@router.put("/api/me/groq-key")
+def set_my_groq_key(body: GroqKeyRequest, member: Member = Depends(current_member)) -> dict[str, Any]:
+    db.set_member_groq_key(member.user_id, body.groqKey or None)
+    _forget_member(member.user_id)  # next call reloads the fresh key, not the 60s cache
+    return {"groqKey": body.groqKey or None}
 
 
 @router.get("/api/team/users")

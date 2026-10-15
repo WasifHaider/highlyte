@@ -11,6 +11,8 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from . import groq_context
+
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 GROQ_MODEL = "openai/gpt-oss-20b"
 # Groq free tier for gpt-oss-20b (checked 2026-09-26): 8k tokens/minute,
@@ -160,23 +162,27 @@ class GroqChat:
         self._reset_at = self._clock() + (wait if wait is not None else DEFAULT_WINDOW_S)
 
 
-_chat: GroqChat | None = None
+_chats: dict[str, GroqChat] = {}
 _chat_lock = threading.Lock()
 
 
 def build_chat() -> GroqChat | None:
-    """One GroqChat per process, shared by every job so they pace calls
-    against the same per-minute budget (spec section 1)."""
-    global _chat
-    key = os.environ.get("GROQ_KEY")
+    """One GroqChat per Groq key, shared by every job using that key so
+    they pace calls against the same per-minute budget (spec section 1).
+    Each member can bring their own key (`groq_context`), so the cache is
+    keyed by key rather than a single process-wide singleton."""
+    key = groq_context.get_groq_key()
     if not key:
         return None
-    if _chat is None:
+    chat = _chats.get(key)
+    if chat is None:
         with _chat_lock:
-            if _chat is None:
+            chat = _chats.get(key)
+            if chat is None:
                 from openai import OpenAI
 
                 # max_retries=0: GroqChat handles 429s itself, and retrying
                 # a daily limit only burns requests.
-                _chat = GroqChat(OpenAI(api_key=key, base_url=GROQ_BASE_URL, max_retries=0))
-    return _chat
+                chat = GroqChat(OpenAI(api_key=key, base_url=GROQ_BASE_URL, max_retries=0))
+                _chats[key] = chat
+    return chat

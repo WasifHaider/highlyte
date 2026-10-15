@@ -40,6 +40,21 @@ results" in `docs/superpowers/specs/2026-09-25-hinglish-v1-roadmap.md`.
 
 ## Setup
 
+### Non-technical teammates (Windows)
+1. Get the `.env` file from whoever set up Supabase/AWS and put it in this
+   folder (same place as `setup.bat`). It's shared once; it already has the
+   team's Supabase and AWS Lambda credentials.
+2. Double-click `setup.bat`. It installs Python/Node/ffmpeg if missing and
+   sets everything up. Only needed once.
+3. Double-click `start.bat` whenever you want to use HighLyte. It opens the
+   app in your browser.
+4. In the app, open the account menu -> Settings and paste your own free
+   Groq key (get one at console.groq.com/keys). Each person uses their own.
+
+Running the app locally like this, instead of through the shared server,
+means your own internet connection downloads the videos — no "Tailscale not
+connected" errors from a teammate's laptop being offline.
+
 ### Backend
 ```
 cd HighLyte

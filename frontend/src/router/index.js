@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import JobView from '../views/JobView.vue'
 import LoginView from '../views/LoginView.vue'
 import ProjectsView from '../views/ProjectsView.vue'
+import SettingsView from '../views/SettingsView.vue'
 import SignupView from '../views/SignupView.vue'
 import TeamView from '../views/TeamView.vue'
 import { useAuthStore } from '../stores/authStore'
@@ -16,6 +17,7 @@ const router = createRouter({
     { path: '/projects', name: 'projects', component: ProjectsView },
     { path: '/jobs/:id', name: 'job', component: JobView, props: true },
     { path: '/team', name: 'team', component: TeamView, meta: { adminOnly: true } },
+    { path: '/settings', name: 'settings', component: SettingsView },
     // Library was replaced by Projects; keep old links working.
     { path: '/library', redirect: '/projects' },
   ],

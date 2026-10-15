@@ -48,6 +48,7 @@
           <Transition name="pop">
             <div v-if="menuOpen" class="account-menu card" role="menu">
               <div class="account-email faint">{{ auth.me?.user.email }}</div>
+              <router-link to="/settings" class="btn btn-ghost menu-link" role="menuitem" @click="menuOpen = false">Settings</router-link>
               <button class="btn btn-ghost logout" role="menuitem" @click="onLogout">Log out</button>
             </div>
           </Transition>
@@ -147,7 +148,8 @@ async function onLogout() {
   box-shadow: 0 1px 2px rgba(0,0,0,.04); z-index: 30;
 }
 .account-email { padding: 4px 6px 10px; border-bottom: 1px solid var(--border); margin-bottom: 8px; word-break: break-all; font-size: 12.5px; }
-.logout { width: 100%; justify-content: flex-start; }
+.menu-link, .logout { width: 100%; justify-content: flex-start; text-decoration: none; }
+.menu-link { margin-bottom: 4px; }
 .account-label { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 @media (max-width: 640px) {

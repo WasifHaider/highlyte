@@ -168,6 +168,6 @@ def rank(chat, units: list[ThoughtUnit]) -> RankResult:
                 + (f" Try again in {daily_wait}." if daily_wait else " Try again later.")
             )
         if last_error is not None and is_auth_failure(last_error):
-            raise SelectionFailed("Clip selection couldn't reach Groq: the API key was rejected. Check GROQ_KEY.")
+            raise SelectionFailed("Clip selection couldn't reach Groq: the API key was rejected. Check your Groq key under Settings.")
         raise SelectionFailed("Clip selection failed for this video. Try again.")
     return RankResult(picks, skipped)

@@ -128,7 +128,7 @@ def select(segments: list[Segment], loudness: list[float], *, chat=None) -> Sele
     if chat is None:
         chat = groq_llm.build_chat()
     if chat is None:
-        raise SelectionFailed("Clip selection needs GROQ_KEY.")
+        raise SelectionFailed("Clip selection needs a Groq key. Add yours under Settings.")
 
     utterances = build_utterances(segments)
     if not utterances:
@@ -161,7 +161,7 @@ def regenerate(
     if chat is None:
         chat = groq_llm.build_chat()
     if chat is None:
-        raise SelectionFailed("Regenerate needs GROQ_KEY.")
+        raise SelectionFailed("Regenerate needs a Groq key. Add yours under Settings.")
     utterances = build_utterances(segments)
     if not utterances:
         return None

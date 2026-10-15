@@ -34,7 +34,7 @@ import tempfile
 from dataclasses import dataclass, field
 from typing import Callable
 
-from . import asr, audio, hinglish, langcheck, segments
+from . import asr, audio, groq_context, hinglish, langcheck, segments
 
 ROMAN_URDU_HINDI_SEED = (
     "Yeh podcast Roman Urdu aur Hindi mein baat karta hai, jaise "
@@ -71,7 +71,7 @@ class NoSpeechError(RuntimeError):
 
 
 def _providers(language: str) -> tuple[asr.AsrProvider | None, asr.AsrProvider]:
-    key = os.environ.get("GROQ_KEY")
+    key = groq_context.get_groq_key()
     model = asr.GROQ_HINGLISH_MODEL if language == "hinglish" else asr.GROQ_ENGLISH_MODEL
     return (asr.GroqAsr(key, model) if key else None), asr.LocalWhisperAsr("small")
 
@@ -93,7 +93,7 @@ def transcribe(
         loudness = audio.loudness_db(samples)
 
         if detect is None:
-            key = os.environ.get("GROQ_KEY")
+            key = groq_context.get_groq_key()
             detect = langcheck.groq_detector(key) if key else langcheck.local_detect
         decision = langcheck.decide(audio.language_samples(samples, tmp_dir), requested, detect)
 

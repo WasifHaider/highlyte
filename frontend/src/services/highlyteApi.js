@@ -117,3 +117,5 @@ export const logout = () => api.post('/api/auth/logout')
 export const listTeamUsers = () => api.get('/api/team/users').then(r => r.data)
 export const addTeamUser = email => api.post('/api/team/users', { email }).then(r => r.data)
 export const removeTeamUser = userId => api.delete(`/api/team/users/${userId}`)
+
+export const setMyGroqKey = groqKey => api.put('/api/me/groq-key', { groqKey }).then(r => r.data)
