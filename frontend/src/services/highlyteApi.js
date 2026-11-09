@@ -119,3 +119,10 @@ export const addTeamUser = email => api.post('/api/team/users', { email }).then(
 export const removeTeamUser = userId => api.delete(`/api/team/users/${userId}`)
 
 export const setMyGroqKey = groqKey => api.put('/api/me/groq-key', { groqKey }).then(r => r.data)
+
+// Video upload: the browser sends the parts straight to R2 (see uploader.js).
+export const startUpload = (file) =>
+  api.post('/api/uploads', { filename: file.name, size: file.size, contentType: file.type || null }).then(r => r.data)
+export const completeUpload = (uploadId, parts, language) =>
+  api.post(`/api/uploads/${uploadId}/complete`, { parts, language }).then(r => r.data)
+export const abortUpload = (uploadId) => api.delete(`/api/uploads/${uploadId}`)

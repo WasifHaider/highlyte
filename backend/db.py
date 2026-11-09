@@ -87,6 +87,18 @@ def get_job(job_id: str) -> dict[str, Any] | None:
         return None
 
 
+def find_job_by_url(url: str) -> dict[str, Any] | None:
+    """Any job with this source (used for uploads, whose source is unique)."""
+    client = get_client()
+    if client is None:
+        return None
+    try:
+        return _first(client.table("jobs").select("id,team_id").eq("url", url).limit(1).execute())
+    except Exception as e:  # noqa: BLE001
+        print(f"[supabase] find_job_by_url failed: {e}")
+        return None
+
+
 def list_clips_for_job(job_id: str) -> list[dict[str, Any]]:
     client = get_client()
     if client is None:

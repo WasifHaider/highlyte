@@ -18,11 +18,11 @@ import math
 from fastapi import Body, Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from . import accounts, captions, db, projects, render, srt, storage
 from .accounts import Member, current_member
-from .pipeline import cache, clipprep, cut, groq_context, groq_llm, ingest, scoring, selection, transcript
+from .pipeline import cache, clipprep, cut, groq_context, groq_llm, ingest, scoring, selection, transcript, uploads
 from .pipeline.segments import Segment
 from .pipeline.segments import from_dict as segment_from_dict
 from .spec import ClipStyle, Word, default_style, window_duration
@@ -76,6 +76,15 @@ CLIP_REDIRECT_MAX_AGE_S = 600
 class GenerateRequest(BaseModel):
     url: str
     language: Literal["hinglish", "english"] = "hinglish"
+
+    @field_validator("url")
+    @classmethod
+    def _web_link(cls, v: str) -> str:
+        # "upload:" sources are made only by /api/uploads/{id}/complete,
+        # after checking the upload belongs to the caller's team.
+        if v.strip().lower().startswith(uploads.PREFIX):
+            raise ValueError("Paste a video link")
+        return v.strip()
 
 
 @dataclass
@@ -513,6 +522,7 @@ def health() -> dict[str, Any]:
         "supabase": db.is_enabled(),
         "auth": db.is_enabled(),
         "rendering": RENDER_SERVICE is not None,
+        "uploads": storage.is_enabled(),
     }
 
 
@@ -524,6 +534,108 @@ def generate(req: GenerateRequest, member: Member = Depends(current_member)) -> 
     JOBS[job_id] = job
     _start_thread(_run_pipeline, job, groq_key=member.groq_key)
     return {"job_id": job_id}
+
+
+# --- video upload (the fallback when YouTube blocks every route) -------------
+# Pending uploads: upload id -> {"team", "key", "r2UploadId"}. In memory only;
+# a restart forgets them and the R2 lifecycle rule removes the orphaned parts.
+PENDING_UPLOADS: dict[str, dict[str, str]] = {}
+_UPLOADS_LOCK = threading.Lock()
+
+
+class StartUploadBody(BaseModel):
+    filename: str = Field(max_length=255)
+    size: int
+    contentType: str | None = None
+
+
+class UploadPart(BaseModel):
+    partNumber: int = Field(ge=1, le=10000)
+    etag: str = Field(max_length=200)
+
+
+class CompleteUploadBody(BaseModel):
+    parts: list[UploadPart] = Field(min_length=1, max_length=10000)
+    language: Literal["hinglish", "english"] = "hinglish"
+
+
+def _require_r2() -> None:
+    if not storage.is_enabled():
+        raise HTTPException(503, "Uploads aren't available: storage isn't configured.")
+
+
+def _take_pending(upload_id: str, member: Member) -> dict[str, str]:
+    """Remove and return a pending upload of the caller's team, else 404."""
+    with _UPLOADS_LOCK:
+        pending = PENDING_UPLOADS.get(upload_id)
+        if pending is None or pending["team"] != member.team_id:
+            raise HTTPException(404, "upload not found")
+        return PENDING_UPLOADS.pop(upload_id)
+
+
+@app.post("/api/uploads")
+def start_upload(body: StartUploadBody, member: Member = Depends(current_member)) -> dict[str, Any]:
+    _require_r2()
+    upload_id = uuid.uuid4().hex[:12]
+    try:
+        info = uploads.start(upload_id, body.filename, body.size, body.contentType, member.team_id)
+    except uploads.UploadError as e:
+        raise HTTPException(400, str(e)) from e
+    with _UPLOADS_LOCK:
+        PENDING_UPLOADS[upload_id] = {"team": member.team_id, "key": info["key"], "r2UploadId": info["r2UploadId"]}
+    return {"uploadId": upload_id, "partSize": info["partSize"], "partUrls": info["partUrls"]}
+
+
+@app.post("/api/uploads/{upload_id}/complete")
+def complete_upload(upload_id: str, body: CompleteUploadBody,
+                    member: Member = Depends(current_member)) -> dict[str, str]:
+    _require_r2()
+    pending = _take_pending(upload_id, member)
+    try:
+        uploads.complete(pending["key"], pending["r2UploadId"], [p.model_dump() for p in body.parts])
+    except Exception as e:  # noqa: BLE001
+        print(f"[uploads] complete failed for {upload_id}: {e}")
+        raise HTTPException(502, "Upload failed. Check your connection and try again.") from e
+    job_id = uuid.uuid4().hex[:12]
+    job = Job(id=job_id, url=f"{uploads.PREFIX}{upload_id}", team_id=member.team_id,
+              created_by=member.user_id, language_requested=body.language)
+    JOBS[job_id] = job
+    _start_thread(_run_pipeline, job, groq_key=member.groq_key)
+    return {"job_id": job_id}
+
+
+@app.delete("/api/uploads/{upload_id}", status_code=204)
+def abort_upload(upload_id: str, member: Member = Depends(current_member)) -> Response:
+    pending = _take_pending(upload_id, member)
+    try:
+        uploads.abort(pending["key"], pending["r2UploadId"])
+    except Exception as e:  # noqa: BLE001  the lifecycle rule cleans up anyway
+        print(f"[uploads] abort failed for {upload_id}: {e}")
+    return Response(status_code=204)
+
+
+def _team_owns_upload(member: Member, source: str) -> bool:
+    if any(j.url == source and j.team_id == member.team_id for j in list(JOBS.values())):
+        return True
+    row = db.find_job_by_url(source)
+    return row is not None and row.get("team_id") == member.team_id
+
+
+@app.get("/api/uploads/{upload_id}/thumb.jpg")
+def get_upload_thumb(upload_id: str, member: Member = Depends(current_member)) -> StreamingResponse:
+    source = f"{uploads.PREFIX}{upload_id}"
+    try:
+        uploads.upload_id_of(source)
+    except ValueError as e:
+        raise HTTPException(404, "not found") from e
+    if not _team_owns_upload(member, source):
+        raise HTTPException(404, "not found")
+    try:
+        body = uploads.open_thumb(upload_id)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(404, "not found") from e
+    return StreamingResponse(body, media_type="image/jpeg",
+                             headers={"Cache-Control": storage.MEDIA_CACHE_CONTROL})
 
 
 @app.post("/api/jobs/{job_id}/select")
@@ -630,12 +742,14 @@ def list_projects(
     return projects.build_projects(memory, rows, counts, q=q, status=status, limit=limit)
 
 
-def _purge_job(job_id: str) -> None:
+def _purge_job(job_id: str, *, keep_upload: bool = False) -> None:
     """Delete a job's rows (clips, transcript and renders cascade) and its
-    media in R2 and on local disk. Raises if the database delete fails; the
+    media in R2 and on local disk, including an uploaded original unless
+    keep_upload (a retry reuses it). Raises if the database delete fails; the
     media goes only after that succeeds, so a failure leaves the project
     intact and a later media failure only costs space."""
     job = JOBS.get(job_id)
+    source = job.url if job is not None else (db.get_job(job_id) or {}).get("url")
     rows = db.list_clips_for_job(job_id)
     keys = {r["storage_key"] for r in rows if r.get("storage_key")}
     if job is not None:
@@ -651,6 +765,11 @@ def _purge_job(job_id: str) -> None:
     for key in render_keys:
         storage.delete_clip(key)
     shutil.rmtree(os.path.join(CLIPS_DIR, job_id), ignore_errors=True)
+    if not keep_upload and uploads.is_upload(source):
+        try:
+            uploads.delete_upload(uploads.upload_id_of(source))
+        except ValueError:
+            pass
 
 
 @app.delete("/api/jobs/{job_id}", status_code=204)
@@ -698,7 +817,7 @@ def retry_failed(job_id: str, member: Member = Depends(current_member)) -> dict[
     JOBS[new_id] = new_job
     _start_thread(_run_pipeline, new_job, groq_key=member.groq_key)
     try:
-        _purge_job(job_id)
+        _purge_job(job_id, keep_upload=True)  # the new job reads the same upload
     except Exception as e:  # noqa: BLE001
         print(f"[retry] couldn't remove failed job {job_id}: {e}")
     return {"job_id": new_id}

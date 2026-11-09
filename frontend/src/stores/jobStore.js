@@ -92,6 +92,11 @@ export const useJobStore = defineStore('job', {
     async submitUrl(url, language = 'hinglish') {
       this.error = null
       const { job_id } = await createJob(url, language)
+      return this.openNewJob(job_id)
+    },
+    // A job just created (from a link or an upload) becomes the current one.
+    openNewJob(job_id) {
+      this.error = null
       this.currentJobId = job_id
       this.job = null
       this.selected = {}

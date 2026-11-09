@@ -189,6 +189,16 @@ MISMATCH line at startup if they differ.
 cd renderer && npm test
 ```
 
+## Uploading a video
+
+When YouTube blocks the download routes, or the video isn't on YouTube,
+upload the file on the Home page instead (MP4, MOV, MKV, WebM or M4V, up
+to 5 GB). The browser sends it straight to R2, so the bucket needs a CORS
+rule and a lifecycle rule first: see
+[docs/video-upload-setup.md](docs/video-upload-setup.md). For fewer YouTube
+rate limits in the first place, see section 6 of
+[docs/tailscale-download-route.md](docs/tailscale-download-route.md).
+
 ## Fixing a clip
 
 The clip card offers fast edits without re-running the whole video.
