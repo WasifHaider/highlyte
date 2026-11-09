@@ -18,6 +18,16 @@ services:
       timeout: 5s
       retries: 3
 
+  # Generates YouTube "proof of origin" tokens for yt-dlp (through the
+  # bgutil-ytdlp-pot-provider plugin in requirements.txt), so downloads look
+  # less like a bot and get rate-limited less. Set
+  # YTDLP_POT_URL=http://pot-provider:4416 in .env. No port is published:
+  # only the backend on this compose network can reach it. Keep the image
+  # tag equal to the plugin version in requirements.txt.
+  pot-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:2.0.2
+    restart: unless-stopped
+
   # YouTube blocks EC2's IP, so yt-dlp downloads through teammates' home
   # laptops. Each sidecar joins the tailnet, sends its traffic out through
   # one teammate's laptop (a Tailscale exit node) and offers an HTTP proxy

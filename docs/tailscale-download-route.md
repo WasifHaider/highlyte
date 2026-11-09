@@ -69,6 +69,60 @@ This should print the video title, not a "not a bot" error.
 The backend logs `[ingest] route ... failed: ...` whenever it skips a
 route.
 
+## 6. Fewer rate limits: PO tokens and cookies
+
+Two optional extras make YouTube treat the downloads as less bot-like.
+Each one helps on its own; together they help most.
+
+### PO-token provider
+
+The `pot-provider` service in `deploy/docker-compose.yml` generates
+YouTube "proof of origin" tokens, and the `bgutil-ytdlp-pot-provider`
+plugin (in `requirements.txt`) hands them to yt-dlp. Turn it on by adding
+this to `~/highlyte/.env`, then redeploy:
+
+```
+YTDLP_POT_URL=http://pot-provider:4416
+```
+
+If the sidecar is down, yt-dlp logs a warning and downloads without a
+token, as before. Keep its image tag equal to the plugin version.
+
+### Cookies from a burner account
+
+Logged-in downloads are rate-limited far less than anonymous ones.
+
+> **Use a throwaway Google account made only for this.** YouTube can
+> suspend accounts used for automated downloads. Never use anyone's real
+> account.
+
+1. Make a new Google account and open YouTube with it once.
+2. Open a **private/incognito window**, log in to YouTube with the burner
+   account, and open `https://www.youtube.com/robots.txt` in that tab.
+3. Export the cookies for youtube.com with a cookies.txt extension
+   ("Get cookies.txt LOCALLY" works). Save as `youtube-cookies.txt`.
+4. Close the private window **without logging out**. Using that window
+   again would make YouTube rotate the cookies and the exported ones stop
+   working.
+5. Copy the file to the server and point the backend at it:
+
+   ```bash
+   scp -i hireflow-key.pem youtube-cookies.txt ec2-user@13.204.4.68:~/highlyte/data/secrets/youtube-cookies.txt
+   ```
+
+   In `~/highlyte/.env` (the container sees `data/` as `/app/data`):
+
+   ```
+   YTDLP_COOKIES=/app/data/secrets/youtube-cookies.txt
+   ```
+
+   Then `docker-compose up -d backend`.
+
+The file is read fresh for every download, so replacing it needs no
+restart. When the cookies expire the backend logs
+`[ingest] YouTube rejected the cookies in YTDLP_COOKIES`: repeat steps
+2-5. Expect to do this every few weeks.
+
 ## Limits
 
 - Downloads work only while at least one route's laptop is awake and online.

@@ -239,3 +239,59 @@ def test_video_download_fails_over_between_routes(monkeypatch, ydl, tmp_path):
     monkeypatch.setattr(ingest.cut, "cut_clip", lambda src, s, e, out: out)
     ingest.SectionSource("https://youtu.be/abc", str(tmp_path), "abc")(3.0, 33.0, str(tmp_path / "s.mp4"))
     assert [c[0] for c in ydl.calls] == ["http://a:1056", "http://b:1056"]
+
+
+def test_no_cookies_or_pot_options_by_default(monkeypatch, ydl, tmp_path):
+    monkeypatch.delenv("YTDLP_PROXIES", raising=False)
+    monkeypatch.delenv("YTDLP_COOKIES", raising=False)
+    monkeypatch.delenv("YTDLP_POT_URL", raising=False)
+    ingest.ingest("https://youtu.be/abc", str(tmp_path))
+    opts = ydl.downloads[0]
+    assert "cookiefile" not in opts
+    assert "youtubepot-bgutilhttp" not in opts.get("extractor_args", {})
+
+
+def test_pot_provider_url_is_passed_to_yt_dlp(monkeypatch, ydl, tmp_path):
+    monkeypatch.delenv("YTDLP_PROXIES", raising=False)
+    monkeypatch.setenv("YTDLP_POT_URL", "http://pot-provider:4416")
+    ingest.ingest("https://youtu.be/abc", str(tmp_path))
+    args = ydl.downloads[0]["extractor_args"]
+    assert args["youtubepot-bgutilhttp"] == {"base_url": ["http://pot-provider:4416"]}
+
+
+def test_each_download_gets_its_own_copy_of_the_cookies(monkeypatch, ydl, tmp_path):
+    monkeypatch.delenv("YTDLP_PROXIES", raising=False)
+    cookies = tmp_path / "cookies.txt"
+    cookies.write_text("# Netscape HTTP Cookie File\n")
+    monkeypatch.setenv("YTDLP_COOKIES", str(cookies))
+    seen = []
+    original_enter = ydl.__enter__
+
+    def enter(self):
+        path = self.opts.get("cookiefile")
+        seen.append((path, path is not None and os.path.exists(path)))
+        return original_enter(self)
+
+    monkeypatch.setattr(ydl, "__enter__", enter)
+    ingest.ingest("https://youtu.be/abc", str(tmp_path / "cache"))
+    assert len(seen) == 2  # info pass + audio download
+    paths = [p for p, _ in seen]
+    assert all(exists for _, exists in seen)
+    assert str(cookies) not in paths  # never the original file
+    assert paths[0] != paths[1]
+    assert not any(os.path.exists(p) for p in paths)  # copies are removed
+    assert cookies.read_text() == "# Netscape HTTP Cookie File\n"
+
+
+def test_missing_cookie_file_is_ignored(monkeypatch, ydl, tmp_path):
+    monkeypatch.delenv("YTDLP_PROXIES", raising=False)
+    monkeypatch.setenv("YTDLP_COOKIES", str(tmp_path / "nope.txt"))
+    ingest.ingest("https://youtu.be/abc", str(tmp_path))
+    assert "cookiefile" not in ydl.downloads[0]
+
+
+def test_expired_cookies_warning_is_called_out(capsys):
+    ingest._YtdlpLogger().warning(
+        "[youtube] The provided YouTube account cookies are no longer valid."
+    )
+    assert "YTDLP_COOKIES" in capsys.readouterr().out

@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import os
 import random
+import shutil
 import socket
+import tempfile
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
@@ -53,6 +56,15 @@ _ROUTE_OPTS = {
     "extractor_retries": 1,
     "remote_components": ["ejs:github"],
 }
+
+# Optional helpers that make YouTube treat downloads as less bot-like:
+# YTDLP_POT_URL is the bgutil PO-token provider sidecar (see
+# deploy/docker-compose.yml); YTDLP_COOKIES is a cookies.txt exported from
+# a throwaway YouTube account. Both unset means anonymous downloads.
+POT_URL_ENV = "YTDLP_POT_URL"
+COOKIES_ENV = "YTDLP_COOKIES"
+_POT_EXTRACTOR = "youtubepot-bgutilhttp"
+_EXPIRED_COOKIES = "cookies are no longer valid"
 
 # How long a route is skipped after failing, by kind of failure (seconds).
 RATE_COOLDOWN_S = 600.0
@@ -284,11 +296,62 @@ def _touch(path: str) -> None:
         pass
 
 
+class _YtdlpLogger:
+    """Quiet yt-dlp logger that still prints warnings, and calls out loudly
+    when YouTube says the burner account's cookies have expired."""
+
+    def debug(self, msg: str) -> None:
+        pass
+
+    def info(self, msg: str) -> None:
+        pass
+
+    def warning(self, msg: str) -> None:
+        if _EXPIRED_COOKIES in msg.lower():
+            print(
+                "[ingest] YouTube rejected the cookies in YTDLP_COOKIES (expired "
+                "or logged out). Export fresh ones from the burner account: "
+                "see docs/tailscale-download-route.md."
+            )
+        else:
+            print(f"[ingest] yt-dlp warning: {msg}")
+
+    def error(self, msg: str) -> None:
+        print(f"[ingest] yt-dlp error: {msg}")
+
+
 def _base_opts(route: str | None) -> dict:
-    base = {"quiet": True, "noplaylist": True, **_ROUTE_OPTS}
+    base = {"quiet": True, "noplaylist": True, "logger": _YtdlpLogger(), **_ROUTE_OPTS}
     if route:
         base["proxy"] = route
+    pot_url = os.environ.get(POT_URL_ENV)
+    if pot_url:
+        base["extractor_args"] = {_POT_EXTRACTOR: {"base_url": [pot_url]}}
     return base
+
+
+@contextmanager
+def _ydl(opts: dict):
+    """yt_dlp.YoutubeDL with the burner account's cookies, if set. yt-dlp
+    writes cookies back to the file when it closes, so each instance gets
+    its own temporary copy: parallel downloads would otherwise corrupt one
+    shared file, and the original is never changed."""
+    cookies = os.environ.get(COOKIES_ENV)
+    copy_path = None
+    if cookies and os.path.isfile(cookies):
+        fd, copy_path = tempfile.mkstemp(prefix="ytdlp-cookies-", suffix=".txt")
+        os.close(fd)
+        shutil.copyfile(cookies, copy_path)
+        opts = {**opts, "cookiefile": copy_path}
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            yield ydl
+    finally:
+        if copy_path:
+            try:
+                os.remove(copy_path)
+            except OSError:
+                pass
 
 
 def _find_audio(cache_dir: str, video_id: str) -> str | None:
@@ -328,7 +391,7 @@ def _fetch_audio(
     base = _base_opts(route)
 
     # First pass: extract info only, to get a stable video_id for caching.
-    with yt_dlp.YoutubeDL({**base, "skip_download": True}) as ydl:
+    with _ydl({**base, "skip_download": True}) as ydl:
         info = ydl.extract_info(url, download=False)
 
     video_id = info["id"]
@@ -345,7 +408,7 @@ def _fetch_audio(
         "outtmpl": os.path.join(cache_dir, f"{video_id}.audio.%(ext)s"),
         "progress_hooks": [_progress_hook(on_progress)],
     }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    with _ydl(ydl_opts) as ydl:
         ydl.download([url])
     audio = _find_audio(cache_dir, video_id)
     if audio is None:
@@ -364,6 +427,10 @@ def ingest(url: str, cache_dir: str, on_progress: "callable | None" = None) -> V
     instead of the caller staring at a silent status for minutes on a
     large podcast file.
     """
+    from . import uploads  # here, not at the top: uploads imports VideoMeta from this module
+
+    if uploads.is_upload(url):
+        return uploads.ingest_upload(uploads.upload_id_of(url), cache_dir)
     os.makedirs(cache_dir, exist_ok=True)
     info, audio_path = _with_routes(
         lambda route: _fetch_audio(url, cache_dir, route, on_progress), on_progress
@@ -408,7 +475,7 @@ def _fetch_video(url: str, cache_dir: str, video_id: str, route: str | None,
         "outtmpl": os.path.join(cache_dir, f"{video_id}.video.%(ext)s"),
         "progress_hooks": [_progress_hook(on_progress)],
     }
-    with yt_dlp.YoutubeDL(opts) as ydl:
+    with _ydl(opts) as ydl:
         ydl.download([url])
 
 
@@ -424,6 +491,10 @@ class SectionSource:
         self.on_progress = on_progress
 
     def _video(self) -> str:
+        from . import uploads
+
+        if uploads.is_upload(self.url):
+            return uploads.source_path(uploads.upload_id_of(self.url), self.cache_dir)
         path = _video_path(self.cache_dir, self.video_id)
         with _video_lock(self.video_id):  # one download even if clips run together
             if os.path.exists(path) and os.path.getsize(path) > 0:

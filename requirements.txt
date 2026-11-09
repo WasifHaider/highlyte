@@ -1,6 +1,9 @@
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
 yt-dlp[default]>=2026.8.19
+# yt-dlp plugin that fetches YouTube PO tokens from the pot-provider sidecar
+# (deploy/docker-compose.yml). Keep the same version as that sidecar's image.
+bgutil-ytdlp-pot-provider==2.0.2
 faster-whisper==1.1.0
 # faster_whisper imports requests without declaring it; huggingface-hub 1.x
 # no longer pulls it in, so it must be listed here.
