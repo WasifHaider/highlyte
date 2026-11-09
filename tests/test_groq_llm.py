@@ -82,7 +82,7 @@ def test_build_chat_without_key(monkeypatch):
 
 def test_build_chat_returns_the_same_shared_client(monkeypatch):
     monkeypatch.setenv("GROQ_KEY", "test-key")
-    monkeypatch.setattr(groq_llm, "_chat", None)
+    monkeypatch.setattr(groq_llm, "_chats", {})
     first = groq_llm.build_chat()
     second = groq_llm.build_chat()
     assert first is not None

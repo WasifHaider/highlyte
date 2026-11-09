@@ -51,14 +51,7 @@ def test_other_team_clip_file_and_style_are_404(jobs):
 def test_generate_records_team_and_creator(monkeypatch):
     started = {}
 
-    class NoThread:
-        def __init__(self, target, args, daemon):
-            started["job"] = args[0]
-
-        def start(self):
-            pass
-
-    monkeypatch.setattr(main.threading, "Thread", NoThread)
+    monkeypatch.setattr(main, "_start_thread", lambda target, *args, **kw: started.update(job=args[0]))
     r = client.post("/api/generate", json={"url": "https://youtu.be/qt6YoGmksCc"})
     job = started["job"]
     try:

@@ -66,7 +66,7 @@ def test_select_flags_a_weak_pick_when_short_of_five():
 
 def test_select_without_key_fails_visibly(monkeypatch):
     monkeypatch.setenv("GROQ_KEY", "")
-    with pytest.raises(selection.SelectionFailed, match="GROQ_KEY"):
+    with pytest.raises(selection.SelectionFailed, match="Groq key"):
         selection.select(transcript(), [])
 
 

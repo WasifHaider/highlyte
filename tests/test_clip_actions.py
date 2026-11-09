@@ -39,7 +39,7 @@ def env(monkeypatch):
     ]
     main.JOBS[JOB] = job
     writes, updates = [], []
-    monkeypatch.setattr(main, "_start_thread", lambda target, *args: target(*args))
+    monkeypatch.setattr(main, "_start_thread", lambda target, *args, **kw: target(*args))
     monkeypatch.setattr(main.db, "get_transcript", lambda job_id: {"segments": [], "loudness": []})
     monkeypatch.setattr(main.db, "update_clip", lambda cid, f: updates.append((cid, f)))
     monkeypatch.setattr(main.db, "update_clip_checked", lambda cid, f: writes.append((cid, f)))
@@ -113,7 +113,7 @@ def test_regenerate_failure_keeps_old_clip(env, monkeypatch):
 def test_regenerate_needs_key(env, monkeypatch):
     monkeypatch.setattr(main.groq_llm, "build_chat", lambda: None)
     r = client.post(f"/api/clips/{JOB}-0/regenerate")
-    assert r.status_code == 409 and r.json()["detail"] == "Regenerate needs GROQ_KEY."
+    assert r.status_code == 409 and r.json()["detail"] == "Regenerate needs a Groq key. Add yours under Settings."
 
 
 def test_busy_clip_rejects_a_second_action(env, monkeypatch):
@@ -173,7 +173,7 @@ def _clip_row_for_rebuild(idx, start, end, pending_action=None):
 def test_swap_recovers_a_job_rebuilt_with_an_orphaned_pending_action(monkeypatch):
     main.JOBS.pop(JOB, None)
     updates = []
-    monkeypatch.setattr(main, "_start_thread", lambda target, *args: target(*args))
+    monkeypatch.setattr(main, "_start_thread", lambda target, *args, **kw: target(*args))
     monkeypatch.setattr(main.db, "get_transcript", lambda job_id: {"segments": [], "loudness": []})
     monkeypatch.setattr(main.db, "update_clip", lambda cid, f: updates.append((cid, f)))
     monkeypatch.setattr(main.db, "update_clip_checked", lambda cid, f: None)

@@ -87,7 +87,7 @@ def test_status_clip_has_qa_flags(monkeypatch):
 
 def _start_inline(monkeypatch):
     ran = []
-    monkeypatch.setattr(main, "_start_thread", lambda target, *args: ran.append((target, args)))
+    monkeypatch.setattr(main, "_start_thread", lambda target, *args, **kw: ran.append((target, args)))
     return ran
 
 

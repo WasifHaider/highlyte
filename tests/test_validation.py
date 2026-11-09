@@ -47,8 +47,7 @@ def test_generate_rejects_unknown_language():
 
 def test_generate_accepts_language_and_defaults_to_hinglish(monkeypatch):
     started = []
-    monkeypatch.setattr(main.threading, "Thread", lambda target, args, daemon: type(
-        "T", (), {"start": lambda self: started.append(args[0])})())
+    monkeypatch.setattr(main, "_start_thread", lambda target, *args, **kw: started.append(args[0]))
     client.post("/api/generate", json={"url": "https://youtu.be/x"})
     client.post("/api/generate", json={"url": "https://youtu.be/y", "language": "english"})
     assert [j.language_requested for j in started] == ["hinglish", "english"]
