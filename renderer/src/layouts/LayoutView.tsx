@@ -1,6 +1,8 @@
+import { useMemo } from 'react'
 import { AbsoluteFill, getRemotionEnvironment, OffthreadVideo, useCurrentFrame, useVideoConfig } from 'remotion'
 import { sizeFor } from '../constants'
 import { framePlan } from '../lib/frame'
+import { switchTimes, zoomAt } from '../lib/zoom'
 import { resolveView } from '../lib/view'
 import type { ClipSpec, Layout } from '../schema'
 import { resolveSrc } from '../source'
@@ -28,7 +30,7 @@ const FitBackground: React.FC<{ src: string; trimBefore: number; posterUrl?: str
   )
 }
 
-export const LayoutView: React.FC<{ spec: ClipSpec; layout: Layout; aspect?: string; posterUrl?: string }> = ({ spec, layout, aspect, posterUrl }) => {
+export const LayoutView: React.FC<{ spec: ClipSpec; layout: Layout; aspect?: string; zoom?: string; posterUrl?: string }> = ({ spec, layout, aspect, zoom, posterUrl }) => {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
   const t = frame / fps
@@ -38,7 +40,10 @@ export const LayoutView: React.FC<{ spec: ClipSpec; layout: Layout; aspect?: str
 
   const size = sizeFor(aspect)
   const OUT_W = size.width
-  const plan = framePlan(spec, layout, resolveView(spec, layout, t), t, size)
+  const length = spec.end - spec.start
+  const switches = useMemo(() => switchTimes(spec.words, length), [spec.words, length])
+  const z = zoomAt(t, spec.words, zoom, length, switches)
+  const plan = framePlan(spec, layout, resolveView(spec, layout, t), t, size, z)
 
   // The primary panel carries the sound: a separate <Audio> would download
   // the whole file a second time, and every media element on a slow

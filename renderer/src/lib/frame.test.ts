@@ -84,3 +84,14 @@ describe('framePlan for other aspect ratios', () => {
     expect(p.primary.top).toBe((1080 - boxH) / 2)
   })
 })
+
+describe('framePlan with zoom', () => {
+  it('tightens face crops but never a fit frame', () => {
+    const plain = framePlan(spec, 'follow', resolveView(spec, 'follow', 5), 5)
+    const zoomed = framePlan(spec, 'follow', resolveView(spec, 'follow', 5), 5, SIZES['9:16'], 1.2)
+    expect(zoomed.primary.crop.w).toBeCloseTo(plain.primary.crop.w / 1.2)
+    expect(zoomed.primary.boxH).toBe(plain.primary.boxH)
+    const fit = framePlan(spec, 'fit', resolveView(spec, 'fit', 5), 5, SIZES['9:16'], 1.2)
+    expect(fit.primary.crop).toEqual({ x: 0, y: 0, w: spec.source.width, h: spec.source.height })
+  })
+})

@@ -2,6 +2,7 @@ import { SIZES, type Size } from '../constants'
 import type { ClipSpec, Layout } from '../schema'
 import { cropWindow, type Crop } from './crop'
 import { sampleTrack } from './track'
+import { zoomCrop } from './zoom'
 import type { View } from './view'
 
 // Height of each half of a split frame (9:16 size; other sizes halve
@@ -22,19 +23,25 @@ export type FramePlan = { primary: Panel; secondary: Panel | null; fit: boolean 
 // panel always exists (fit is a letterboxed full-frame crop of it) and the
 // secondary exists for the whole clip whenever split is chosen, hidden
 // during shots that aren't split.
-export function framePlan(spec: ClipSpec, layout: Layout, view: View, t: number, size: Size = SIZES['9:16']): FramePlan {
+// `zoom` (lib/zoom.ts) tightens the face crops; fit frames never zoom.
+export function framePlan(
+  spec: ClipSpec, layout: Layout, view: View, t: number, size: Size = SIZES['9:16'], zoom = 1,
+): FramePlan {
   const { width: OUT_W, height: OUT_H } = size
   const PANEL_H = OUT_H / 2
   const { width: srcW, height: srcH } = spec.source
   const faces = spec.reframe.faces
-  const faceCx = (id: number | undefined): number =>
-    sampleTrack((faces.find(f => f.id === id) ?? faces[0]).track, t).cx
+  const facePos = (id: number | undefined) => sampleTrack((faces.find(f => f.id === id) ?? faces[0]).track, t)
+  const faceCrop = (id: number | undefined, aspect: number) => {
+    const { cx, cy } = facePos(id)
+    return zoomCrop(cropWindow(srcW, srcH, cx, aspect), zoom, cy, srcW, srcH)
+  }
 
   const hasSecondary = layout === 'split' && faces.length >= 2
   const secondaryId = view.kind === 'two' ? view.bottomId : faces[1]?.id
   const secondary: Panel | null = hasSecondary
     ? {
-        crop: cropWindow(srcW, srcH, faceCx(secondaryId), OUT_W / PANEL_H),
+        crop: faceCrop(secondaryId, OUT_W / PANEL_H),
         boxH: PANEL_H,
         top: PANEL_H,
         visible: view.kind === 'two',
@@ -54,7 +61,7 @@ export function framePlan(spec: ClipSpec, layout: Layout, view: View, t: number,
   const boxH = isTwo ? PANEL_H : OUT_H
   return {
     primary: {
-      crop: cropWindow(srcW, srcH, faceCx(isTwo ? view.topId : view.faceId), OUT_W / boxH),
+      crop: faceCrop(isTwo ? view.topId : view.faceId, OUT_W / boxH),
       boxH,
       top: 0,
       visible: true,

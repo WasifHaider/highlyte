@@ -64,6 +64,7 @@ export const clipStyleSchema = z.object({
   font: z.enum(['montserrat', 'poppins', 'anton', 'bebas']).default('montserrat'),
   progressBar: z.enum(['off', 'top', 'bottom']).default('off'),
   aspect: z.enum(['9:16', '4:5', '1:1']).default('9:16'),
+  zoom: z.enum(['off', 'emphasis', 'dynamic']).default('off'),
 })
 
 // posterUrl is preview-only (the fit background in the browser Player, see

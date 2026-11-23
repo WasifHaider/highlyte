@@ -133,6 +133,8 @@ Done when: music plays at the same level in the preview and in a Lambda export, 
 
 Done when: trimmed clips keep captions in sync to the word in preview and export, across all aspects, with tests covering the time mapping.
 
+Status (2026-11-23): zoom built as a per-clip style field `zoom` ("Zoom" in the clip editor and style-all bar): `emphasis` punches in to 1.12x on each emphasised word and eases back; `dynamic` adds a jump between a wide and a 1.08x framing about every 5 s, always on a word start, with a slow 3% push-in inside each stretch (this covers the alternating crop item). Fit frames never zoom. Default `off`: existing clips render and fingerprint as before. Checked on test-pattern renders only; needs a look on real clips. Silence and filler trimming not started.
+
 ## Deferred
 
 - B-roll or screenshots over speech (sourcing, licensing and relevance work).

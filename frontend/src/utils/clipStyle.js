@@ -27,6 +27,12 @@ export const ASPECTS = [
   { value: '1:1', label: '1:1 square' },
 ]
 
+export const ZOOMS = [
+  { value: 'off', label: 'Off' },
+  { value: 'emphasis', label: 'Punch-in on key words' },
+  { value: 'dynamic', label: 'Dynamic' },
+]
+
 export const DEFAULT_BRAND_KIT = { accent: '#FFD400', font: 'montserrat', progressBar: 'off' }
 
 export const PRESETS = [

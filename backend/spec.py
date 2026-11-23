@@ -29,6 +29,8 @@ FontId = Literal["montserrat", "poppins", "anton", "bebas"]
 ProgressBar = Literal["off", "top", "bottom"]
 # Output shape; renderer/src/constants.ts has the pixel size of each.
 Aspect = Literal["9:16", "4:5", "1:1"]
+# Camera motion on face crops (renderer/src/lib/zoom.ts).
+Zoom = Literal["off", "emphasis", "dynamic"]
 
 
 class Word(BaseModel):
@@ -121,6 +123,7 @@ class ClipStyle(BaseModel):
     font: FontId = "montserrat"
     progressBar: ProgressBar = "off"
     aspect: Aspect = "9:16"
+    zoom: Zoom = "off"
 
 
 class BrandKit(BaseModel):
@@ -156,7 +159,7 @@ def default_style(spec: ClipSpec, kit: BrandKit | None = None) -> ClipStyle:
 # Style fields added after renders were already cached. At their default
 # value they are left out of the fingerprints below, so a clip that doesn't
 # use them keeps the fingerprint (and the finished export) it already had.
-_LATER_FIELDS = {"font": "montserrat", "progressBar": "off", "aspect": "9:16"}
+_LATER_FIELDS = {"font": "montserrat", "progressBar": "off", "aspect": "9:16", "zoom": "off"}
 
 
 def _fingerprint_style(style: ClipStyle) -> dict:
