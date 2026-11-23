@@ -7,6 +7,22 @@ export const LAYOUTS = [
 
 export const ACCENT_PRESETS = ['#FFD400', '#FFFFFF', '#00E0B8', '#4DA3FF', '#FF5C8A', '#FF8A00', '#B388FF', '#14201F']
 
+// Ids match FontId in backend/spec.py and renderer/src/fonts.ts.
+export const FONTS = [
+  { value: 'montserrat', label: 'Montserrat' },
+  { value: 'poppins', label: 'Poppins' },
+  { value: 'anton', label: 'Anton' },
+  { value: 'bebas', label: 'Bebas Neue' },
+]
+
+export const PROGRESS_BARS = [
+  { value: 'off', label: 'Off' },
+  { value: 'top', label: 'Top edge' },
+  { value: 'bottom', label: 'Bottom edge' },
+]
+
+export const DEFAULT_BRAND_KIT = { accent: '#FFD400', font: 'montserrat', progressBar: 'off' }
+
 export const PRESETS = [
   { value: 'karaoke', label: 'Karaoke highlight' },
   { value: 'pop', label: 'Pop word-by-word' },

@@ -59,6 +59,10 @@ export const clipStyleSchema = z.object({
   hookTitle: z.string().max(80).nullable(),
   accent: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
   captionPosition: z.enum(['lower', 'middle']),
+  // Added later: styles saved before them parse to these defaults, and raw
+  // props without them render the same (fonts.fontFor, ProgressBar).
+  font: z.enum(['montserrat', 'poppins', 'anton', 'bebas']).default('montserrat'),
+  progressBar: z.enum(['off', 'top', 'bottom']).default('off'),
 })
 
 // posterUrl is preview-only (the fit background in the browser Player, see

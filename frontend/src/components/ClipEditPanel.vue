@@ -76,6 +76,28 @@
                   @update:model-value="v => set({ captionPosition: v })"
                 />
               </label>
+              <label class="field" for="edit-font-select">
+                <span class="field-label" id="edit-font-label">Font</span>
+                <UiSelect
+                  id="edit-font-select"
+                  labelledby="edit-font-label"
+                  :model-value="clip.style.font || 'montserrat'"
+                  :options="FONTS"
+                  :disabled="!!clip.pendingAction"
+                  @update:model-value="v => set({ font: v })"
+                />
+              </label>
+              <label class="field" for="edit-progress-select">
+                <span class="field-label" id="edit-progress-label">Progress bar</span>
+                <UiSelect
+                  id="edit-progress-select"
+                  labelledby="edit-progress-label"
+                  :model-value="clip.style.progressBar || 'off'"
+                  :options="PROGRESS_BARS"
+                  :disabled="!!clip.pendingAction"
+                  @update:model-value="v => set({ progressBar: v })"
+                />
+              </label>
               <div class="field">
                 <span class="field-label" id="edit-accent-label">Accent colour</span>
                 <UiColorField
@@ -116,7 +138,7 @@ import TrimControls from './TrimControls.vue'
 import RemotionPreview from './RemotionPreview.vue'
 import UiSelect from './ui/UiSelect.vue'
 import UiColorField from './ui/UiColorField.vue'
-import { LAYOUTS, PRESETS, layoutAllowed } from '../utils/clipStyle'
+import { FONTS, LAYOUTS, PRESETS, PROGRESS_BARS, layoutAllowed } from '../utils/clipStyle'
 import { toClipTime } from '@renderer/lib/timeline'
 
 const SAVED_MESSAGE_MS = 1500

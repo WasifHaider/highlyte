@@ -13,6 +13,14 @@
         <span class="field-label" id="style-all-accent-label">Accent colour</span>
         <UiColorField v-model="form.accent" labelledby="style-all-accent-label" />
       </div>
+      <div class="field">
+        <span class="field-label" id="style-all-font-label">Font</span>
+        <UiSelect v-model="form.font" :options="FONTS" labelledby="style-all-font-label" />
+      </div>
+      <div class="field">
+        <span class="field-label" id="style-all-progress-label">Progress bar</span>
+        <UiSelect v-model="form.progressBar" :options="PROGRESS_BARS" labelledby="style-all-progress-label" />
+      </div>
       <label class="check">
         <input v-model="form.showHook" type="checkbox" /> Show hook title
       </label>
@@ -30,7 +38,7 @@ import { onUnmounted, reactive, ref } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import UiSelect from './ui/UiSelect.vue'
 import UiColorField from './ui/UiColorField.vue'
-import { LAYOUTS, PRESETS } from '../utils/clipStyle'
+import { FONTS, LAYOUTS, PRESETS, PROGRESS_BARS } from '../utils/clipStyle'
 
 const APPLIED_MESSAGE_MS = 2400
 const layoutOptions = LAYOUTS.map(l => ({ value: l.value, label: l.label }))
@@ -43,6 +51,8 @@ const form = reactive({
   layout: first.layout || 'fit',
   captionPreset: first.captionPreset || 'karaoke',
   accent: first.accent || '#FFD400',
+  font: first.font || 'montserrat',
+  progressBar: first.progressBar || 'off',
   showHook: first.showHook ?? true,
 })
 const appliedCount = ref(0)

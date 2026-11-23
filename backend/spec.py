@@ -24,6 +24,9 @@ from pydantic import BaseModel, Field
 
 LayoutKind = Literal["follow", "speaker", "split", "fit"]
 CaptionPreset = Literal["karaoke", "pop", "clean"]
+# Caption and hook-title fonts (renderer/src/fonts.ts loads each one).
+FontId = Literal["montserrat", "poppins", "anton", "bebas"]
+ProgressBar = Literal["off", "top", "bottom"]
 
 
 class Word(BaseModel):
@@ -113,21 +116,58 @@ class ClipStyle(BaseModel):
     hookTitle: str | None = Field(None, max_length=80)
     accent: str = Field("#FFD400", pattern=r"^#[0-9A-Fa-f]{6}$")
     captionPosition: Literal["lower", "middle"] = "lower"
+    font: FontId = "montserrat"
+    progressBar: ProgressBar = "off"
 
 
-def default_style(spec: ClipSpec) -> ClipStyle:
+class BrandKit(BaseModel):
+    """A member's starting style for their new clips (Settings > Brand kit)."""
+    accent: str = Field("#FFD400", pattern=r"^#[0-9A-Fa-f]{6}$")
+    font: FontId = "montserrat"
+    progressBar: ProgressBar = "off"
+
+
+def brand_kit_from(raw: object) -> BrandKit | None:
+    """A stored kit, or None when there is none or it no longer validates."""
+    if not isinstance(raw, dict):
+        return None
+    try:
+        return BrandKit.model_validate(raw)
+    except ValueError:
+        return None
+
+
+def default_style(spec: ClipSpec, kit: BrandKit | None = None) -> ClipStyle:
+    kit = kit or BrandKit()
     return ClipStyle(
         layout=spec.reframe.auto,
         showHook=spec.hookTitle is not None,
         hookTitle=spec.hookTitle,
         captionPosition="middle" if spec.reframe.auto == "split" else "lower",
+        accent=kit.accent,
+        font=kit.font,
+        progressBar=kit.progressBar,
     )
+
+
+# Style fields added after renders were already cached. At their default
+# value they are left out of the fingerprints below, so a clip that doesn't
+# use them keeps the fingerprint (and the finished export) it already had.
+_LATER_FIELDS = {"font": "montserrat", "progressBar": "off"}
+
+
+def _fingerprint_style(style: ClipStyle) -> dict:
+    data = style.model_dump()
+    for k, default in _LATER_FIELDS.items():
+        if data.get(k) == default:
+            data.pop(k)
+    return data
 
 
 def style_hash(style: ClipStyle) -> str:
     """Stable fingerprint of a style, used to reuse an existing render
     instead of paying for an identical one again."""
-    payload = json.dumps(style.model_dump(), sort_keys=True, separators=(",", ":"))
+    payload = json.dumps(_fingerprint_style(style), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
@@ -135,7 +175,7 @@ def render_hash(style: ClipStyle, words: list[Word], bounds: tuple[float, float]
     """Fingerprint of everything an export depends on that a user can
     change: the style, the caption words and (once clips can be trimmed)
     the clip's bounds. Editing any of them must not reuse the old mp4."""
-    payload: dict = {"style": style.model_dump(), "words": [w.model_dump() for w in words]}
+    payload: dict = {"style": _fingerprint_style(style), "words": [w.model_dump() for w in words]}
     if bounds is not None:
         payload["bounds"] = [round(bounds[0], 3), round(bounds[1], 3)]
     data = json.dumps(payload, sort_keys=True, separators=(",", ":"))

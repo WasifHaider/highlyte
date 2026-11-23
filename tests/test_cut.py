@@ -72,3 +72,68 @@ def test_make_thumbnail_writes_a_portrait_jpeg(source, tmp_path):
     w, h, _ = cut.probe_video(out)
     assert out.endswith(".jpg")
     assert h > w
+
+
+@pytest.fixture(scope="module")
+def quiet_burst(tmp_path_factory):
+    """10 s video whose audio is silent except a quiet 440 Hz tone from 4 s
+    to 7 s (about -30 LUFS), at 44.1 kHz."""
+    path = tmp_path_factory.mktemp("burst") / "burst.mp4"
+    subprocess.run([
+        "ffmpeg", "-y", "-loglevel", "error",
+        "-f", "lavfi", "-i", "testsrc=size=320x180:rate=30:duration=10",
+        "-f", "lavfi", "-i", "aevalsrc=if(between(t\,4\,7)\,0.03*sin(2*PI*440*t)\,0):s=44100:d=10",
+        "-c:v", "libx264", "-c:a", "aac", "-shortest", str(path),
+    ], check=True)
+    return str(path)
+
+
+def _integrated_lufs(path: str) -> float:
+    err = subprocess.run(["ffmpeg", "-nostats", "-i", path, "-af", "ebur128", "-f", "null", "-"],
+                         capture_output=True).stderr.decode(errors="ignore")
+    summary = err[err.rindex("Summary:"):]
+    return float(summary.split("I:")[1].split("LUFS")[0])
+
+
+def _audio_onset(path: str, rate: int = 48000) -> float:
+    pcm = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-ac", "1", "-ar", str(rate), "-f", "s16le", "-"],
+                         capture_output=True, check=True).stdout
+    import array
+    samples = array.array("h", pcm)
+    peak = max(abs(s) for s in samples)
+    first = next(i for i, s in enumerate(samples) if abs(s) > peak * 0.2)
+    return first / rate
+
+
+def _sample_rate(path: str) -> int:
+    out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=sample_rate",
+                          "-of", "csv=p=0", path], capture_output=True, check=True).stdout
+    return int(out.decode().strip())
+
+
+def test_reencode_segment_brings_speech_to_social_loudness(quiet_burst, tmp_path):
+    out = cut.reencode_segment(quiet_burst, str(tmp_path / "loud.mp4"))
+    assert _integrated_lufs(quiet_burst) < -25
+    assert _integrated_lufs(out) == pytest.approx(cut.TARGET_LUFS, abs=1.5)
+    assert _sample_rate(out) == 48000
+
+
+def test_reencode_segment_keeps_audio_timing(quiet_burst, tmp_path):
+    # Captions and the clip bounds are word times inside this file, so the
+    # audio must not shift.
+    out = cut.reencode_segment(quiet_burst, str(tmp_path / "timed.mp4"))
+    assert _audio_onset(out) == pytest.approx(_audio_onset(quiet_burst), abs=0.03)
+    assert cut.probe_duration(out) == pytest.approx(cut.probe_duration(quiet_burst), abs=0.1)
+
+
+def test_reencode_segment_handles_silent_and_soundless_video(tmp_path):
+    silent = tmp_path / "silent.mp4"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=30:duration=3",
+                    "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono", "-t", "3", "-c:v", "libx264", "-c:a", "aac",
+                    "-shortest", str(silent)], check=True)
+    mute = tmp_path / "mute.mp4"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=30:duration=3",
+                    "-c:v", "libx264", str(mute)], check=True)
+    assert cut.voice_audio_args(str(silent))[0] == "-c:a"     # nothing to normalise
+    assert cut.probe_duration(cut.reencode_segment(str(silent), str(tmp_path / "s.mp4"))) == pytest.approx(3, abs=0.1)
+    assert cut.probe_duration(cut.reencode_segment(str(mute), str(tmp_path / "m.mp4"))) == pytest.approx(3, abs=0.1)

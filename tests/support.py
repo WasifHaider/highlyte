@@ -133,10 +133,14 @@ class FakeTeamDb:
     def claim_unowned_jobs(self, team_id: str) -> None:
         self.claimed.append(team_id)
 
+    def set_member_brand_kit(self, user_id: str, kit: dict) -> None:
+        self.members[user_id]["brand_kit"] = kit
+
 
 def install_team_db(monkeypatch) -> FakeTeamDb:
     fake = FakeTeamDb()
-    for name in ("create_team", "delete_team", "add_member", "get_member", "list_members", "oldest_team_id", "claim_unowned_jobs"):
+    for name in ("create_team", "delete_team", "add_member", "get_member", "list_members", "oldest_team_id", "claim_unowned_jobs",
+                 "set_member_brand_kit"):
         monkeypatch.setattr(db, name, getattr(fake, name))
     monkeypatch.setattr(db, "is_enabled", lambda: True)
     return fake

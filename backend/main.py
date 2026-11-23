@@ -25,7 +25,7 @@ from .accounts import Member, current_member
 from .pipeline import cache, clipprep, cut, groq_context, groq_llm, ingest, scoring, selection, transcript, uploads
 from .pipeline.segments import Segment
 from .pipeline.segments import from_dict as segment_from_dict
-from .spec import ClipStyle, Word, default_style, window_duration
+from .spec import BrandKit, ClipStyle, Word, default_style, window_duration
 from . import validation
 from .validation import check_clip_filename, check_id
 
@@ -107,6 +107,10 @@ class Job:
     language_note: str | None = None
     selection_note: str | None = None
     alternates: list[dict[str, Any]] = field(default_factory=list)
+    # The starting style for this job's clips: the brand kit of the member
+    # who started (or retried) it. In memory only; a job rebuilt after a
+    # restart uses the default style.
+    brand_kit: BrandKit | None = field(default=None, repr=False)
     _last_persist: float = field(default=0.0, repr=False)
 
 
@@ -214,6 +218,7 @@ def _start_thread(target, *args, groq_key: str | None = None) -> None:
 
 def _clip_record(
     job_id: str, idx: int, clip: selection.Clip, prepared: clipprep.PreparedClip, revision: int = 0,
+    kit: BrandKit | None = None,
 ) -> dict[str, Any]:
     spec = prepared.spec
     filename = prepared.filename or clipprep.clip_filename(idx, revision)
@@ -233,7 +238,7 @@ def _clip_record(
         "storageProvider": "r2" if prepared.storage_key else "local",
         "storageKey": prepared.storage_key,
         "spec": spec.model_dump(),
-        "style": default_style(spec).model_dump(),
+        "style": default_style(spec, kit).model_dump(),
         "qaFlags": _qa_flags(clip.flags, prepared.face_at_start),
         "reason": clip.reason,
         "pendingAction": None,
@@ -434,7 +439,7 @@ def _select_and_prepare(job: Job, meta: ingest.VideoMeta, segs: list[Segment], l
             segments=word_segments,
             clips_dir=CLIPS_DIR, models_dir=MODELS_DIR, on_step=on_step,
         )
-        record = _clip_record(job.id, i, c, prepared)
+        record = _clip_record(job.id, i, c, prepared, kit=job.brand_kit)
         job.clips.append(record)
         # Saved per clip, so a failure later in the job doesn't lose
         # the clips already prepared.
@@ -530,7 +535,7 @@ def health() -> dict[str, Any]:
 def generate(req: GenerateRequest, member: Member = Depends(current_member)) -> dict[str, str]:
     job_id = uuid.uuid4().hex[:12]
     job = Job(id=job_id, url=req.url, team_id=member.team_id, created_by=member.user_id,
-              language_requested=req.language)
+              language_requested=req.language, brand_kit=member.brand_kit)
     JOBS[job_id] = job
     _start_thread(_run_pipeline, job, groq_key=member.groq_key)
     return {"job_id": job_id}
@@ -598,7 +603,7 @@ def complete_upload(upload_id: str, body: CompleteUploadBody,
         raise HTTPException(502, "Upload failed. Check your connection and try again.") from e
     job_id = uuid.uuid4().hex[:12]
     job = Job(id=job_id, url=f"{uploads.PREFIX}{upload_id}", team_id=member.team_id,
-              created_by=member.user_id, language_requested=body.language)
+              created_by=member.user_id, language_requested=body.language, brand_kit=member.brand_kit)
     JOBS[job_id] = job
     _start_thread(_run_pipeline, job, groq_key=member.groq_key)
     return {"job_id": job_id}
@@ -661,6 +666,7 @@ def retry_selection(job_id: str, member: Member = Depends(current_member)) -> di
         previous_error = job.error
         job.status, job.error, job.selection_note, job.clips = "analyzing", None, None, []
         job.progress = {"stage": "analyzing", "percent": None, "note": "picking clips…"}
+        job.brand_kit = member.brand_kit
         JOBS[job_id] = job
         _persist_job(job)
 
@@ -813,7 +819,8 @@ def retry_failed(job_id: str, member: Member = Depends(current_member)) -> dict[
 
     new_id = uuid.uuid4().hex[:12]
     new_job = Job(id=new_id, url=url, team_id=member.team_id, created_by=member.user_id,
-                  language_requested=language if language in ("hinglish", "english") else "hinglish")
+                  language_requested=language if language in ("hinglish", "english") else "hinglish",
+                  brand_kit=member.brand_kit)
     JOBS[new_id] = new_job
     _start_thread(_run_pipeline, new_job, groq_key=member.groq_key)
     try:
@@ -1183,6 +1190,9 @@ def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:
             "captionPreset": old_style["captionPreset"],
             "accent": old_style["accent"],
             "captionPosition": old_style["captionPosition"],
+            # Styles saved before these fields existed lack them.
+            "font": old_style.get("font", "montserrat"),
+            "progressBar": old_style.get("progressBar", "off"),
         }
         fields = {k: v for k, v in _clip_row(job.id, idx, new_record).items() if k != "id"}
         fields |= {"words_original": None, "bounds_original": None, "pending_action": None, "action_error": None}

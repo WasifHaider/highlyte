@@ -3,6 +3,7 @@ import { AbsoluteFill, useCurrentFrame, useVideoConfig } from 'remotion'
 import { Captions } from './captions/Captions'
 import { HookTitle } from './HookTitle'
 import { LayoutView } from './layouts/LayoutView'
+import { ProgressBar } from './ProgressBar'
 import { captionPositionAt } from './lib/view'
 import { toClipTime } from './lib/timeline'
 import type { ClipProps } from './schema'
@@ -15,8 +16,11 @@ export const ClipComposition: React.FC<ClipProps> = ({ spec, style, posterUrl })
   return (
     <AbsoluteFill style={{ backgroundColor: 'black' }}>
       <LayoutView spec={clip} layout={style.layout} posterUrl={posterUrl} />
-      <Captions words={clip.words} preset={style.captionPreset} accent={style.accent} position={position} />
-      {style.showHook && style.hookTitle ? <HookTitle text={style.hookTitle} /> : null}
+      <Captions words={clip.words} preset={style.captionPreset} accent={style.accent} position={position} font={style.font} />
+      {style.showHook && style.hookTitle ? <HookTitle text={style.hookTitle} font={style.font} /> : null}
+      {style.progressBar === 'top' || style.progressBar === 'bottom'
+        ? <ProgressBar edge={style.progressBar} color={style.accent} />
+        : null}
     </AbsoluteFill>
   )
 }
