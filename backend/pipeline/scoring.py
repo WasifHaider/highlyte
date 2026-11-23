@@ -107,8 +107,37 @@ def structural_reject(c: Candidate) -> str | None:
     return None
 
 
-def passes_thresholds(c: Candidate) -> bool:
-    return c.standalone >= MIN_STANDALONE and c.hook >= MIN_HOOK
+@dataclass(frozen=True)
+class Gates:
+    standalone: float
+    hook: float
+
+
+FIXED_GATES = Gates(MIN_STANDALONE, MIN_HOOK)
+GATE_MIN_CANDIDATES = 6  # fewer than this and the median says too little
+
+
+def gates(cands: list[Candidate]) -> Gates:
+    """The bar a video's candidates must clear: the median of their own
+    standalone and hook scores, never above the fixed bar and never below
+    the near-miss floor. A model that scores everything high gets the fixed
+    bar as before; one that scores a whole video lower (a stricter prompt,
+    a quieter podcast) keeps its relatively best picks instead of falling
+    back to a handful of flagged near misses."""
+    if len(cands) < GATE_MIN_CANDIDATES:
+        return FIXED_GATES
+
+    def gate(values: list[float], floor: float, ceiling: float) -> float:
+        return round(min(ceiling, max(floor, statistics.median(values))), 3)
+
+    return Gates(
+        gate([c.standalone for c in cands], NEAR_MIN_STANDALONE, MIN_STANDALONE),
+        gate([c.hook for c in cands], NEAR_MIN_HOOK, MIN_HOOK),
+    )
+
+
+def passes_thresholds(c: Candidate, g: Gates = FIXED_GATES) -> bool:
+    return c.standalone >= g.standalone and c.hook >= g.hook
 
 
 def near_miss(c: Candidate) -> bool:
@@ -148,7 +177,8 @@ def max_clips(video_s: float) -> int:
     return max(MAX_CLIPS, min(MAX_CLIPS_CEILING, math.ceil(video_s / CLIP_EVERY_S)))
 
 
-def pack(cands: list[Candidate], max_clips: int = MAX_CLIPS, presorted: bool = False) -> list[Candidate]:
+def pack(cands: list[Candidate], max_clips: int = MAX_CLIPS, presorted: bool = False,
+         gates: Gates = FIXED_GATES) -> list[Candidate]:
     """The best candidates that pass the thresholds and don't overlap, up to
     max_clips, topped up with near misses to MIN_CLIPS. Best means highest
     total, or the given order when `presorted` (see selection.rank_and_pack)."""
@@ -157,12 +187,12 @@ def pack(cands: list[Candidate], max_clips: int = MAX_CLIPS, presorted: bool = F
     for c in by_total:
         if len(kept) >= max_clips:
             break
-        if passes_thresholds(c) and _fits(c, kept):
+        if passes_thresholds(c, gates) and _fits(c, kept):
             kept.append(c)
     if len(kept) < MIN_CLIPS:
         for c in by_total:
             if len(kept) >= MIN_CLIPS:
                 break
-            if not passes_thresholds(c) and near_miss(c) and _fits(c, kept):
+            if not passes_thresholds(c, gates) and near_miss(c) and _fits(c, kept):
                 kept.append(replace(c, flags=[*c.flags, "weak_pick"]))
     return sorted(kept, key=lambda c: c.start)

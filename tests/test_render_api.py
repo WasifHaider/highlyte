@@ -155,3 +155,22 @@ def test_render_refused_while_clip_is_being_replaced(env):
     assert r.status_code == 409
     assert r.json()["detail"] == "This clip is being replaced. Wait for it to finish."
     assert record["style"] == old_style and fake.props is None
+
+
+def test_extra_shape_renders_without_changing_the_saved_style(env):
+    record, fake = env
+    main_render = client.post(f"/api/clips/{CLIP_ID}/render", json=STYLE).json()
+    square = client.post(f"/api/clips/{CLIP_ID}/render?save_style=false", json={**STYLE, "aspect": "1:1"})
+    assert square.status_code == 200
+    square = square.json()
+    assert square["id"] != main_render["id"]
+    assert record["style"].get("aspect", "9:16") == "9:16"   # the clip still saves as 9:16
+    assert fake.props["style"]["aspect"] == "1:1"
+
+    fake.done = True
+    for rid in (main_render["id"], square["id"]):
+        assert client.get(f"/api/renders/{rid}").json()["status"] == "done"
+    z = client.get(f"/api/renders/zip?ids={main_render['id']},{square['id']}")
+    assert z.status_code == 200
+    names = zipfile.ZipFile(io.BytesIO(z.content)).namelist()
+    assert names == [f"highlyte-{CLIP_ID}.mp4", f"highlyte-{CLIP_ID}.srt", f"highlyte-{CLIP_ID}-1x1.mp4"]

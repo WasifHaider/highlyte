@@ -1,6 +1,7 @@
 import { Composition } from 'remotion'
 import { ClipComposition } from './ClipComposition'
 import { FPS, OUT_H, OUT_W, durationInFrames, sizeFor } from './constants'
+import { clipFrames } from './lib/tighten'
 import fixture from './__fixtures__/clip-spec.json'
 import { clipPropsSchema, type ClipProps } from './schema'
 
@@ -28,7 +29,7 @@ export const RemotionRoot: React.FC = () => (
     defaultProps={defaultProps}
     // Lambda sizes each render from its style's aspect (9:16 when unset).
     calculateMetadata={({ props }: { props: ClipProps }) => ({
-      durationInFrames: durationInFrames(props.spec),
+      durationInFrames: clipFrames(props.spec, props.style.tighten),
       ...sizeFor(props.style.aspect),
     })}
   />

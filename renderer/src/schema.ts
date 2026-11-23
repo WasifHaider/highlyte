@@ -50,6 +50,9 @@ export const clipSpecSchema = z.object({
     speakerTimeline: z.array(z.object({ t: z.number(), faceId: z.number().int() })),
     shots: z.array(shotSchema).default([]),
   }),
+  // Pauses in the speech, [start, end] in the same time base as the words
+  // (lib/tighten.ts). Missing on clips prepared before they were measured.
+  silences: z.array(z.tuple([z.number(), z.number()])).default([]),
 })
 
 export const clipStyleSchema = z.object({
@@ -65,6 +68,7 @@ export const clipStyleSchema = z.object({
   progressBar: z.enum(['off', 'top', 'bottom']).default('off'),
   aspect: z.enum(['9:16', '4:5', '1:1']).default('9:16'),
   zoom: z.enum(['off', 'emphasis', 'dynamic']).default('off'),
+  tighten: z.enum(['off', 'pauses', 'all']).default('off'),
 })
 
 // posterUrl is preview-only (the fit background in the browser Player, see

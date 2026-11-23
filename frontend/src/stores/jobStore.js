@@ -25,6 +25,12 @@ const boundsSaves = new Map() // clipId -> Promise<string|null> (error message o
 // again clears the warning), set in the existing error paths below.
 const failedSaves = new Map()
 
+// The export bar's extra shapes that differ from the clip's own.
+function extraShapes(clip, shapes) {
+  const own = clip.style?.aspect || '9:16'
+  return shapes.filter(a => a !== own)
+}
+
 function track(saves, clipId, promise, onChange) {
   const p = promise.finally(() => {
     if (saves.get(clipId) === p) saves.delete(clipId)
@@ -43,7 +49,12 @@ export const useJobStore = defineStore('job', {
     error: null,
     polling: false,
     _timer: null,
-    renders: {}, // clipId -> render {id, status, progress, error, downloadUrl}
+    // clipId -> render {id, status, progress, error, downloadUrl} for the
+    // clip in its own shape; `${clipId}@${aspect}` for an extra shape.
+    renders: {},
+    // Extra shapes the export bar renders every selected clip in, besides
+    // its own (aspect ids, see utils/clipStyle ASPECTS).
+    exportShapes: [],
     renderingEnabled: false,
     _renderTimer: null,
     _styleTimers: {},
@@ -70,10 +81,17 @@ export const useJobStore = defineStore('job', {
     isDone: (state) => state.job?.status === 'done',
     selectionFailed: (state) => state.job?.status === 'selection_failed',
     progress: (state) => state.job?.progress || {},
+    // Every render an export of the selected clips is made of, in order:
+    // each clip in its own shape, then in each extra shape it doesn't
+    // already have.
     selectedRenders: (state) => (state.job?.clips || [])
       .filter(c => state.selected[c.id])
-      .map(c => state.renders[c.id])
+      .flatMap(c => [c.id, ...extraShapes(c, state.exportShapes).map(a => `${c.id}@${a}`)])
+      .map(key => state.renders[key])
       .filter(Boolean),
+    expectedRenderCount: (state) => (state.job?.clips || [])
+      .filter(c => state.selected[c.id])
+      .reduce((n, c) => n + 1 + extraShapes(c, state.exportShapes).length, 0),
     // Whether a style or trim save is queued (debounced) or in flight for
     // this clip. Additive: read-only over the existing save-tracking maps,
     // it doesn't change save behaviour.
@@ -133,7 +151,7 @@ export const useJobStore = defineStore('job', {
           for (const c of data.clips) {
             if (!(c.id in this.selected)) this.selected[c.id] = true
             if (this._revisions[c.id] !== undefined && this._revisions[c.id] !== c.revision) {
-              delete this.renders[c.id]
+              this._dropRenders(c.id)
             }
             this._revisions[c.id] = c.revision
           }
@@ -289,7 +307,7 @@ export const useJobStore = defineStore('job', {
       clip.captionsEdited = res.captionsEdited
       clip.actionError = null
       // Any existing render was made with the old text; don't offer it.
-      delete this.renders[clipId]
+      this._dropRenders(clipId)
     },
     async resetCaptions(clipId) {
       const clip = this.clips.find(c => c.id === clipId)
@@ -298,7 +316,7 @@ export const useJobStore = defineStore('job', {
       clip.spec = { ...clip.spec, words: res.words }
       clip.captionsEdited = res.captionsEdited
       clip.actionError = null
-      delete this.renders[clipId]
+      this._dropRenders(clipId)
     },
     updateBounds(clipId, bounds) {
       const clip = this.clips.find(c => c.id === clipId)
@@ -306,7 +324,7 @@ export const useJobStore = defineStore('job', {
       clip.spec = { ...clip.spec, ...bounds }
       clip.boundsEdited = true
       clip.actionError = null
-      delete this.renders[clipId]
+      this._dropRenders(clipId)
       clearTimeout(this._boundsTimers[clipId])
       queuedBounds.set(clipId, bounds)
       failedSaves.delete(clipId)
@@ -325,7 +343,7 @@ export const useJobStore = defineStore('job', {
         const res = await apiResetBounds(clipId)
         clip.spec = { ...clip.spec, start: res.start, end: res.end }
         clip.boundsEdited = res.boundsEdited
-        delete this.renders[clipId]
+        this._dropRenders(clipId)
       } catch (e) {
         this.error = apiErrorMessage(e, 'Failed to reset the trim')
       }
@@ -364,6 +382,18 @@ export const useJobStore = defineStore('job', {
       this._cancelBounds(clipId)
       await this._saveStyleNow(clipId)
     },
+    // Forget a clip's renders in every shape (its text, trim or revision
+    // changed, so they no longer match).
+    _dropRenders(clipId) {
+      for (const key of Object.keys(this.renders)) {
+        if (key === clipId || key.startsWith(`${clipId}@`)) delete this.renders[key]
+      }
+    },
+    toggleExportShape(aspect) {
+      this.exportShapes = this.exportShapes.includes(aspect)
+        ? this.exportShapes.filter(a => a !== aspect)
+        : [...this.exportShapes, aspect]
+    },
     async exportSelected() {
       // A clip being replaced can't be rendered (the server says 409); it is
       // left out rather than shown as a failed render.
@@ -393,6 +423,15 @@ export const useJobStore = defineStore('job', {
         this.renders[clip.id] = await startRender(clip.id, current.style)
       } catch (e) {
         this.renders[clip.id] = { status: 'error', error: e?.response?.data?.detail || e.message }
+      }
+      // The same clip in each extra shape; its saved style stays as it is.
+      for (const aspect of extraShapes(current, this.exportShapes)) {
+        const key = `${clip.id}@${aspect}`
+        try {
+          this.renders[key] = await startRender(clip.id, { ...current.style, aspect }, { saveStyle: false })
+        } catch (e) {
+          this.renders[key] = { status: 'error', error: e?.response?.data?.detail || e.message }
+        }
       }
     },
     _pollRenders() {

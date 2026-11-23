@@ -97,9 +97,9 @@ def _text(c: scoring.Candidate) -> str:
     return " ".join(w.t for w in c.words)
 
 
-def _to_clip(c: scoring.Candidate, meta: titles.Titles) -> Clip:
+def _to_clip(c: scoring.Candidate, meta: titles.Titles, gates: scoring.Gates = scoring.FIXED_GATES) -> Clip:
     flags = [*scoring.qa_flags(c), *c.flags]
-    if not scoring.passes_thresholds(c) and "weak_pick" not in flags:
+    if not scoring.passes_thresholds(c, gates) and "weak_pick" not in flags:
         flags.append("weak_pick")
     return Clip(
         start=c.start, end=c.end, text=_text(c), score=round(c.total * 10, 1), tag=meta.tag,
@@ -109,7 +109,8 @@ def _to_clip(c: scoring.Candidate, meta: titles.Titles) -> Clip:
     )
 
 
-def _alternates(candidates: list[scoring.Candidate], kept: list[scoring.Candidate]) -> list[dict]:
+def _alternates(candidates: list[scoring.Candidate], kept: list[scoring.Candidate],
+                gates: scoring.Gates = scoring.FIXED_GATES) -> list[dict]:
     out: list[dict] = []
     chosen: list[tuple[float, float]] = [(k.start, k.end) for k in kept]
     for i, c in enumerate(sorted(candidates, key=lambda c: c.total, reverse=True)):
@@ -119,7 +120,7 @@ def _alternates(candidates: list[scoring.Candidate], kept: list[scoring.Candidat
         if any(scoring.span_overlap(span, s) >= scoring.MAX_OVERLAP for s in chosen):
             continue
         chosen.append(span)
-        clip = _to_clip(c, titles.fallback(_text(c), i))
+        clip = _to_clip(c, titles.fallback(_text(c), i), gates)
         out.append({
             "start": clip.start, "end": clip.end, "text": clip.text, "score": clip.score,
             "tag": clip.tag, "flags": clip.flags, "reason": clip.reason, "emphasis": clip.emphasis,
@@ -155,8 +156,9 @@ def rank_and_pack(
     if rerank:
         ordered = _reranked(chat, candidates)
         if ordered is not None:
-            return ranked, candidates, scoring.pack(ordered, scoring.max_clips(video_s), presorted=True)
-    return ranked, candidates, scoring.pack(candidates, scoring.max_clips(video_s))
+            return ranked, candidates, scoring.pack(ordered, scoring.max_clips(video_s), presorted=True,
+                                                    gates=scoring.gates(candidates))
+    return ranked, candidates, scoring.pack(candidates, scoring.max_clips(video_s), gates=scoring.gates(candidates))
 
 
 def _reranked(chat, candidates: list[scoring.Candidate]) -> list[scoring.Candidate] | None:
@@ -180,16 +182,18 @@ def select(segments: list[Segment], loudness: list[float], *, chat=None) -> Sele
     if ranked_pack is None:
         return Selection([])
     ranked, candidates, kept = ranked_pack
+    # The same per-video bar packing used, so "weaker pick" means the same.
+    gates = scoring.gates(candidates)
     texts = [_text(c) for c in kept]
     meta, titles_ok = titles.write_titles(chat, texts)
-    clips = [_to_clip(c, m) for c, m in zip(kept, meta)]
+    clips = [_to_clip(c, m, gates) for c, m in zip(kept, meta)]
 
     notes = [skipped_note(ranked.skipped)]
     if not kept:
         notes.append(ZERO_CLIPS_NOTE)
     elif not titles_ok:
         notes.append(TITLES_FAILED_NOTE)
-    return Selection(clips, " ".join(n for n in notes if n) or None, alternates=_alternates(candidates, kept))
+    return Selection(clips, " ".join(n for n in notes if n) or None, alternates=_alternates(candidates, kept, gates))
 
 
 def regenerate(

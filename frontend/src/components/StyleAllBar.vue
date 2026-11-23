@@ -18,6 +18,10 @@
         <UiSelect v-model="form.aspect" :options="ASPECTS" labelledby="style-all-aspect-label" />
       </div>
       <div class="field">
+        <span class="field-label" id="style-all-tighten-label">Tighten</span>
+        <UiSelect v-model="form.tighten" :options="TIGHTEN" labelledby="style-all-tighten-label" />
+      </div>
+      <div class="field">
         <span class="field-label" id="style-all-zoom-label">Zoom</span>
         <UiSelect v-model="form.zoom" :options="ZOOMS" labelledby="style-all-zoom-label" />
       </div>
@@ -46,7 +50,7 @@ import { onUnmounted, reactive, ref } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import UiSelect from './ui/UiSelect.vue'
 import UiColorField from './ui/UiColorField.vue'
-import { ASPECTS, FONTS, LAYOUTS, PRESETS, PROGRESS_BARS, ZOOMS } from '../utils/clipStyle'
+import { ASPECTS, FONTS, LAYOUTS, PRESETS, PROGRESS_BARS, TIGHTEN, ZOOMS } from '../utils/clipStyle'
 
 const APPLIED_MESSAGE_MS = 2400
 const layoutOptions = LAYOUTS.map(l => ({ value: l.value, label: l.label }))
@@ -63,6 +67,7 @@ const form = reactive({
   progressBar: first.progressBar || 'off',
   aspect: first.aspect || '9:16',
   zoom: first.zoom || 'off',
+  tighten: first.tighten || 'off',
   showHook: first.showHook ?? true,
 })
 const appliedCount = ref(0)

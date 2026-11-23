@@ -31,6 +31,9 @@ ProgressBar = Literal["off", "top", "bottom"]
 Aspect = Literal["9:16", "4:5", "1:1"]
 # Camera motion on face crops (renderer/src/lib/zoom.ts).
 Zoom = Literal["off", "emphasis", "dynamic"]
+# Cutting dead air (renderer/src/lib/tighten.ts): pauses, or pauses and
+# filler words.
+Tighten = Literal["off", "pauses", "all"]
 
 
 class Word(BaseModel):
@@ -102,6 +105,10 @@ class ClipSpec(BaseModel):
     hookTitle: str | None
     viralityScore: float = Field(ge=0, le=10)
     reframe: Reframe
+    # Pauses in the speech, [[start, end], ...] in cut-file time (like the
+    # word times), for tightening. Empty for clips prepared before pauses
+    # were measured: those can only have filler words cut.
+    silences: list[list[float]] = Field(default_factory=list)
 
 
 def window_duration(spec: dict) -> float | None:
@@ -124,6 +131,7 @@ class ClipStyle(BaseModel):
     progressBar: ProgressBar = "off"
     aspect: Aspect = "9:16"
     zoom: Zoom = "off"
+    tighten: Tighten = "off"
 
 
 class BrandKit(BaseModel):
@@ -159,7 +167,7 @@ def default_style(spec: ClipSpec, kit: BrandKit | None = None) -> ClipStyle:
 # Style fields added after renders were already cached. At their default
 # value they are left out of the fingerprints below, so a clip that doesn't
 # use them keeps the fingerprint (and the finished export) it already had.
-_LATER_FIELDS = {"font": "montserrat", "progressBar": "off", "aspect": "9:16", "zoom": "off"}
+_LATER_FIELDS = {"font": "montserrat", "progressBar": "off", "aspect": "9:16", "zoom": "off", "tighten": "off"}
 
 
 def _fingerprint_style(style: ClipStyle) -> dict:

@@ -22,6 +22,9 @@ export function toClipTime(spec: ClipSpec): ClipSpec {
         .filter(s => s.end > start && s.start < end)
         .map(s => ({ ...s, start: Math.max(0, shift(s.start)), end: Math.min(length, shift(s.end)) })),
     },
+    silences: (spec.silences ?? [])
+      .filter(([a, b]) => b > start && a < end)
+      .map(([a, b]) => [Math.max(0, shift(a)), Math.min(length, shift(b))] as [number, number]),
   }
 }
 

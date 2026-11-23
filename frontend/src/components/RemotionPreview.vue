@@ -14,7 +14,8 @@ import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Player } from '@remotion/player'
 import { ClipComposition } from '@renderer/ClipComposition'
-import { FPS, durationInFrames, sizeFor } from '@renderer/constants'
+import { FPS, sizeFor } from '@renderer/constants'
+import { clipFrames } from '@renderer/lib/tighten'
 
 const props = defineProps({
   spec: { type: Object, required: true },
@@ -75,7 +76,8 @@ function draw() {
   root.render(createElement(Player, {
     component: ClipComposition,
     inputProps,
-    durationInFrames: durationInFrames(spec),
+    // Shorter than the clip when tightening cuts pauses (lib/tighten.ts).
+    durationInFrames: clipFrames(spec, inputProps.style.tighten),
     fps: FPS,
     compositionWidth: size.value.width,
     compositionHeight: size.value.height,

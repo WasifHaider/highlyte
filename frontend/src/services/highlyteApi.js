@@ -91,8 +91,11 @@ export function clipSrtUrl(clipId) {
   return `${baseURL}/api/clips/${clipId}/captions.srt`
 }
 
-export function startRender(clipId, style) {
-  return api.post(`/api/clips/${clipId}/render`, style).then(r => r.data)
+// saveStyle: false renders the clip in `style` without saving it as the
+// clip's style (the export bar's extra shapes).
+export function startRender(clipId, style, { saveStyle = true } = {}) {
+  const params = saveStyle ? undefined : { save_style: false }
+  return api.post(`/api/clips/${clipId}/render`, style, { params }).then(r => r.data)
 }
 
 export function getRender(renderId) {

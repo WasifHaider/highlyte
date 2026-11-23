@@ -80,6 +80,40 @@ def voice_audio_args(in_path: str) -> list[str]:
     return ["-af", f"{_VOICE_PRE},{apply},aresample=48000", "-c:a", "aac", "-b:a", "160k", "-ar", "48000"]
 
 
+# Pauses in a segment's speech, for tightening clips (renderer
+# lib/tighten.ts). Groq's word timings run back to back, so pauses come from
+# the audio: stretches quieter than SILENCE_DB for at least SILENCE_MIN_S.
+# Measured on the normalised segment (about -14 LUFS), so the threshold is
+# relative to speech at a known level.
+SILENCE_DB = -35
+SILENCE_MIN_S = 0.3
+
+
+def detect_silences(path: str) -> list[list[float]]:
+    """[[start, end], ...] in seconds from the file start; [] when the file
+    has no audio or ffmpeg can't read it."""
+    proc = subprocess.run([
+        "ffmpeg", "-hide_banner", "-nostats", "-i", path, "-vn",
+        "-af", f"silencedetect=noise={SILENCE_DB}dB:d={SILENCE_MIN_S}", "-f", "null", "-",
+    ], capture_output=True)
+    if proc.returncode != 0:
+        return []
+    out: list[list[float]] = []
+    start: float | None = None
+    for line in proc.stderr.decode(errors="ignore").splitlines():
+        if "silence_start:" in line:
+            start = max(0.0, float(line.split("silence_start:")[1].split()[0]))
+        elif "silence_end:" in line and start is not None:
+            end = float(line.split("silence_end:")[1].split("|")[0].strip())
+            out.append([round(start, 3), round(end, 3)])
+            start = None
+    if start is not None:  # silent to the end of the file
+        duration = probe_duration(path)
+        if duration and duration > start:
+            out.append([round(start, 3), round(duration, 3)])
+    return out
+
+
 # Card posters: a centre 9:16 crop, small enough to load instantly.
 THUMB_W = 360
 

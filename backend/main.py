@@ -68,7 +68,7 @@ app.middleware("http")(accounts.session_middleware)
 app.include_router(accounts.router)
 
 RENDERER_PACKAGE_JSON = os.path.join(BASE_DIR, "renderer", "package.json")
-MAX_ZIP_RENDERS = 20
+MAX_ZIP_RENDERS = 60  # up to 12 clips in three shapes
 # How long a browser may reuse /api/clips's redirect to a presigned R2 URL.
 CLIP_REDIRECT_MAX_AGE_S = 600
 
@@ -1195,6 +1195,7 @@ def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:
             "progressBar": old_style.get("progressBar", "off"),
             "aspect": old_style.get("aspect", "9:16"),
             "zoom": old_style.get("zoom", "off"),
+            "tighten": old_style.get("tighten", "off"),
         }
         fields = {k: v for k, v in _clip_row(job.id, idx, new_record).items() if k != "id"}
         fields |= {"words_original": None, "bounds_original": None, "pending_action": None, "action_error": None}
@@ -1234,7 +1235,13 @@ def regenerate_clip(clip_id: str, member: Member = Depends(current_member)) -> d
 
 
 @app.post("/api/clips/{clip_id}/render")
-def start_render(clip_id: str, style: ClipStyle = Body(...), member: Member = Depends(current_member)) -> dict[str, Any]:
+def start_render(
+    clip_id: str, style: ClipStyle = Body(...), member: Member = Depends(current_member),
+    save_style: bool = Query(True),
+) -> dict[str, Any]:
+    """Render the clip in `style`. The export bar's extra shapes pass
+    save_style=false: the same clip in another shape, without changing the
+    style the clip is saved with."""
     record = _clip_for_style(clip_id, member)
     if record.get("pendingAction"):
         raise HTTPException(409, "This clip is being replaced. Wait for it to finish.")
@@ -1242,7 +1249,8 @@ def start_render(clip_id: str, style: ClipStyle = Body(...), member: Member = De
         raise HTTPException(503, "Rendering not configured")
     if not record.get("storageKey"):
         raise HTTPException(409, "This clip's source isn't in R2, which Lambda rendering needs.")
-    _save_style(record, style)
+    if save_style:
+        _save_style(record, style)
     try:
         words = [Word.model_validate(w) for w in record["spec"]["words"]]
     except (KeyError, TypeError, ValidationError):
@@ -1263,6 +1271,14 @@ def _get_render(render_id: str, member: Member) -> render.Render:
     return RENDER_SERVICE.refresh(render_id)
 
 
+def render_zip_name(r: render.Render) -> str:
+    """highlyte-<clip>.mp4 for 9:16, highlyte-<clip>-4x5.mp4 and so on for
+    other shapes, so one clip's shapes don't overwrite each other."""
+    aspect = (r.style or {}).get("aspect") or "9:16"
+    suffix = "" if aspect == "9:16" else "-" + aspect.replace(":", "x")
+    return f"highlyte-{r.clip_id}{suffix}.mp4"
+
+
 # Declared before /api/renders/{render_id} so "zip" isn't taken as an id.
 @app.get("/api/renders/zip")
 def renders_zip(ids: str = Query(...), member: Member = Depends(current_member)) -> StreamingResponse:
@@ -1273,10 +1289,14 @@ def renders_zip(ids: str = Query(...), member: Member = Depends(current_member))
     # Spools to disk past 64 MB; mp4s are already compressed, so store them as-is.
     buf = tempfile.SpooledTemporaryFile(max_size=64 * 1024 * 1024)
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:
+        srt_written: set[str] = set()
         for r in renders:
-            with zf.open(f"highlyte-{r.clip_id}.mp4", "w") as dest, contextlib.closing(storage.open_object(r.storage_key)) as src:
+            with zf.open(render_zip_name(r), "w") as dest, contextlib.closing(storage.open_object(r.storage_key)) as src:
                 for chunk in iter(lambda: src.read(1024 * 1024), b""):
                     dest.write(chunk)
+            if r.clip_id in srt_written:
+                continue  # one caption file per clip, whatever its shapes
+            srt_written.add(r.clip_id)
             clip_record = _find_clip(r.clip_id)
             if clip_record is not None and clip_record.get("spec"):
                 zf.writestr(f"highlyte-{r.clip_id}.srt", srt.build_srt(clip_record["spec"]))

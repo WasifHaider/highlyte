@@ -97,6 +97,7 @@ def prepare_clip(
         if os.path.exists(raw_path):
             os.remove(raw_path)
     width, height, fps = cut.probe_video(local_path)
+    silences = cut.detect_silences(local_path)
     thumb_path = make_poster(local_path, offset)
 
     on_step("timing captions")
@@ -143,5 +144,6 @@ def prepare_clip(
         hookTitle=clip.hook_title,
         viralityScore=max(0.0, min(10.0, round(clip.score, 1))),
         reframe=reframe_result,
+        silences=silences,
     )
     return PreparedClip(spec=spec, storage_key=storage_key, face_at_start=face_at_start, filename=filename)

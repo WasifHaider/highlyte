@@ -137,3 +137,19 @@ def test_reencode_segment_handles_silent_and_soundless_video(tmp_path):
     assert cut.voice_audio_args(str(silent))[0] == "-c:a"     # nothing to normalise
     assert cut.probe_duration(cut.reencode_segment(str(silent), str(tmp_path / "s.mp4"))) == pytest.approx(3, abs=0.1)
     assert cut.probe_duration(cut.reencode_segment(str(mute), str(tmp_path / "m.mp4"))) == pytest.approx(3, abs=0.1)
+
+
+def test_detect_silences_finds_the_quiet_stretches(quiet_burst):
+    # Silent 0-4 s and 7-10 s around a tone.
+    silences = cut.detect_silences(quiet_burst)
+    assert len(silences) == 2
+    (a0, a1), (b0, b1) = silences
+    assert a0 == pytest.approx(0.0, abs=0.05) and a1 == pytest.approx(4.0, abs=0.1)
+    assert b0 == pytest.approx(7.0, abs=0.1) and b1 == pytest.approx(10.0, abs=0.15)
+
+
+def test_detect_silences_is_empty_without_audio(tmp_path):
+    mute = tmp_path / "mute.mp4"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=30:duration=2",
+                    "-c:v", "libx264", str(mute)], check=True)
+    assert cut.detect_silences(str(mute)) == []

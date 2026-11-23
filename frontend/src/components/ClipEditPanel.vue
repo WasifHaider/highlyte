@@ -87,6 +87,17 @@
                   @update:model-value="v => set({ aspect: v })"
                 />
               </label>
+              <label class="field" for="edit-tighten-select">
+                <span class="field-label" id="edit-tighten-label">Tighten</span>
+                <UiSelect
+                  id="edit-tighten-select"
+                  labelledby="edit-tighten-label"
+                  :model-value="clip.style.tighten || 'off'"
+                  :options="TIGHTEN"
+                  :disabled="!!clip.pendingAction"
+                  @update:model-value="v => set({ tighten: v })"
+                />
+              </label>
               <label class="field" for="edit-zoom-select">
                 <span class="field-label" id="edit-zoom-label">Zoom</span>
                 <UiSelect
@@ -160,7 +171,7 @@ import TrimControls from './TrimControls.vue'
 import RemotionPreview from './RemotionPreview.vue'
 import UiSelect from './ui/UiSelect.vue'
 import UiColorField from './ui/UiColorField.vue'
-import { ASPECTS, FONTS, LAYOUTS, PRESETS, PROGRESS_BARS, ZOOMS, layoutAllowed } from '../utils/clipStyle'
+import { ASPECTS, FONTS, LAYOUTS, PRESETS, PROGRESS_BARS, TIGHTEN, ZOOMS, layoutAllowed } from '../utils/clipStyle'
 import { toClipTime } from '@renderer/lib/timeline'
 
 const SAVED_MESSAGE_MS = 1500

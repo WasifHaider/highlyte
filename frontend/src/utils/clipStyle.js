@@ -33,6 +33,12 @@ export const ZOOMS = [
   { value: 'dynamic', label: 'Dynamic' },
 ]
 
+export const TIGHTEN = [
+  { value: 'off', label: 'Off' },
+  { value: 'pauses', label: 'Cut long pauses' },
+  { value: 'all', label: 'Cut pauses and um/uh' },
+]
+
 export const DEFAULT_BRAND_KIT = { accent: '#FFD400', font: 'montserrat', progressBar: 'off' }
 
 export const PRESETS = [
