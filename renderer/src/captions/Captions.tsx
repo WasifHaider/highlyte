@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion'
+import { sizeFor } from '../constants'
 import { fontFor, weightFor } from '../fonts'
 import { captionBox } from '../lib/safe'
 import type { ClipStyle, Word } from '../schema'
@@ -17,11 +18,12 @@ type Props = {
   accent: string
   position: ClipStyle['captionPosition']
   font?: string
+  aspect?: string
 }
 
 const OUTLINE = { WebkitTextStroke: '12px black', paintOrder: 'stroke fill' } as const
 
-export const Captions: React.FC<Props> = ({ words, preset, accent, position, font }) => {
+export const Captions: React.FC<Props> = ({ words, preset, accent, position, font, aspect }) => {
   const f = fontFor(font)
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
@@ -33,7 +35,7 @@ export const Captions: React.FC<Props> = ({ words, preset, accent, position, fon
 
   // Inside the platform safe area (lib/safe.ts): clear of the right-hand
   // buttons, and lower captions grow upward from above the description.
-  const box = captionBox(position)
+  const box = captionBox(position, aspect, sizeFor(aspect))
   const place = 'centered' in box
     ? { top: box.top, transform: 'translateY(-50%)' }
     : { bottom: box.bottom }

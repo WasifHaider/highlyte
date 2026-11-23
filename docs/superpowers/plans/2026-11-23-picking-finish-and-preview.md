@@ -88,3 +88,60 @@ Status (2026-11-23):
 - Caption safe areas done (`renderer/src/lib/safe.ts`): text stays out of the bottom 480 px, the right 140 px and the top 250 px. Lower captions grow upward from the safe line; the hook title starts below the top band. This changes exported frames on purpose.
 - Brand kit done, scoped with the user: per member (not per team), with accent colour, caption font (Montserrat, Poppins, Anton, Bebas Neue) and progress bar (off, top, bottom); no logo. Stored in `team_members.brand_kit` (migration `20261123120000_member_brand_kit.sql`); new jobs start their clips from the creator's kit; Swap and Regenerate keep the clip's font and bar. Settings has a "My brand kit" section; the clip editor and the style-all bar have font and progress bar controls. Styles without the new fields render exactly as before, and their render fingerprints are unchanged, so existing exports are reused.
 - Needs a Lambda site redeploy (`npm run deploy:site`) before exports show fonts, the progress bar and the safe-area caption placement.
+
+## Phase 4: multiple aspect ratios (9:16, 4:5, 1:1)
+
+Today the output size is two constants (`OUT_W` 1080, `OUT_H` 1920) used by `Root.tsx`, `LayoutView.tsx` (also through `PANEL_H`), `Captions.tsx` and `RemotionPreview.vue`. The crop helper `cropWindow` already takes an aspect ratio, so the reframing maths is not tied to 9:16. Also 9:16-specific: the card poster crop in `backend/pipeline/cut.py` and the CSS aspect ratio of the preview and clip card. Caption and hook-title sizes are in pixels for a 1080-wide frame; every new size is also 1080 wide, so they can stay.
+
+Steps:
+
+1. Add `aspect` (`9:16` default, `4:5`, `1:1`) to `ClipStyle` in both `spec.py` and `schema.ts`. Old styles default to 9:16, so existing clips are unchanged. The render hash already covers the whole style, so a new aspect never reuses an old export.
+2. Replace the constants with a size lookup. On Lambda the composition size comes from `calculateMetadata` (it can return width and height); layouts and captions read the size from `useVideoConfig()`. Sizes: 1080x1920, 1080x1350, 1080x1080.
+3. Check every layout per aspect. Follow and speaker use the same crop maths; fit keeps the blurred background; split keeps two stacked panels (wide crops of the 16:9 source). Captions (`OUT_H * 0.7` today) and the hook title (fixed `top: 200`) need per-aspect positions and safe areas.
+4. Preview: the Player does not run `calculateMetadata`, so `RemotionPreview.vue` must pass the composition size and the CSS aspect ratio from the style itself. The card poster can stay 9:16.
+5. Export: choose aspects in the export bar. Each aspect is a separate Lambda render (an orchestrator plus about four chunk functions each, one render at a time by default in `backend/render.py`), so three aspects take three times as long and cost three times as much. Export one aspect by default and let the user opt in to more.
+6. Redeploy the Remotion Lambda site after the renderer change; Lambda renders the deployed bundle, not the local code.
+
+Risks: face tracking drives only the horizontal crop position, fine for crops of a 16:9 source but untested for vertical sources. Check each aspect on real clips with one speaker, two speakers and a camera cut.
+
+Done when: all three aspects export and preview identically for every layout on those test clips, and existing 9:16 clips are untouched.
+
+Status (2026-11-23): built. `aspect` is a per-clip style field (`9:16`, `4:5`, `1:1`), set in the clip editor ("Shape") and the style-all bar; each clip exports in its own shape. The renderer takes its size from `constants.sizeFor`, Lambda from `calculateMetadata`, and the preview Player and its box from the style. Safe areas are per aspect (4:5 and 1:1 are feed posts, so they only keep text off the edges). Checked: 4:5 and 1:1 stills render at 1080x1350 and 1080x1080 for follow, split and fit; 9:16 renders are pixel-identical to before; styles without `aspect` keep their render fingerprint.
+
+Not done:
+- Exporting one clip in several shapes at once. Renders are tracked one per clip in the frontend (`jobStore.renders`), so this needs that reworked; for now, change the shape and export again.
+- The karaoke and pop captions keep their 9:16 sizes, which fill more of a square frame; review on real clips.
+- Needs the same Lambda site redeploy as Phase 3.
+
+## Phase 5: background music
+
+Needs Phase 0 (it adds another audio element to the preview) and Phase 3's loudness step (the music level only means something against a normalised voice). The track source is still an open decision, to settle before this phase starts.
+
+- Tracks: a small set of properly licensed tracks. Either bundled in the Remotion site (`renderer/public`, a site redeploy whenever tracks change) or stored in R2 and referenced by URL in the style; R2 avoids redeploys and also allows a team to upload its own track through the existing upload path.
+- Track ids must be immutable (a replaced file gets a new id): the render hash covers the style, not the file's contents, so an edited file under the same id would reuse a stale export.
+- Style fields: `musicTrack` (id or none) and `musicVolume`, added to `spec.py` and `schema.ts` together.
+- Composition: a looping `<Audio>` layer with fade in and fade out. Podcast clips are nearly continuous speech, so ducking under words gains little; start with a fixed low level (about 8 to 12 percent, tuned by ear) and add ducking only if it sounds needed.
+- UI: a track picker and volume slider in the clip edit panel, off by default, plus apply-to-all in the existing style-all bar.
+
+Done when: music plays at the same level in the preview and in a Lambda export, and clips without music are unchanged.
+
+## Phase 6: pacing
+
+- Punch-in zoom on emphasis words (already flagged on words in the spec) and slow push-ins, in `CroppedVideo.tsx`.
+- Optional alternating crop scale for static talking heads.
+- Silence and filler trimming. Riskiest item: it changes the timeline, so word timings, face tracks, shots, the preview and the export must all agree (`lib/timeline.ts`, `lib/trim.ts`), and it must work with every aspect from Phase 4. Needs crossfades or hidden jump cuts and thorough tests. It touches the contract between `backend/spec.py` and `renderer/src/schema.ts`; change both together and bump the spec version.
+
+Done when: trimmed clips keep captions in sync to the word in preview and export, across all aspects, with tests covering the time mapping.
+
+## Deferred
+
+- B-roll or screenshots over speech (sourcing, licensing and relevance work).
+- Automatic sound effects.
+- Learning from swaps and trims: needs an event log first (swapped clips are replaced, so the history may not exist today) and weeks of use.
+
+## Risks
+
+- Render cost grows with effects, duration and the number of aspects exported; check Lambda billing before adding heavy layers.
+- Groq usage: each member uses their own key and the daily limit is a known failure, so Phase 1 runs and Phase 2's extra call must stay small and keep the existing fallback.
+- Picking gains are unmeasured until the Phase 1 gold set exists; treat the first results as the baseline, not proof.
+- Phase 0 adds a preview-only difference from the export (the fit background); keep it to that one place.

@@ -134,7 +134,7 @@ def test_old_style_fingerprints_survive_the_new_fields():
                                        "hookTitle": None, "accent": "#FFD400", "captionPosition": "lower"})
     assert style_hash(legacy) == style_hash(a)
     import hashlib, json
-    old_payload = json.dumps({k: v for k, v in a.model_dump().items() if k not in ("font", "progressBar")},
+    old_payload = json.dumps({k: v for k, v in a.model_dump().items() if k not in ("font", "progressBar", "aspect")},
                              sort_keys=True, separators=(",", ":"))
     assert style_hash(a) == hashlib.sha256(old_payload.encode()).hexdigest()[:16]
 
@@ -143,6 +143,7 @@ def test_new_style_fields_change_the_fingerprint():
     base = ClipStyle(layout="fit")
     assert style_hash(ClipStyle(layout="fit", font="anton")) != style_hash(base)
     assert render_hash(ClipStyle(layout="fit", progressBar="top"), []) != render_hash(base, [])
+    assert style_hash(ClipStyle(layout="fit", aspect="1:1")) != style_hash(base)
 
 
 def test_default_style_starts_from_the_brand_kit():

@@ -27,6 +27,7 @@ const style = (layout: ClipStyle['layout'], captionPosition: ClipStyle['captionP
   captionPosition,
   font: 'montserrat',
   progressBar: 'off',
+  aspect: '9:16',
 })
 
 describe('resolveView with shots', () => {

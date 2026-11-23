@@ -1,5 +1,5 @@
 import { AbsoluteFill, getRemotionEnvironment, OffthreadVideo, useCurrentFrame, useVideoConfig } from 'remotion'
-import { OUT_W } from '../constants'
+import { sizeFor } from '../constants'
 import { framePlan } from '../lib/frame'
 import { resolveView } from '../lib/view'
 import type { ClipSpec, Layout } from '../schema'
@@ -28,7 +28,7 @@ const FitBackground: React.FC<{ src: string; trimBefore: number; posterUrl?: str
   )
 }
 
-export const LayoutView: React.FC<{ spec: ClipSpec; layout: Layout; posterUrl?: string }> = ({ spec, layout, posterUrl }) => {
+export const LayoutView: React.FC<{ spec: ClipSpec; layout: Layout; aspect?: string; posterUrl?: string }> = ({ spec, layout, aspect, posterUrl }) => {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
   const t = frame / fps
@@ -36,7 +36,9 @@ export const LayoutView: React.FC<{ spec: ClipSpec; layout: Layout; posterUrl?: 
   const trimBefore = Math.round(spec.start * fps)
   const { width: srcW, height: srcH } = spec.source
 
-  const plan = framePlan(spec, layout, resolveView(spec, layout, t), t)
+  const size = sizeFor(aspect)
+  const OUT_W = size.width
+  const plan = framePlan(spec, layout, resolveView(spec, layout, t), t, size)
 
   // The primary panel carries the sound: a separate <Audio> would download
   // the whole file a second time, and every media element on a slow

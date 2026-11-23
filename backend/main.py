@@ -1193,6 +1193,7 @@ def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:
             # Styles saved before these fields existed lack them.
             "font": old_style.get("font", "montserrat"),
             "progressBar": old_style.get("progressBar", "off"),
+            "aspect": old_style.get("aspect", "9:16"),
         }
         fields = {k: v for k, v in _clip_row(job.id, idx, new_record).items() if k != "id"}
         fields |= {"words_original": None, "bounds_original": None, "pending_action": None, "action_error": None}

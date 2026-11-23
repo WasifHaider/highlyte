@@ -1,5 +1,5 @@
 <template>
-  <div class="remotion-preview-wrap">
+  <div class="remotion-preview-wrap" :style="{ aspectRatio: `${size.width} / ${size.height}` }">
     <div ref="host" class="remotion-preview"></div>
     <div v-if="!ready" class="remotion-skeleton skeleton" aria-hidden="true"></div>
   </div>
@@ -9,12 +9,12 @@
 // Hosts the Remotion Player (React) inside this Vue app. The composition
 // is imported straight from renderer/src, so the preview is the exact
 // code Lambda renders.
-import { onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue'
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Player } from '@remotion/player'
 import { ClipComposition } from '@renderer/ClipComposition'
-import { FPS, OUT_H, OUT_W, durationInFrames } from '@renderer/constants'
+import { FPS, durationInFrames, sizeFor } from '@renderer/constants'
 
 const props = defineProps({
   spec: { type: Object, required: true },
@@ -61,6 +61,9 @@ const plain = (value) => JSON.parse(JSON.stringify(toRaw(value)))
 // stutters playback. So only a real change is drawn.
 let lastDrawn = null
 
+// The clip's output size (its aspect ratio; 9:16 when the style has none).
+const size = computed(() => sizeFor(props.clipStyle?.aspect))
+
 function draw() {
   if (!root) return
   const inputProps = { spec: plain(props.spec), style: plain(props.clipStyle) }
@@ -74,8 +77,8 @@ function draw() {
     inputProps,
     durationInFrames: durationInFrames(spec),
     fps: FPS,
-    compositionWidth: OUT_W,
-    compositionHeight: OUT_H,
+    compositionWidth: size.value.width,
+    compositionHeight: size.value.height,
     controls: true,
     autoPlay: props.autoPlay,
     acknowledgeRemotionLicense: true,
@@ -112,7 +115,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.remotion-preview-wrap { position: relative; width: 100%; aspect-ratio: 9 / 16; border-radius: 10px; overflow: hidden; }
-.remotion-preview { width: 100%; height: 100%; aspect-ratio: 9 / 16; background: #000; border-radius: 10px; overflow: hidden; }
+.remotion-preview-wrap { position: relative; width: 100%; border-radius: 10px; overflow: hidden; }
+.remotion-preview { width: 100%; height: 100%; background: #000; border-radius: 10px; overflow: hidden; }
 .remotion-skeleton { position: absolute; inset: 0; border-radius: 10px; }
 </style>

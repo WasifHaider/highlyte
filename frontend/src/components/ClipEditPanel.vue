@@ -76,6 +76,17 @@
                   @update:model-value="v => set({ captionPosition: v })"
                 />
               </label>
+              <label class="field" for="edit-aspect-select">
+                <span class="field-label" id="edit-aspect-label">Shape</span>
+                <UiSelect
+                  id="edit-aspect-select"
+                  labelledby="edit-aspect-label"
+                  :model-value="clip.style.aspect || '9:16'"
+                  :options="ASPECTS"
+                  :disabled="!!clip.pendingAction"
+                  @update:model-value="v => set({ aspect: v })"
+                />
+              </label>
               <label class="field" for="edit-font-select">
                 <span class="field-label" id="edit-font-label">Font</span>
                 <UiSelect
@@ -138,7 +149,7 @@ import TrimControls from './TrimControls.vue'
 import RemotionPreview from './RemotionPreview.vue'
 import UiSelect from './ui/UiSelect.vue'
 import UiColorField from './ui/UiColorField.vue'
-import { FONTS, LAYOUTS, PRESETS, PROGRESS_BARS, layoutAllowed } from '../utils/clipStyle'
+import { ASPECTS, FONTS, LAYOUTS, PRESETS, PROGRESS_BARS, layoutAllowed } from '../utils/clipStyle'
 import { toClipTime } from '@renderer/lib/timeline'
 
 const SAVED_MESSAGE_MS = 1500

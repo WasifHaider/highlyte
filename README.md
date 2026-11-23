@@ -155,6 +155,8 @@ else about it changed.
   `npm run fixture:video && npm run stills` renders a still for every
   layout × preset.
 - Remotion's free license covers teams of 3 or fewer people.
+- Shape: each clip renders as 9:16, 4:5 or 1:1 (clip editor, "Shape"); the
+  output size comes from the style through `calculateMetadata`.
 - Brand kit: each member sets an accent colour, caption font (Montserrat,
   Poppins, Anton, Bebas Neue) and progress bar under Settings; their new
   clips start with it and any clip can still change it in its editor. It is

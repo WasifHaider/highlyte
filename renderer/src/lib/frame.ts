@@ -1,10 +1,12 @@
-import { OUT_H, OUT_W } from '../constants'
+import { SIZES, type Size } from '../constants'
 import type { ClipSpec, Layout } from '../schema'
 import { cropWindow, type Crop } from './crop'
 import { sampleTrack } from './track'
 import type { View } from './view'
 
-export const PANEL_H = OUT_H / 2
+// Height of each half of a split frame (9:16 size; other sizes halve
+// their own height).
+export const PANEL_H = SIZES['9:16'].height / 2
 
 // One video panel: which part of the source it shows (`crop`, source
 // pixels), the box it fills (full output width, `boxH` tall, `top` from the
@@ -20,7 +22,9 @@ export type FramePlan = { primary: Panel; secondary: Panel | null; fit: boolean 
 // panel always exists (fit is a letterboxed full-frame crop of it) and the
 // secondary exists for the whole clip whenever split is chosen, hidden
 // during shots that aren't split.
-export function framePlan(spec: ClipSpec, layout: Layout, view: View, t: number): FramePlan {
+export function framePlan(spec: ClipSpec, layout: Layout, view: View, t: number, size: Size = SIZES['9:16']): FramePlan {
+  const { width: OUT_W, height: OUT_H } = size
+  const PANEL_H = OUT_H / 2
   const { width: srcW, height: srcH } = spec.source
   const faces = spec.reframe.faces
   const faceCx = (id: number | undefined): number =>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import fixture from '../__fixtures__/clip-spec.json'
-import { OUT_H, OUT_W } from '../constants'
+import { OUT_H, OUT_W, SIZES } from '../constants'
 import { clipSpecSchema, type Layout } from '../schema'
 import { framePlan, PANEL_H } from './frame'
 import { resolveView } from './view'
@@ -59,5 +59,28 @@ describe('framePlan geometry', () => {
     expect(p.primary.boxH).toBe(OUT_H)
     expect(p.primary.top).toBe(0)
     expect(p.primary.crop.w / p.primary.crop.h).toBeCloseTo(OUT_W / OUT_H)
+  })
+})
+
+describe('framePlan for other aspect ratios', () => {
+  const at = (layout: Layout, t: number, aspect: keyof typeof SIZES) =>
+    framePlan(spec, layout, resolveView(spec, layout, t), t, SIZES[aspect])
+
+  it('a close-up fills a square frame with a square crop', () => {
+    const p = at('follow', 5, '1:1')
+    expect(p.primary.boxH).toBe(1080)
+    expect(p.primary.crop.w / p.primary.crop.h).toBeCloseTo(1)
+  })
+  it('split halves a 4:5 frame', () => {
+    const p = at('split', 1, '4:5')
+    expect(p.primary.boxH).toBe(675)
+    expect(p.secondary?.top).toBe(675)
+    expect(p.secondary?.crop.w! / p.secondary?.crop.h!).toBeCloseTo(1080 / 675)
+  })
+  it('fit letterboxes inside the frame height', () => {
+    const p = at('fit', 1, '1:1')
+    const boxH = (1080 * spec.source.height) / spec.source.width
+    expect(p.primary.boxH).toBe(boxH)
+    expect(p.primary.top).toBe((1080 - boxH) / 2)
   })
 })

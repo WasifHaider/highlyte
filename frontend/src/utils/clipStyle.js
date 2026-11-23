@@ -21,6 +21,12 @@ export const PROGRESS_BARS = [
   { value: 'bottom', label: 'Bottom edge' },
 ]
 
+export const ASPECTS = [
+  { value: '9:16', label: '9:16 vertical' },
+  { value: '4:5', label: '4:5 portrait' },
+  { value: '1:1', label: '1:1 square' },
+]
+
 export const DEFAULT_BRAND_KIT = { accent: '#FFD400', font: 'montserrat', progressBar: 'off' }
 
 export const PRESETS = [
