@@ -57,6 +57,11 @@ Status (2026-11-23): built `backend/eval/compare_selection.py` (`--replay` resco
 - First comparison on four videos, one run each: v2 drops the sponsor reads the current prompt kept and picks more story moments, but some v2 picks open on earlier context, and it tends to pick 40-56 s spans. No clear overall win. The Groq daily limit ended the v2 run on the 2 h video early.
 - Still open: two runs per prompt, and a gold set from the user.
 
+Gold set and second round (2026-11-23): gold moments in `eval-runs/gold.json` were marked by Claude from the transcripts (7 for 638ad258ba16, 13 for 48ec2e8a39e7), a stand-in for a human set. Findings, with "pool" meaning all candidates before packing:
+- The picker is the bottleneck: on the Tenerife video the candidate pool covers only 5 of 13 gold moments (current) and 3 of 13 (v2); packing then keeps what it can.
+- On the 10-minute video the current prompt is unstable across runs (1 and 4 of 7 gold); v2 found 4 of 7 in both runs; current+rerank 4 of 7 in both with 4 of 5 kept clips on gold; v2+rerank 4 of 7 with 5 of 5 kept clips on gold (one run; the second hit the Groq daily limit).
+- Small sample; Tenerife results for v2 and the rerank variants are pending quota.
+
 ## Phase 2: stronger selection
 
 - Two-pass ranking: after the per-window picks, one call ranks the shortlisted texts against each other. If it fails or hits a rate limit, fall back to today's `scoring.pack` order. Try a larger model for this call only, since its input is small.
@@ -112,6 +117,8 @@ Not done:
 - Exporting one clip in several shapes at once. Renders are tracked one per clip in the frontend (`jobStore.renders`), so this needs that reworked; for now, change the shape and export again.
 - The karaoke and pop captions keep their 9:16 sizes, which fill more of a square frame; review on real clips.
 - Needs the same Lambda site redeploy as Phase 3.
+
+Lambda (2026-11-23): the branch renderer is deployed as a separate site, `highlyte-clip-quality`, so production's `highlyte` site is untouched until merge. A test render there (1:1, Anton, zoom, progress bar) came back 1080x1080 with audio. At merge, point `REMOTION_SERVE_URL` on the server at `.../sites/highlyte-clip-quality/index.html` (or redeploy `highlyte`). The CLI's default chunking hits the account's Lambda concurrency limit; the backend already sizes chunks so a render uses about five functions.
 
 ## Phase 5: background music
 
