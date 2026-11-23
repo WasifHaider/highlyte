@@ -51,6 +51,12 @@ Done when: on a real clip from a long podcast, switching layout five times in a 
 
 Done when: the new prompt finds at least as many gold moments as the old one across repeated runs, and the tests pass.
 
+Status (2026-11-23): built `backend/eval/compare_selection.py` (`--replay` rescoring from saved answers in `eval-runs/`, gitignored) and the `v2` prompt in `backend/eval/prompts.py`, with start times shown to the model. Production still uses the current prompt.
+
+- Found and fixed: Groq word timings have no gaps (median 0.0 s on all 21 stored transcripts), so `snap.forward_to_pause` rejected picks ending on a clean sentence. A sentence end now counts as a cut point. On the Tenerife video this took 16 picks from 3 candidates to 9.
+- First comparison on four videos, one run each: v2 drops the sponsor reads the current prompt kept and picks more story moments, but some v2 picks open on earlier context, and it tends to pick 40-56 s spans. No clear overall win. The Groq daily limit ended the v2 run on the 2 h video early.
+- Still open: two runs per prompt, and a gold set from the user.
+
 ## Phase 2: stronger selection
 
 - Two-pass ranking: after the per-window picks, one call ranks the shortlisted texts against each other. If it fails or hits a rate limit, fall back to today's `scoring.pack` order. Try a larger model for this call only, since its input is small.
@@ -59,6 +65,14 @@ Done when: the new prompt finds at least as many gold moments as the old one acr
 - Optional: per-video percentile thresholds instead of the fixed 0.7 and 0.55 gates, tuned only against the gold set.
 
 Done when: the gold-set score improves over Phase 1 across repeated runs, the fallback path is covered by a test, and the job time for a long podcast is measured before and after.
+
+Status (2026-11-23):
+
+- Over-long picks are shortened to their last sentence end that fits 60 s instead of being dropped (`snap.shorten`), and flagged `shortened` ("Shortened, check the ending" on the card). Replaying the saved runs: 0 picks lost to length instead of 21 of 90; 1 to 2 kept clips per video are shortened.
+- Clip cap: 8 up to 80 minutes, then one per 10 minutes, up to 12 (`scoring.max_clips`, ceiling provisional). The titles call budget grows with the clip count. The 2 h video now gets 12 clips.
+- Mid-thought picks take in one neighbouring thought instead of being dropped. Rare in practice: 2 of 134 saved picks.
+- Two-pass shortlist ranking (`pipeline/shortlist.py`) is built with its fallback and tests, but only the comparison script turns it on (`current+rerank`, `v2+rerank`) until it is measured.
+- Not done: percentile thresholds; job-time measurement for 12 clips.
 
 ## Phase 3: finished-clip polish, audio first
 

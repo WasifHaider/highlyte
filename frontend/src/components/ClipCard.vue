@@ -107,6 +107,7 @@ const QA_LABELS = {
   low_confidence: 'Low confidence — check captions',
   weak_pick: 'Weaker pick',
   no_face_start: 'No face at start',
+  shortened: 'Shortened, check the ending',
 }
 
 const props = defineProps({

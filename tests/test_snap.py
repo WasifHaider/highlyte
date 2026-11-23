@@ -39,6 +39,25 @@ def test_forward_to_pause_rejects_a_run_on():
     assert e.value.reason == "hanging_end"
 
 
+def test_forward_to_pause_accepts_a_sentence_end_without_a_pause():
+    # Groq word timings are back to back (no gaps), so a clean sentence end
+    # must count as a cut point on its own.
+    words = line("yeh bahut zaroori hai. agla point yeh hai ki sab kuch badal gaya", dur=0.4)
+    assert snap.forward_to_pause(words, 3) == 3
+
+
+def test_forward_to_pause_moves_on_to_a_nearby_sentence_end():
+    words = line("woh kehte hain ki sab theek hoga. phir kuch aur hua bina ruke aage", dur=0.4)
+    assert snap.forward_to_pause(words, 4) == 6
+
+
+def test_forward_to_pause_still_rejects_a_run_on_with_no_sentence_end():
+    words = line(" ".join(f"x{i}" for i in range(30)), dur=0.4)
+    with pytest.raises(snap.Reject) as e:
+        snap.forward_to_pause(words, 5)
+    assert e.value.reason == "hanging_end"
+
+
 def test_start_cut_leads_by_220ms_without_eating_previous_word():
     words = [w("a", 0.0, 3.0), w("b", 5.0, 5.4)]
     assert snap.start_cut(words, 1) == 4.78
@@ -98,3 +117,33 @@ def test_snap_places_both_cuts():
     assert (cut.first, cut.last) == (1, len(words) - 2)
     assert cut.start == 1.78
     assert cut.end == round(body[-1].end + 0.4, 3)
+
+
+def test_snap_shortens_a_long_span_to_its_last_sentence_end_that_fits():
+    # Four 16 s sentences (40 words x 0.4 s); the whole span is 64 s.
+    sentence = "baat " * 39 + "khatam. "
+    words = line(sentence * 4, dur=0.4)
+    cut = snap.snap(words, 0, len(words) - 1, max_s=60.0)
+    assert cut.shortened
+    assert words[cut.last].t == "khatam."
+    assert cut.last == 119            # end of the third sentence (48 s)
+    assert cut.end - cut.start <= 60.0
+
+
+def test_snap_leaves_a_span_that_fits_alone():
+    words = line(("baat " * 39 + "khatam. ") * 2, dur=0.4)
+    cut = snap.snap(words, 0, len(words) - 1, max_s=60.0)
+    assert not cut.shortened and cut.last == len(words) - 1
+
+
+def test_snap_rejects_a_long_span_with_no_sentence_end_to_shorten_to():
+    words = line("baat " * 170 + "khatam.", dur=0.4)
+    with pytest.raises(snap.Reject) as e:
+        snap.snap(words, 0, len(words) - 1, max_s=60.0)
+    assert e.value.reason == "too_long"
+
+
+def test_snap_without_max_s_never_shortens():
+    words = line(("baat " * 39 + "khatam. ") * 4, dur=0.4)
+    cut = snap.snap(words, 0, len(words) - 1)
+    assert not cut.shortened and cut.last == len(words) - 1

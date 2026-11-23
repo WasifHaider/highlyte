@@ -48,3 +48,20 @@ def test_no_chat_or_no_clips():
 def test_code_emphasis_picks_longest_non_stopwords():
     # longest first; "din"/"se" are too short and "warna" is a stopword
     assert titles.code_emphasis("Honestly marketing budget pehle din se rakho warna") == ["marketing", "honestly", "budget"]
+
+
+def test_token_budget_grows_with_the_number_of_clips():
+    from backend.pipeline.groq_llm import ChatResult
+
+    class BudgetChat:
+        def __init__(self):
+            self.budgets = []
+
+        def complete(self, prompt, *, max_tokens):
+            self.budgets.append(max_tokens)
+            return ChatResult("[]", "stop")
+
+    chat = BudgetChat()
+    titles.write_titles(chat, ["baat"] * 4)
+    titles.write_titles(chat, ["baat"] * 12)
+    assert chat.budgets == [titles.MAX_TOKENS, 12 * titles.TOKENS_PER_CLIP]

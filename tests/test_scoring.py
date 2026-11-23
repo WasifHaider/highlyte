@@ -104,3 +104,17 @@ def test_pack_fills_to_five_with_flagged_near_misses():
     assert len(kept) == 5
     assert sum("weak_pick" in c.flags for c in kept) == 2
     assert all(c.start != 200 for c in kept)
+
+
+def test_max_clips_grows_with_video_length():
+    assert scoring.max_clips(10 * 60) == 8          # short videos keep the old cap
+    assert scoring.max_clips(75 * 60) == 8
+    assert scoring.max_clips(120 * 60) == 12        # one per 10 minutes past 80 min
+    assert scoring.max_clips(240 * 60) == scoring.MAX_CLIPS_CEILING
+    assert scoring.max_clips(0) == 8
+
+
+def test_pack_takes_a_larger_cap():
+    cands = [cand(i * 25.0, i * 25.0 + 20, total=0.5 + i / 100) for i in range(14)]
+    assert len(scoring.pack(cands, max_clips=12)) == 12
+    assert len(scoring.pack(cands)) == 8

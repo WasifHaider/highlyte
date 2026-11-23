@@ -37,6 +37,7 @@ class Cut:
     last: int
     start: float
     end: float
+    shortened: bool = False  # the end was moved earlier to fit max_s
 
 
 def back_to_pause(words: list[SegWord], first: int) -> int:
@@ -53,11 +54,13 @@ def back_to_pause(words: list[SegWord], first: int) -> int:
 
 
 def forward_to_pause(words: list[SegWord], last: int) -> int:
-    """Move forward to the next gap >= CUT_PAUSE_S within MAX_EXTEND_S;
-    a speaker who never pauses there means the clip would end mid-flow."""
+    """Move forward to the next safe cut within MAX_EXTEND_S: a gap >=
+    CUT_PAUSE_S or a word that ends a sentence. Groq's word timings run back
+    to back with no gaps, so on most transcripts the sentence end is the only
+    signal. Neither one nearby means the clip would end mid-flow."""
     i = last
     while i < len(words) - 1:
-        if words[i + 1].start - words[i].end >= CUT_PAUSE_S:
+        if words[i + 1].start - words[i].end >= CUT_PAUSE_S or words[i].t.endswith(_SENTENCE_END):
             return i
         if words[i + 1].end - words[last].end > MAX_EXTEND_S:
             raise Reject("hanging_end")
@@ -116,9 +119,29 @@ def end_cut(words: list[SegWord], last: int) -> float:
     return round(max(t, w.end), 3)
 
 
-def snap(words: list[SegWord], first: int, last: int) -> Cut:
+def shorten(words: list[SegWord], first: int, last: int, max_s: float) -> int:
+    """The latest sentence end before `last` that keeps the cut within
+    max_s (and at least MIN_SPAN_S long). The opening, where the hook is,
+    stays; the ending is what gives way."""
+    start = start_cut(words, first)
+    for k in range(last - 1, first - 1, -1):
+        w = words[k]
+        if words[k].end - words[first].start < MIN_SPAN_S:
+            break
+        if (w.t.endswith(_SENTENCE_END) and norm(w.t) not in HANGING_END_WORDS
+                and end_cut(words, k) - start <= max_s):
+            return k
+    raise Reject("too_long")
+
+
+def snap(words: list[SegWord], first: int, last: int, max_s: float | None = None) -> Cut:
+    """Cut points for a picked span. With `max_s`, a span that runs longer
+    is shortened to an earlier sentence end instead of being dropped."""
     first = back_to_pause(words, first)
     last = forward_to_pause(words, last)
     first = strip_leading_filler(words, first, last)
     last = fix_last_line(words, first, last)
-    return Cut(first, last, start_cut(words, first), end_cut(words, last))
+    shortened = False
+    if max_s is not None and end_cut(words, last) - start_cut(words, first) > max_s:
+        last, shortened = shorten(words, first, last, max_s), True
+    return Cut(first, last, start_cut(words, first), end_cut(words, last), shortened)
