@@ -1,57 +1,63 @@
-import { AbsoluteFill, Audio, OffthreadVideo, useCurrentFrame, useVideoConfig } from 'remotion'
-import { OUT_H, OUT_W } from '../constants'
-import { cropWindow } from '../lib/crop'
-import { sampleTrack } from '../lib/track'
+import { AbsoluteFill, getRemotionEnvironment, OffthreadVideo, useCurrentFrame, useVideoConfig } from 'remotion'
+import { OUT_W } from '../constants'
+import { framePlan } from '../lib/frame'
 import { resolveView } from '../lib/view'
 import type { ClipSpec, Layout } from '../schema'
 import { resolveSrc } from '../source'
 import { CroppedVideo } from './CroppedVideo'
 
-const PANEL_H = OUT_H / 2
+const BLUR = { filter: 'blur(40px)', transform: 'scale(1.15)' } as const
 
-export const LayoutView: React.FC<{ spec: ClipSpec; layout: Layout }> = ({ spec, layout }) => {
+// Behind a fit (letterboxed) frame. Rendering draws a blurred copy of the
+// video. The browser preview would need a second video element for that,
+// mounted and unmounted at every fit shot, which reloads and drifts out of
+// sync; there it uses the clip's still poster instead (or plain black when
+// none is given). This is the one place the preview differs from the render.
+const FitBackground: React.FC<{ src: string; trimBefore: number; posterUrl?: string }> = ({ src, trimBefore, posterUrl }) => {
+  if (getRemotionEnvironment().isPlayer) {
+    return posterUrl ? (
+      <AbsoluteFill style={BLUR}>
+        <img src={posterUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </AbsoluteFill>
+    ) : null
+  }
+  return (
+    <AbsoluteFill style={BLUR}>
+      <OffthreadVideo src={src} trimBefore={trimBefore} muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+    </AbsoluteFill>
+  )
+}
+
+export const LayoutView: React.FC<{ spec: ClipSpec; layout: Layout; posterUrl?: string }> = ({ spec, layout, posterUrl }) => {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
   const t = frame / fps
   const src = resolveSrc(spec.source.url)
   const trimBefore = Math.round(spec.start * fps)
   const { width: srcW, height: srcH } = spec.source
-  const faces = spec.reframe.faces
 
-  const view = resolveView(spec, layout, t)
+  const plan = framePlan(spec, layout, resolveView(spec, layout, t), t)
 
-  if (view.kind === 'fit') {
-    return (
-      <AbsoluteFill style={{ backgroundColor: 'black' }}>
-        <Audio src={src} trimBefore={trimBefore} />
-        <AbsoluteFill style={{ filter: 'blur(40px)', transform: 'scale(1.15)' }}>
-          <OffthreadVideo src={src} trimBefore={trimBefore} muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        </AbsoluteFill>
-        <AbsoluteFill style={{ justifyContent: 'center' }}>
-          <OffthreadVideo src={src} trimBefore={trimBefore} muted style={{ width: OUT_W, height: (OUT_W * srcH) / srcW }} />
-        </AbsoluteFill>
-      </AbsoluteFill>
-    )
-  }
-
-  // 'two' and 'one' share one tree shape (Audio, then a stable primary panel,
-  // then an optional secondary panel) so a switch at a camera cut only
-  // changes props on already-mounted elements instead of remounting them —
-  // that would restart audio and flash black in the browser preview.
-  const isTwo = view.kind === 'two'
-  const primaryFace = faces.find(f => f.id === (isTwo ? view.topId : view.faceId)) ?? faces[0]
-  const secondaryFace = isTwo ? faces.find(f => f.id === view.bottomId) ?? faces[0] : null
-  const primaryBoxH = isTwo ? PANEL_H : OUT_H
-  const primaryAspect = OUT_W / primaryBoxH
-
+  // The primary panel carries the sound: a separate <Audio> would download
+  // the whole file a second time, and every media element on a slow
+  // connection competes for the same bandwidth. The primary is mounted for
+  // the whole clip in every layout, so the sound never restarts.
+  // pauseWhenBuffering (off by default in Remotion 4) stops the timeline
+  // while any media element loads. Without it the captions run on, the
+  // picture freezes, and on a slow connection Remotion keeps seeking the
+  // video to catch up, which only starts another load: the preview never
+  // recovers until the page is reloaded. Rendering ignores it.
+  // The children keep the same slots in every frame and layout (background,
+  // primary, secondary), so a camera cut or a layout change only
+  // changes props on mounted elements and never remounts a video.
   return (
     <AbsoluteFill style={{ backgroundColor: 'black' }}>
-      <Audio src={src} trimBefore={trimBefore} />
-      <CroppedVideo key="primary" src={src} trimBefore={trimBefore} srcW={srcW} srcH={srcH} boxW={OUT_W} boxH={primaryBoxH} muted
-        crop={cropWindow(srcW, srcH, sampleTrack(primaryFace.track, t).cx, primaryAspect)} />
-      {secondaryFace ? (
-        <CroppedVideo key="secondary" src={src} trimBefore={trimBefore} srcW={srcW} srcH={srcH} boxW={OUT_W} boxH={PANEL_H} muted
-          crop={cropWindow(srcW, srcH, sampleTrack(secondaryFace.track, t).cx, OUT_W / PANEL_H)} />
+      {plan.fit ? <FitBackground src={src} trimBefore={trimBefore} posterUrl={posterUrl} /> : null}
+      <CroppedVideo key="primary" src={src} trimBefore={trimBefore} srcW={srcW} srcH={srcH} boxW={OUT_W}
+        crop={plan.primary.crop} boxH={plan.primary.boxH} top={plan.primary.top} />
+      {plan.secondary ? (
+        <CroppedVideo key="secondary" src={src} trimBefore={trimBefore} srcW={srcW} srcH={srcH} boxW={OUT_W} muted
+          crop={plan.secondary.crop} boxH={plan.secondary.boxH} top={plan.secondary.top} visible={plan.secondary.visible} />
       ) : null}
     </AbsoluteFill>
   )

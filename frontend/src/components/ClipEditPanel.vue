@@ -28,7 +28,7 @@
         <Transition name="fade" mode="out-in">
           <div class="panel-body" :key="clip.id">
             <div class="panel-preview">
-              <RemotionPreview :spec="previewSpec" :clip-style="clip.style" auto-play />
+              <RemotionPreview :spec="previewSpec" :clip-style="clip.style" :poster-url="clip.thumbUrl || null" auto-play />
               <div v-if="clip.pendingAction" class="panel-preview-busy" aria-hidden="true"></div>
             </div>
 

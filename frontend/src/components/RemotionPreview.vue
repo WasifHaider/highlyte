@@ -20,6 +20,9 @@ const props = defineProps({
   spec: { type: Object, required: true },
   clipStyle: { type: Object, required: true },
   autoPlay: { type: Boolean, default: false },
+  // The clip's still image, used by the preview as the blurred background
+  // behind a fit frame (renders draw that background from the video).
+  posterUrl: { type: String, default: null },
 })
 
 const host = ref(null)
@@ -52,12 +55,23 @@ function markReady() {
 // React must receive plain objects, not Vue's reactive proxies.
 const plain = (value) => JSON.parse(JSON.stringify(toRaw(value)))
 
+// The serialized props last drawn. The deep watch below also fires when a
+// status poll replaces the clip with an identical copy; redrawing then makes
+// the Player re-check every media element and can trigger a seek, which
+// stutters playback. So only a real change is drawn.
+let lastDrawn = null
+
 function draw() {
   if (!root) return
-  const spec = plain(props.spec)
+  const inputProps = { spec: plain(props.spec), style: plain(props.clipStyle) }
+  if (props.posterUrl) inputProps.posterUrl = props.posterUrl
+  const key = JSON.stringify([inputProps, props.autoPlay])
+  if (key === lastDrawn) return
+  lastDrawn = key
+  const spec = inputProps.spec
   root.render(createElement(Player, {
     component: ClipComposition,
-    inputProps: { spec, style: plain(props.clipStyle) },
+    inputProps,
     durationInFrames: durationInFrames(spec),
     fps: FPS,
     compositionWidth: OUT_W,
@@ -86,13 +100,14 @@ onMounted(() => {
     rafId2 = requestAnimationFrame(markReady)
   })
 })
-watch(() => [props.spec, props.clipStyle], draw, { deep: true })
+watch(() => [props.spec, props.clipStyle, props.posterUrl], draw, { deep: true })
 onBeforeUnmount(() => {
   if (rafId1 != null) cancelAnimationFrame(rafId1)
   if (rafId2 != null) cancelAnimationFrame(rafId2)
   detachFrameListener()
   root?.unmount()
   root = null
+  lastDrawn = null
 })
 </script>
 

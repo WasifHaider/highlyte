@@ -7,14 +7,14 @@ import { captionPositionAt } from './lib/view'
 import { toClipTime } from './lib/timeline'
 import type { ClipProps } from './schema'
 
-export const ClipComposition: React.FC<ClipProps> = ({ spec, style }) => {
+export const ClipComposition: React.FC<ClipProps> = ({ spec, style, posterUrl }) => {
   const clip = useMemo(() => toClipTime(spec), [spec])
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
   const position = captionPositionAt(clip, style, frame / fps)
   return (
     <AbsoluteFill style={{ backgroundColor: 'black' }}>
-      <LayoutView spec={clip} layout={style.layout} />
+      <LayoutView spec={clip} layout={style.layout} posterUrl={posterUrl} />
       <Captions words={clip.words} preset={style.captionPreset} accent={style.accent} position={position} />
       {style.showHook && style.hookTitle ? <HookTitle text={style.hookTitle} /> : null}
     </AbsoluteFill>

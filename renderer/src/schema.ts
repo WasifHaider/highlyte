@@ -61,7 +61,9 @@ export const clipStyleSchema = z.object({
   captionPosition: z.enum(['lower', 'middle']),
 })
 
-export const clipPropsSchema = z.object({ spec: clipSpecSchema, style: clipStyleSchema })
+// posterUrl is preview-only (the fit background in the browser Player, see
+// layouts/LayoutView.tsx); renders never receive it.
+export const clipPropsSchema = z.object({ spec: clipSpecSchema, style: clipStyleSchema, posterUrl: z.string().optional() })
 
 export type Layout = z.infer<typeof layoutSchema>
 export type Word = z.infer<typeof wordSchema>

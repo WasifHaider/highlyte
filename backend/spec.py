@@ -4,7 +4,9 @@ Remotion renderer (renderer/src/schema.ts mirrors these models in zod).
 A spec holds what analysis measured about one clip and is written once.
 A style holds what the team chose for it and changes freely. Remotion
 receives both as {spec, style} input props, so the browser preview and
-the Lambda render draw exactly the same thing.
+the Lambda render draw exactly the same thing. One deliberate exception:
+behind a fit frame the preview shows the blurred poster image instead of a
+blurred copy of the video (renderer/src/layouts/LayoutView.tsx).
 
 All times are seconds. start/end are positions inside the padded source
 segment (the cut file). In version 2, word, face-track, speaker and shot
