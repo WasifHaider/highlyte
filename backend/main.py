@@ -25,7 +25,7 @@ from .accounts import Member, current_member
 from .pipeline import cache, clipprep, cut, groq_context, groq_llm, ingest, scoring, selection, transcript, uploads
 from .pipeline.segments import Segment
 from .pipeline.segments import from_dict as segment_from_dict
-from .spec import ClipStyle, Word, default_style, window_duration
+from .spec import BrandKit, ClipStyle, Word, default_style, window_duration
 from . import validation
 from .validation import check_clip_filename, check_id
 
@@ -68,7 +68,7 @@ app.middleware("http")(accounts.session_middleware)
 app.include_router(accounts.router)
 
 RENDERER_PACKAGE_JSON = os.path.join(BASE_DIR, "renderer", "package.json")
-MAX_ZIP_RENDERS = 20
+MAX_ZIP_RENDERS = 60  # up to 12 clips in three shapes
 # How long a browser may reuse /api/clips's redirect to a presigned R2 URL.
 CLIP_REDIRECT_MAX_AGE_S = 600
 
@@ -107,6 +107,10 @@ class Job:
     language_note: str | None = None
     selection_note: str | None = None
     alternates: list[dict[str, Any]] = field(default_factory=list)
+    # The starting style for this job's clips: the brand kit of the member
+    # who started (or retried) it. In memory only; a job rebuilt after a
+    # restart uses the default style.
+    brand_kit: BrandKit | None = field(default=None, repr=False)
     _last_persist: float = field(default=0.0, repr=False)
 
 
@@ -201,12 +205,12 @@ def _job_from_row(row: dict[str, Any]) -> Job:
     )
 
 
-def _start_thread(target, *args, groq_key: str | None = None) -> None:
+def _start_thread(target, *args, groq_key: str | None = None, groq_backup_key: str | None = None) -> None:
     # A plain Thread doesn't inherit the request thread's groq_context, so
     # the worker sets it itself as its first line, before anything in
     # `target` can call groq_llm.build_chat().
     def run() -> None:
-        groq_context.set_groq_key(groq_key)
+        groq_context.set_groq_keys(groq_key, groq_backup_key)
         target(*args)
 
     threading.Thread(target=run, daemon=True).start()
@@ -214,6 +218,7 @@ def _start_thread(target, *args, groq_key: str | None = None) -> None:
 
 def _clip_record(
     job_id: str, idx: int, clip: selection.Clip, prepared: clipprep.PreparedClip, revision: int = 0,
+    kit: BrandKit | None = None,
 ) -> dict[str, Any]:
     spec = prepared.spec
     filename = prepared.filename or clipprep.clip_filename(idx, revision)
@@ -233,7 +238,7 @@ def _clip_record(
         "storageProvider": "r2" if prepared.storage_key else "local",
         "storageKey": prepared.storage_key,
         "spec": spec.model_dump(),
-        "style": default_style(spec).model_dump(),
+        "style": default_style(spec, kit).model_dump(),
         "qaFlags": _qa_flags(clip.flags, prepared.face_at_start),
         "reason": clip.reason,
         "pendingAction": None,
@@ -434,7 +439,7 @@ def _select_and_prepare(job: Job, meta: ingest.VideoMeta, segs: list[Segment], l
             segments=word_segments,
             clips_dir=CLIPS_DIR, models_dir=MODELS_DIR, on_step=on_step,
         )
-        record = _clip_record(job.id, i, c, prepared)
+        record = _clip_record(job.id, i, c, prepared, kit=job.brand_kit)
         job.clips.append(record)
         # Saved per clip, so a failure later in the job doesn't lose
         # the clips already prepared.
@@ -530,9 +535,9 @@ def health() -> dict[str, Any]:
 def generate(req: GenerateRequest, member: Member = Depends(current_member)) -> dict[str, str]:
     job_id = uuid.uuid4().hex[:12]
     job = Job(id=job_id, url=req.url, team_id=member.team_id, created_by=member.user_id,
-              language_requested=req.language)
+              language_requested=req.language, brand_kit=member.brand_kit)
     JOBS[job_id] = job
-    _start_thread(_run_pipeline, job, groq_key=member.groq_key)
+    _start_thread(_run_pipeline, job, groq_key=member.groq_key, groq_backup_key=member.groq_backup_key)
     return {"job_id": job_id}
 
 
@@ -598,9 +603,9 @@ def complete_upload(upload_id: str, body: CompleteUploadBody,
         raise HTTPException(502, "Upload failed. Check your connection and try again.") from e
     job_id = uuid.uuid4().hex[:12]
     job = Job(id=job_id, url=f"{uploads.PREFIX}{upload_id}", team_id=member.team_id,
-              created_by=member.user_id, language_requested=body.language)
+              created_by=member.user_id, language_requested=body.language, brand_kit=member.brand_kit)
     JOBS[job_id] = job
-    _start_thread(_run_pipeline, job, groq_key=member.groq_key)
+    _start_thread(_run_pipeline, job, groq_key=member.groq_key, groq_backup_key=member.groq_backup_key)
     return {"job_id": job_id}
 
 
@@ -661,6 +666,7 @@ def retry_selection(job_id: str, member: Member = Depends(current_member)) -> di
         previous_error = job.error
         job.status, job.error, job.selection_note, job.clips = "analyzing", None, None, []
         job.progress = {"stage": "analyzing", "percent": None, "note": "picking clips…"}
+        job.brand_kit = member.brand_kit
         JOBS[job_id] = job
         _persist_job(job)
 
@@ -672,7 +678,7 @@ def retry_selection(job_id: str, member: Member = Depends(current_member)) -> di
             job.status, job.error = "selection_failed", previous_error
             _persist_job(job)
         raise HTTPException(409, "This video's transcript wasn't saved. Submit the video again.")
-    _start_thread(_run_selection_retry, job, stored, groq_key=member.groq_key)
+    _start_thread(_run_selection_retry, job, stored, groq_key=member.groq_key, groq_backup_key=member.groq_backup_key)
     return {"job_id": job_id}
 
 
@@ -813,9 +819,10 @@ def retry_failed(job_id: str, member: Member = Depends(current_member)) -> dict[
 
     new_id = uuid.uuid4().hex[:12]
     new_job = Job(id=new_id, url=url, team_id=member.team_id, created_by=member.user_id,
-                  language_requested=language if language in ("hinglish", "english") else "hinglish")
+                  language_requested=language if language in ("hinglish", "english") else "hinglish",
+                  brand_kit=member.brand_kit)
     JOBS[new_id] = new_job
-    _start_thread(_run_pipeline, new_job, groq_key=member.groq_key)
+    _start_thread(_run_pipeline, new_job, groq_key=member.groq_key, groq_backup_key=member.groq_backup_key)
     try:
         _purge_job(job_id, keep_upload=True)  # the new job reads the same upload
     except Exception as e:  # noqa: BLE001
@@ -1075,7 +1082,7 @@ def _start_clip_action(clip_id: str, kind: str, member: Member) -> dict[str, Any
             if pick_alternate(job.alternates, current, others) is None:
                 raise HTTPException(409, "No other moments left to swap in.")
         else:
-            groq_context.set_groq_key(member.groq_key)
+            groq_context.set_groq_keys(member.groq_key, member.groq_backup_key)
             if groq_llm.build_chat() is None:
                 raise HTTPException(409, "Regenerate needs a Groq key. Add yours under Settings.")
         record["pendingAction"] = kind
@@ -1085,7 +1092,7 @@ def _start_clip_action(clip_id: str, kind: str, member: Member) -> dict[str, Any
     except Exception:
         record["pendingAction"] = None
         raise
-    _start_thread(_run_clip_action, job, clip_id, kind, groq_key=member.groq_key)
+    _start_thread(_run_clip_action, job, clip_id, kind, groq_key=member.groq_key, groq_backup_key=member.groq_backup_key)
     return {"clipId": clip_id, "pendingAction": kind}
 
 
@@ -1183,6 +1190,12 @@ def _run_clip_action(job: Job, clip_id: str, kind: str) -> None:
             "captionPreset": old_style["captionPreset"],
             "accent": old_style["accent"],
             "captionPosition": old_style["captionPosition"],
+            # Styles saved before these fields existed lack them.
+            "font": old_style.get("font", "montserrat"),
+            "progressBar": old_style.get("progressBar", "off"),
+            "aspect": old_style.get("aspect", "9:16"),
+            "zoom": old_style.get("zoom", "off"),
+            "tighten": old_style.get("tighten", "off"),
         }
         fields = {k: v for k, v in _clip_row(job.id, idx, new_record).items() if k != "id"}
         fields |= {"words_original": None, "bounds_original": None, "pending_action": None, "action_error": None}
@@ -1222,7 +1235,13 @@ def regenerate_clip(clip_id: str, member: Member = Depends(current_member)) -> d
 
 
 @app.post("/api/clips/{clip_id}/render")
-def start_render(clip_id: str, style: ClipStyle = Body(...), member: Member = Depends(current_member)) -> dict[str, Any]:
+def start_render(
+    clip_id: str, style: ClipStyle = Body(...), member: Member = Depends(current_member),
+    save_style: bool = Query(True),
+) -> dict[str, Any]:
+    """Render the clip in `style`. The export bar's extra shapes pass
+    save_style=false: the same clip in another shape, without changing the
+    style the clip is saved with."""
     record = _clip_for_style(clip_id, member)
     if record.get("pendingAction"):
         raise HTTPException(409, "This clip is being replaced. Wait for it to finish.")
@@ -1230,7 +1249,8 @@ def start_render(clip_id: str, style: ClipStyle = Body(...), member: Member = De
         raise HTTPException(503, "Rendering not configured")
     if not record.get("storageKey"):
         raise HTTPException(409, "This clip's source isn't in R2, which Lambda rendering needs.")
-    _save_style(record, style)
+    if save_style:
+        _save_style(record, style)
     try:
         words = [Word.model_validate(w) for w in record["spec"]["words"]]
     except (KeyError, TypeError, ValidationError):
@@ -1251,6 +1271,14 @@ def _get_render(render_id: str, member: Member) -> render.Render:
     return RENDER_SERVICE.refresh(render_id)
 
 
+def render_zip_name(r: render.Render) -> str:
+    """highlyte-<clip>.mp4 for 9:16, highlyte-<clip>-4x5.mp4 and so on for
+    other shapes, so one clip's shapes don't overwrite each other."""
+    aspect = (r.style or {}).get("aspect") or "9:16"
+    suffix = "" if aspect == "9:16" else "-" + aspect.replace(":", "x")
+    return f"highlyte-{r.clip_id}{suffix}.mp4"
+
+
 # Declared before /api/renders/{render_id} so "zip" isn't taken as an id.
 @app.get("/api/renders/zip")
 def renders_zip(ids: str = Query(...), member: Member = Depends(current_member)) -> StreamingResponse:
@@ -1261,10 +1289,14 @@ def renders_zip(ids: str = Query(...), member: Member = Depends(current_member))
     # Spools to disk past 64 MB; mp4s are already compressed, so store them as-is.
     buf = tempfile.SpooledTemporaryFile(max_size=64 * 1024 * 1024)
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:
+        srt_written: set[str] = set()
         for r in renders:
-            with zf.open(f"highlyte-{r.clip_id}.mp4", "w") as dest, contextlib.closing(storage.open_object(r.storage_key)) as src:
+            with zf.open(render_zip_name(r), "w") as dest, contextlib.closing(storage.open_object(r.storage_key)) as src:
                 for chunk in iter(lambda: src.read(1024 * 1024), b""):
                     dest.write(chunk)
+            if r.clip_id in srt_written:
+                continue  # one caption file per clip, whatever its shapes
+            srt_written.add(r.clip_id)
             clip_record = _find_clip(r.clip_id)
             if clip_record is not None and clip_record.get("spec"):
                 zf.writestr(f"highlyte-{r.clip_id}.srt", srt.build_srt(clip_record["spec"]))

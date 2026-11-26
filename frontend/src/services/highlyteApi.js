@@ -91,8 +91,11 @@ export function clipSrtUrl(clipId) {
   return `${baseURL}/api/clips/${clipId}/captions.srt`
 }
 
-export function startRender(clipId, style) {
-  return api.post(`/api/clips/${clipId}/render`, style).then(r => r.data)
+// saveStyle: false renders the clip in `style` without saving it as the
+// clip's style (the export bar's extra shapes).
+export function startRender(clipId, style, { saveStyle = true } = {}) {
+  const params = saveStyle ? undefined : { save_style: false }
+  return api.post(`/api/clips/${clipId}/render`, style, { params }).then(r => r.data)
 }
 
 export function getRender(renderId) {
@@ -119,6 +122,8 @@ export const addTeamUser = email => api.post('/api/team/users', { email }).then(
 export const removeTeamUser = userId => api.delete(`/api/team/users/${userId}`)
 
 export const setMyGroqKey = groqKey => api.put('/api/me/groq-key', { groqKey }).then(r => r.data)
+export const setMyGroqBackupKey = groqBackupKey => api.put('/api/me/groq-backup-key', { groqBackupKey }).then(r => r.data)
+export const setMyBrandKit = kit => api.put('/api/me/brand-kit', kit).then(r => r.data)
 
 // Video upload: the browser sends the parts straight to R2 (see uploader.js).
 export const startUpload = (file) =>

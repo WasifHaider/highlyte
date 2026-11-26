@@ -1,5 +1,5 @@
 <template>
-  <div class="remotion-preview-wrap">
+  <div class="remotion-preview-wrap" :style="{ aspectRatio: `${size.width} / ${size.height}` }">
     <div ref="host" class="remotion-preview"></div>
     <div v-if="!ready" class="remotion-skeleton skeleton" aria-hidden="true"></div>
   </div>
@@ -9,17 +9,21 @@
 // Hosts the Remotion Player (React) inside this Vue app. The composition
 // is imported straight from renderer/src, so the preview is the exact
 // code Lambda renders.
-import { onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue'
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Player } from '@remotion/player'
 import { ClipComposition } from '@renderer/ClipComposition'
-import { FPS, OUT_H, OUT_W, durationInFrames } from '@renderer/constants'
+import { FPS, sizeFor } from '@renderer/constants'
+import { clipFrames } from '@renderer/lib/tighten'
 
 const props = defineProps({
   spec: { type: Object, required: true },
   clipStyle: { type: Object, required: true },
   autoPlay: { type: Boolean, default: false },
+  // The clip's still image, used by the preview as the blurred background
+  // behind a fit frame (renders draw that background from the video).
+  posterUrl: { type: String, default: null },
 })
 
 const host = ref(null)
@@ -52,16 +56,31 @@ function markReady() {
 // React must receive plain objects, not Vue's reactive proxies.
 const plain = (value) => JSON.parse(JSON.stringify(toRaw(value)))
 
+// The serialized props last drawn. The deep watch below also fires when a
+// status poll replaces the clip with an identical copy; redrawing then makes
+// the Player re-check every media element and can trigger a seek, which
+// stutters playback. So only a real change is drawn.
+let lastDrawn = null
+
+// The clip's output size (its aspect ratio; 9:16 when the style has none).
+const size = computed(() => sizeFor(props.clipStyle?.aspect))
+
 function draw() {
   if (!root) return
-  const spec = plain(props.spec)
+  const inputProps = { spec: plain(props.spec), style: plain(props.clipStyle) }
+  if (props.posterUrl) inputProps.posterUrl = props.posterUrl
+  const key = JSON.stringify([inputProps, props.autoPlay])
+  if (key === lastDrawn) return
+  lastDrawn = key
+  const spec = inputProps.spec
   root.render(createElement(Player, {
     component: ClipComposition,
-    inputProps: { spec, style: plain(props.clipStyle) },
-    durationInFrames: durationInFrames(spec),
+    inputProps,
+    // Shorter than the clip when tightening cuts pauses (lib/tighten.ts).
+    durationInFrames: clipFrames(spec, inputProps.style.tighten),
     fps: FPS,
-    compositionWidth: OUT_W,
-    compositionHeight: OUT_H,
+    compositionWidth: size.value.width,
+    compositionHeight: size.value.height,
     controls: true,
     autoPlay: props.autoPlay,
     acknowledgeRemotionLicense: true,
@@ -86,18 +105,19 @@ onMounted(() => {
     rafId2 = requestAnimationFrame(markReady)
   })
 })
-watch(() => [props.spec, props.clipStyle], draw, { deep: true })
+watch(() => [props.spec, props.clipStyle, props.posterUrl], draw, { deep: true })
 onBeforeUnmount(() => {
   if (rafId1 != null) cancelAnimationFrame(rafId1)
   if (rafId2 != null) cancelAnimationFrame(rafId2)
   detachFrameListener()
   root?.unmount()
   root = null
+  lastDrawn = null
 })
 </script>
 
 <style scoped>
-.remotion-preview-wrap { position: relative; width: 100%; aspect-ratio: 9 / 16; border-radius: 10px; overflow: hidden; }
-.remotion-preview { width: 100%; height: 100%; aspect-ratio: 9 / 16; background: #000; border-radius: 10px; overflow: hidden; }
+.remotion-preview-wrap { position: relative; width: 100%; border-radius: 10px; overflow: hidden; }
+.remotion-preview { width: 100%; height: 100%; background: #000; border-radius: 10px; overflow: hidden; }
 .remotion-skeleton { position: absolute; inset: 0; border-radius: 10px; }
 </style>

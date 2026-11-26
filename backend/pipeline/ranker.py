@@ -87,8 +87,18 @@ def windows(units: list[ThoughtUnit]) -> list[list[int]]:
     return out
 
 
-def format_window(units: list[ThoughtUnit], idxs: list[int]) -> str:
-    return "\n\n".join("\n".join(f"{u.id}: {u.text}" for u in units[i].utterances) for i in idxs)
+def _clock(seconds: float) -> str:
+    m, s = divmod(int(seconds), 60)
+    return f"{m}:{s:02d}"
+
+
+def format_window(units: list[ThoughtUnit], idxs: list[int], clock: bool = False) -> str:
+    """One line per utterance, a blank line between thought units. With
+    `clock`, each line also shows when the utterance starts (m:ss), so the
+    model can judge a range's length; it still answers with ids only."""
+    def line(u) -> str:
+        return f"{u.id} [{_clock(u.start)}]: {u.text}" if clock else f"{u.id}: {u.text}"
+    return "\n\n".join("\n".join(line(u) for u in units[i].utterances) for i in idxs)
 
 
 def _clamp01(x: float) -> float:
@@ -114,19 +124,27 @@ def parse_picks(content: str, units: list[ThoughtUnit], idxs: list[int]) -> list
         s, e = item.get("s"), item.get("e")
         if not isinstance(s, str) or not isinstance(e, str) or s not in unit_of or e not in unit_of:
             continue
-        if item.get("starts_mid") is True or item.get("ends_mid") is True:
-            continue
         try:
             standalone, hook, payoff = (_clamp01(float(item[k])) for k in ("standalone", "hook", "payoff"))
         except (KeyError, TypeError, ValueError):
             continue
         first, last = sorted((unit_of[s], unit_of[e]))
+        # The model says the range starts or ends mid-thought: take in the
+        # thought before or after it (snap shortens it if that runs too long),
+        # or drop it when there is none.
+        if item.get("starts_mid") is True:
+            first -= 1
+        if item.get("ends_mid") is True:
+            last += 1
+        if first < 0 or last >= len(units):
+            continue
         picks.append(Pick(first, last, standalone, hook, payoff, reason=str(item.get("reason", ""))[:120]))
     return picks
 
 
-def _rank_window(chat, units: list[ThoughtUnit], idxs: list[int]) -> list[Pick]:
-    prompt = PROMPT.format(transcript=format_window(units, idxs), n=PICKS_PER_WINDOW)
+def _rank_window(chat, units: list[ThoughtUnit], idxs: list[int], template: str = PROMPT,
+                 clock: bool = False) -> list[Pick]:
+    prompt = template.format(transcript=format_window(units, idxs, clock), n=PICKS_PER_WINDOW)
     last_error: BadAnswer | None = None
     for _ in range(2):  # one retry for a cut-off or unreadable answer
         result = chat.complete(prompt, max_tokens=MAX_TOKENS)
@@ -140,7 +158,10 @@ def _rank_window(chat, units: list[ThoughtUnit], idxs: list[int]) -> list[Pick]:
     raise last_error
 
 
-def rank(chat, units: list[ThoughtUnit]) -> RankResult:
+def rank(chat, units: list[ThoughtUnit], *, template: str = PROMPT, clock: bool = False) -> RankResult:
+    """`template` is the prompt with {transcript} and {n} slots and `clock`
+    adds start times to the transcript lines; only the selection comparison
+    script (backend/eval) passes anything but the defaults."""
     wins = windows(units)
     picks: list[Pick] = []
     skipped: list[Skipped] = []
@@ -150,7 +171,7 @@ def rank(chat, units: list[ThoughtUnit]) -> RankResult:
     for n, idxs in enumerate(wins):
         start, end = units[idxs[0]].start, units[idxs[-1]].end
         try:
-            picks.extend(_rank_window(chat, units, idxs))
+            picks.extend(_rank_window(chat, units, idxs, template, clock))
         except DailyLimit as e:
             # Spend nothing more today: skip this window and every later one.
             daily, daily_wait = True, e.wait

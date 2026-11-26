@@ -155,6 +155,17 @@ else about it changed.
   `npm run fixture:video && npm run stills` renders a still for every
   layout × preset.
 - Remotion's free license covers teams of 3 or fewer people.
+- Shape: each clip renders as 9:16, 4:5 or 1:1 (clip editor, "Shape"); the
+  output size comes from the style through `calculateMetadata`.
+- Brand kit: each member sets an accent colour, caption font (Montserrat,
+  Poppins, Anton, Bebas Neue) and progress bar under Settings; their new
+  clips start with it and any clip can still change it in its editor. It is
+  stored in `team_members.brand_kit` (migration
+  `20261123120000_member_brand_kit.sql`). After changing `renderer/`
+  (fonts, progress bar, caption safe areas), redeploy the Lambda site
+  (`npm run deploy:site` in `renderer/`): exports use the deployed bundle,
+  so until then they ignore the font and progress bar and keep the old
+  caption placement.
 
 ### One-time AWS setup
 

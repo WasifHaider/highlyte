@@ -14,7 +14,8 @@ TAGS = ["Strong opinion", "Key insight", "Funny moment", "Actionable advice", "C
 HOOK_TITLE_MAX_WORDS = 8
 MAX_EMPHASIS_WORDS = 5
 CODE_EMPHASIS_WORDS = 3
-MAX_TOKENS = 1200
+MAX_TOKENS = 1200         # enough for 8 clips
+TOKENS_PER_CLIP = 150     # long videos get up to 12 (scoring.max_clips)
 _MIN_EMPHASIS_LEN = 4
 
 STOPWORDS = {
@@ -124,7 +125,7 @@ def write_titles(chat, texts: list[str]) -> tuple[list[Titles], bool]:
         return [fallback(t, i) for i, t in enumerate(texts)], False
     clips = "\n\n".join(f"c{i + 1}: {t}" for i, t in enumerate(texts))
     try:
-        result = chat.complete(PROMPT.format(clips=clips, tags=", ".join(TAGS)), max_tokens=MAX_TOKENS)
+        result = chat.complete(PROMPT.format(clips=clips, tags=", ".join(TAGS)), max_tokens=max(MAX_TOKENS, TOKENS_PER_CLIP * len(texts)))
         if result.finish_reason == "length":
             raise BadAnswer("cut off at the token limit")
         return _parse(result.content, texts), True

@@ -317,6 +317,14 @@ def set_member_groq_key(user_id: str, groq_key: str | None) -> None:
     _require_client().table("team_members").update({"groq_key": groq_key}).eq("user_id", user_id).execute()
 
 
+def set_member_groq_backup_key(user_id: str, groq_backup_key: str | None) -> None:
+    _require_client().table("team_members").update({"groq_backup_key": groq_backup_key}).eq("user_id", user_id).execute()
+
+
+def set_member_brand_kit(user_id: str, kit: dict[str, Any]) -> None:
+    _require_client().table("team_members").update({"brand_kit": kit}).eq("user_id", user_id).execute()
+
+
 def oldest_team_id() -> str | None:
     # Which team gets the pre-login jobs. Ordered by created_at then id so
     # ties (teams created in the same instant) still resolve consistently

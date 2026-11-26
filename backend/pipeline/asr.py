@@ -105,6 +105,35 @@ class GroqAsr:
         return words
 
 
+class GroqKeysAsr:
+    """Groq Whisper on the main key, then the backup key (another Groq
+    account, so another free quota). A key that answers with a rate limit
+    is left out for the rest of the job. The last key's errors are raised
+    as they are, so transcribe_chunks waits a rate limit out and then sends
+    the chunk to local Whisper as before."""
+
+    name = "groq"
+
+    def __init__(self, providers: list[GroqAsr]) -> None:
+        self.providers = list(providers)
+        self._skip: set[int] = set()
+
+    def transcribe(self, wav: str, *, prompt: str | None) -> list[AsrWord]:
+        last: Exception | None = None
+        for i, provider in enumerate(self.providers):
+            if i in self._skip:
+                continue
+            try:
+                return provider.transcribe(wav, prompt=prompt)
+            except Exception as e:  # noqa: BLE001
+                if not _is_rate_limit(e) or i == len(self.providers) - 1:
+                    raise
+                print(f"[asr] Groq key {i + 1} rate-limited, trying the next key")
+                self._skip.add(i)
+                last = e
+        raise last or RuntimeError("no Groq key")
+
+
 _local_models: dict[str, Any] = {}
 
 

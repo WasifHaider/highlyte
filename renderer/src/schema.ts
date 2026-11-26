@@ -50,6 +50,9 @@ export const clipSpecSchema = z.object({
     speakerTimeline: z.array(z.object({ t: z.number(), faceId: z.number().int() })),
     shots: z.array(shotSchema).default([]),
   }),
+  // Pauses in the speech, [start, end] in the same time base as the words
+  // (lib/tighten.ts). Missing on clips prepared before they were measured.
+  silences: z.array(z.tuple([z.number(), z.number()])).default([]),
 })
 
 export const clipStyleSchema = z.object({
@@ -59,9 +62,18 @@ export const clipStyleSchema = z.object({
   hookTitle: z.string().max(80).nullable(),
   accent: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
   captionPosition: z.enum(['lower', 'middle']),
+  // Added later: styles saved before them parse to these defaults, and raw
+  // props without them render the same (fonts.fontFor, ProgressBar).
+  font: z.enum(['montserrat', 'poppins', 'anton', 'bebas']).default('montserrat'),
+  progressBar: z.enum(['off', 'top', 'bottom']).default('off'),
+  aspect: z.enum(['9:16', '4:5', '1:1']).default('9:16'),
+  zoom: z.enum(['off', 'emphasis', 'dynamic']).default('off'),
+  tighten: z.enum(['off', 'pauses', 'all']).default('off'),
 })
 
-export const clipPropsSchema = z.object({ spec: clipSpecSchema, style: clipStyleSchema })
+// posterUrl is preview-only (the fit background in the browser Player, see
+// layouts/LayoutView.tsx); renders never receive it.
+export const clipPropsSchema = z.object({ spec: clipSpecSchema, style: clipStyleSchema, posterUrl: z.string().optional() })
 
 export type Layout = z.infer<typeof layoutSchema>
 export type Word = z.infer<typeof wordSchema>

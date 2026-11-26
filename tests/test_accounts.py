@@ -244,3 +244,42 @@ def test_invalid_refresh_clears_cookies(env):
     assert r.status_code == 401
     cleared = [h.lower() for h in r.headers.get_list("set-cookie") if h.startswith("hl_refresh=")]
     assert cleared and ("max-age=0" in cleared[0] or "expires=thu, 01 jan 1970" in cleared[0])
+
+
+def test_brand_kit_defaults_then_saves_and_shows_in_me(env):
+    _, teams = env
+    c = api_client()
+    assert _signup(c).json()["brandKit"] == {"accent": "#FFD400", "font": "montserrat", "progressBar": "off"}
+    kit = {"accent": "#00AAFF", "font": "anton", "progressBar": "top"}
+    r = c.put("/api/me/brand-kit", json=kit, headers={"X-Requested-With": "highlyte"})
+    assert r.status_code == 200 and r.json() == kit
+    assert c.get("/api/auth/me").json()["brandKit"] == kit
+    assert next(iter(teams.members.values()))["brand_kit"] == kit
+
+
+def test_brand_kit_rejects_bad_values(env):
+    c = api_client()
+    _signup(c)
+    for bad in ({"accent": "blue"}, {"font": "comic-sans"}, {"progressBar": "middle"}):
+        assert c.put("/api/me/brand-kit", json=bad, headers={"X-Requested-With": "highlyte"}).status_code == 422
+
+
+def test_brand_kit_save_failure_is_503(env, monkeypatch):
+    c = api_client()
+    _signup(c)
+
+    def boom(user_id, kit):
+        raise RuntimeError("column team_members.brand_kit does not exist")
+
+    monkeypatch.setattr(db, "set_member_brand_kit", boom)
+    r = c.put("/api/me/brand-kit", json={"accent": "#00AAFF"}, headers={"X-Requested-With": "highlyte"})
+    assert r.status_code == 503 and "brand_kit column" in r.json()["detail"]
+
+
+def test_a_broken_stored_kit_falls_back_to_the_default(env):
+    _, teams = env
+    c = api_client()
+    _signup(c)
+    next(iter(teams.members.values()))["brand_kit"] = {"font": "gone-font"}
+    accounts._member_cache.clear()
+    assert c.get("/api/auth/me").json()["brandKit"]["font"] == "montserrat"

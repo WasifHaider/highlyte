@@ -29,6 +29,91 @@ STREAM_VIDEO_ARGS = [
     "-movflags", "+faststart",
 ]
 
+# Voice polish for every segment, so the preview and the export both get
+# it: cut rumble below 80 Hz, even out loud and soft passages gently, then
+# bring the whole segment to the loudness social platforms play at (about
+# -14 LUFS, peaks under -1.5 dBTP). Two passes: the first measures the
+# segment, the second applies one steady gain from that measurement (a
+# single pass adjusts the gain as it goes, which undershoots on short
+# segments and can pump). loudnorm works at 192 kHz internally, so the
+# result is resampled back to 48 kHz. Nothing here changes timing: word
+# times in the spec stay valid.
+TARGET_LUFS = -14.0
+TARGET_TP = -1.5
+TARGET_LRA = 11.0
+_VOICE_PRE = "highpass=f=80,acompressor=threshold=-20dB:ratio=2.5:attack=15:release=250:makeup=2"
+_LOUDNORM = f"loudnorm=I={TARGET_LUFS}:TP={TARGET_TP}:LRA={TARGET_LRA}"
+
+
+def _measure_loudness(in_path: str) -> dict | None:
+    """loudnorm's first-pass measurement of the polished audio, or None when
+    the input has no audio or ffmpeg's report can't be read."""
+    proc = subprocess.run([
+        "ffmpeg", "-hide_banner", "-nostats", "-i", in_path, "-vn",
+        "-af", f"{_VOICE_PRE},{_LOUDNORM}:print_format=json", "-f", "null", "-",
+    ], capture_output=True)
+    err = proc.stderr.decode(errors="ignore")
+    start, end = err.rfind("{"), err.rfind("}")
+    if proc.returncode != 0 or start < 0 or end < start:
+        return None
+    try:
+        m = json.loads(err[start:end + 1])
+        values = {k: float(m[k]) for k in ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset")}
+    except (KeyError, ValueError):
+        return None
+    # Silence measures as -inf / -70; there is nothing to normalise.
+    if not all(map(lambda v: v == v and abs(v) != float("inf"), values.values())) or values["input_i"] <= -70:
+        return None
+    return values
+
+
+def voice_audio_args(in_path: str) -> list[str]:
+    """ffmpeg output arguments for the segment's audio: polished and
+    normalised when it can be measured, otherwise just re-encoded."""
+    m = _measure_loudness(in_path)
+    if m is None:
+        return ["-c:a", "aac", "-b:a", "160k", "-ar", "48000"]
+    apply = (
+        f"{_LOUDNORM}:measured_I={m['input_i']}:measured_TP={m['input_tp']}:measured_LRA={m['input_lra']}"
+        f":measured_thresh={m['input_thresh']}:offset={m['target_offset']}:linear=true"
+    )
+    return ["-af", f"{_VOICE_PRE},{apply},aresample=48000", "-c:a", "aac", "-b:a", "160k", "-ar", "48000"]
+
+
+# Pauses in a segment's speech, for tightening clips (renderer
+# lib/tighten.ts). Groq's word timings run back to back, so pauses come from
+# the audio: stretches quieter than SILENCE_DB for at least SILENCE_MIN_S.
+# Measured on the normalised segment (about -14 LUFS), so the threshold is
+# relative to speech at a known level.
+SILENCE_DB = -35
+SILENCE_MIN_S = 0.3
+
+
+def detect_silences(path: str) -> list[list[float]]:
+    """[[start, end], ...] in seconds from the file start; [] when the file
+    has no audio or ffmpeg can't read it."""
+    proc = subprocess.run([
+        "ffmpeg", "-hide_banner", "-nostats", "-i", path, "-vn",
+        "-af", f"silencedetect=noise={SILENCE_DB}dB:d={SILENCE_MIN_S}", "-f", "null", "-",
+    ], capture_output=True)
+    if proc.returncode != 0:
+        return []
+    out: list[list[float]] = []
+    start: float | None = None
+    for line in proc.stderr.decode(errors="ignore").splitlines():
+        if "silence_start:" in line:
+            start = max(0.0, float(line.split("silence_start:")[1].split()[0]))
+        elif "silence_end:" in line and start is not None:
+            end = float(line.split("silence_end:")[1].split("|")[0].strip())
+            out.append([round(start, 3), round(end, 3)])
+            start = None
+    if start is not None:  # silent to the end of the file
+        duration = probe_duration(path)
+        if duration and duration > start:
+            out.append([round(start, 3), round(duration, 3)])
+    return out
+
+
 # Card posters: a centre 9:16 crop, small enough to load instantly.
 THUMB_W = 360
 
@@ -55,11 +140,12 @@ def cut_clip(source_path: str, start: float, end: float, out_path: str) -> str:
 
 
 def reencode_segment(in_path: str, out_path: str) -> str:
-    """Re-encode an existing segment with STREAM_VIDEO_ARGS. Audio is
-    copied and no trim is applied, so every time in its spec stays valid."""
+    """Re-encode a downloaded segment with STREAM_VIDEO_ARGS and the voice
+    polish (voice_audio_args). No trim is applied, so every time in its spec
+    stays valid."""
     cmd = [
         "ffmpeg", "-y", "-loglevel", "error", "-i", in_path,
-        *STREAM_VIDEO_ARGS, "-c:a", "copy",
+        *STREAM_VIDEO_ARGS, *voice_audio_args(in_path),
         out_path,
     ]
     return _run(cmd, out_path)

@@ -28,7 +28,7 @@
         <Transition name="fade" mode="out-in">
           <div class="panel-body" :key="clip.id">
             <div class="panel-preview">
-              <RemotionPreview :spec="previewSpec" :clip-style="clip.style" auto-play />
+              <RemotionPreview :spec="previewSpec" :clip-style="clip.style" :poster-url="clip.thumbUrl || null" auto-play />
               <div v-if="clip.pendingAction" class="panel-preview-busy" aria-hidden="true"></div>
             </div>
 
@@ -76,6 +76,61 @@
                   @update:model-value="v => set({ captionPosition: v })"
                 />
               </label>
+              <label class="field" for="edit-aspect-select">
+                <span class="field-label" id="edit-aspect-label">Shape</span>
+                <UiSelect
+                  id="edit-aspect-select"
+                  labelledby="edit-aspect-label"
+                  :model-value="clip.style.aspect || '9:16'"
+                  :options="ASPECTS"
+                  :disabled="!!clip.pendingAction"
+                  @update:model-value="v => set({ aspect: v })"
+                />
+              </label>
+              <label class="field" for="edit-tighten-select">
+                <span class="field-label" id="edit-tighten-label">Tighten</span>
+                <UiSelect
+                  id="edit-tighten-select"
+                  labelledby="edit-tighten-label"
+                  :model-value="clip.style.tighten || 'off'"
+                  :options="TIGHTEN"
+                  :disabled="!!clip.pendingAction"
+                  @update:model-value="v => set({ tighten: v })"
+                />
+              </label>
+              <label class="field" for="edit-zoom-select">
+                <span class="field-label" id="edit-zoom-label">Zoom</span>
+                <UiSelect
+                  id="edit-zoom-select"
+                  labelledby="edit-zoom-label"
+                  :model-value="clip.style.zoom || 'off'"
+                  :options="ZOOMS"
+                  :disabled="clip.style.layout === 'fit' || !!clip.pendingAction"
+                  @update:model-value="v => set({ zoom: v })"
+                />
+              </label>
+              <label class="field" for="edit-font-select">
+                <span class="field-label" id="edit-font-label">Font</span>
+                <UiSelect
+                  id="edit-font-select"
+                  labelledby="edit-font-label"
+                  :model-value="clip.style.font || 'montserrat'"
+                  :options="FONTS"
+                  :disabled="!!clip.pendingAction"
+                  @update:model-value="v => set({ font: v })"
+                />
+              </label>
+              <label class="field" for="edit-progress-select">
+                <span class="field-label" id="edit-progress-label">Progress bar</span>
+                <UiSelect
+                  id="edit-progress-select"
+                  labelledby="edit-progress-label"
+                  :model-value="clip.style.progressBar || 'off'"
+                  :options="PROGRESS_BARS"
+                  :disabled="!!clip.pendingAction"
+                  @update:model-value="v => set({ progressBar: v })"
+                />
+              </label>
               <div class="field">
                 <span class="field-label" id="edit-accent-label">Accent colour</span>
                 <UiColorField
@@ -116,7 +171,7 @@ import TrimControls from './TrimControls.vue'
 import RemotionPreview from './RemotionPreview.vue'
 import UiSelect from './ui/UiSelect.vue'
 import UiColorField from './ui/UiColorField.vue'
-import { LAYOUTS, PRESETS, layoutAllowed } from '../utils/clipStyle'
+import { ASPECTS, FONTS, LAYOUTS, PRESETS, PROGRESS_BARS, TIGHTEN, ZOOMS, layoutAllowed } from '../utils/clipStyle'
 import { toClipTime } from '@renderer/lib/timeline'
 
 const SAVED_MESSAGE_MS = 1500

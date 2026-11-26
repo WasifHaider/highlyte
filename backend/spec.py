@@ -4,7 +4,9 @@ Remotion renderer (renderer/src/schema.ts mirrors these models in zod).
 A spec holds what analysis measured about one clip and is written once.
 A style holds what the team chose for it and changes freely. Remotion
 receives both as {spec, style} input props, so the browser preview and
-the Lambda render draw exactly the same thing.
+the Lambda render draw exactly the same thing. One deliberate exception:
+behind a fit frame the preview shows the blurred poster image instead of a
+blurred copy of the video (renderer/src/layouts/LayoutView.tsx).
 
 All times are seconds. start/end are positions inside the padded source
 segment (the cut file). In version 2, word, face-track, speaker and shot
@@ -22,6 +24,16 @@ from pydantic import BaseModel, Field
 
 LayoutKind = Literal["follow", "speaker", "split", "fit"]
 CaptionPreset = Literal["karaoke", "pop", "clean"]
+# Caption and hook-title fonts (renderer/src/fonts.ts loads each one).
+FontId = Literal["montserrat", "poppins", "anton", "bebas"]
+ProgressBar = Literal["off", "top", "bottom"]
+# Output shape; renderer/src/constants.ts has the pixel size of each.
+Aspect = Literal["9:16", "4:5", "1:1"]
+# Camera motion on face crops (renderer/src/lib/zoom.ts).
+Zoom = Literal["off", "emphasis", "dynamic"]
+# Cutting dead air (renderer/src/lib/tighten.ts): pauses, or pauses and
+# filler words.
+Tighten = Literal["off", "pauses", "all"]
 
 
 class Word(BaseModel):
@@ -93,6 +105,10 @@ class ClipSpec(BaseModel):
     hookTitle: str | None
     viralityScore: float = Field(ge=0, le=10)
     reframe: Reframe
+    # Pauses in the speech, [[start, end], ...] in cut-file time (like the
+    # word times), for tightening. Empty for clips prepared before pauses
+    # were measured: those can only have filler words cut.
+    silences: list[list[float]] = Field(default_factory=list)
 
 
 def window_duration(spec: dict) -> float | None:
@@ -111,21 +127,61 @@ class ClipStyle(BaseModel):
     hookTitle: str | None = Field(None, max_length=80)
     accent: str = Field("#FFD400", pattern=r"^#[0-9A-Fa-f]{6}$")
     captionPosition: Literal["lower", "middle"] = "lower"
+    font: FontId = "montserrat"
+    progressBar: ProgressBar = "off"
+    aspect: Aspect = "9:16"
+    zoom: Zoom = "off"
+    tighten: Tighten = "off"
 
 
-def default_style(spec: ClipSpec) -> ClipStyle:
+class BrandKit(BaseModel):
+    """A member's starting style for their new clips (Settings > Brand kit)."""
+    accent: str = Field("#FFD400", pattern=r"^#[0-9A-Fa-f]{6}$")
+    font: FontId = "montserrat"
+    progressBar: ProgressBar = "off"
+
+
+def brand_kit_from(raw: object) -> BrandKit | None:
+    """A stored kit, or None when there is none or it no longer validates."""
+    if not isinstance(raw, dict):
+        return None
+    try:
+        return BrandKit.model_validate(raw)
+    except ValueError:
+        return None
+
+
+def default_style(spec: ClipSpec, kit: BrandKit | None = None) -> ClipStyle:
+    kit = kit or BrandKit()
     return ClipStyle(
         layout=spec.reframe.auto,
         showHook=spec.hookTitle is not None,
         hookTitle=spec.hookTitle,
         captionPosition="middle" if spec.reframe.auto == "split" else "lower",
+        accent=kit.accent,
+        font=kit.font,
+        progressBar=kit.progressBar,
     )
+
+
+# Style fields added after renders were already cached. At their default
+# value they are left out of the fingerprints below, so a clip that doesn't
+# use them keeps the fingerprint (and the finished export) it already had.
+_LATER_FIELDS = {"font": "montserrat", "progressBar": "off", "aspect": "9:16", "zoom": "off", "tighten": "off"}
+
+
+def _fingerprint_style(style: ClipStyle) -> dict:
+    data = style.model_dump()
+    for k, default in _LATER_FIELDS.items():
+        if data.get(k) == default:
+            data.pop(k)
+    return data
 
 
 def style_hash(style: ClipStyle) -> str:
     """Stable fingerprint of a style, used to reuse an existing render
     instead of paying for an identical one again."""
-    payload = json.dumps(style.model_dump(), sort_keys=True, separators=(",", ":"))
+    payload = json.dumps(_fingerprint_style(style), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
@@ -133,7 +189,7 @@ def render_hash(style: ClipStyle, words: list[Word], bounds: tuple[float, float]
     """Fingerprint of everything an export depends on that a user can
     change: the style, the caption words and (once clips can be trimmed)
     the clip's bounds. Editing any of them must not reuse the old mp4."""
-    payload: dict = {"style": style.model_dump(), "words": [w.model_dump() for w in words]}
+    payload: dict = {"style": _fingerprint_style(style), "words": [w.model_dump() for w in words]}
     if bounds is not None:
         payload["bounds"] = [round(bounds[0], 3), round(bounds[1], 3)]
     data = json.dumps(payload, sort_keys=True, separators=(",", ":"))

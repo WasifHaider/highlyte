@@ -104,3 +104,41 @@ def test_pack_fills_to_five_with_flagged_near_misses():
     assert len(kept) == 5
     assert sum("weak_pick" in c.flags for c in kept) == 2
     assert all(c.start != 200 for c in kept)
+
+
+def test_max_clips_grows_with_video_length():
+    assert scoring.max_clips(10 * 60) == 8          # short videos keep the old cap
+    assert scoring.max_clips(75 * 60) == 8
+    assert scoring.max_clips(120 * 60) == 12        # one per 10 minutes past 80 min
+    assert scoring.max_clips(240 * 60) == scoring.MAX_CLIPS_CEILING
+    assert scoring.max_clips(0) == 8
+
+
+def test_pack_takes_a_larger_cap():
+    cands = [cand(i * 25.0, i * 25.0 + 20, total=0.5 + i / 100) for i in range(14)]
+    assert len(scoring.pack(cands, max_clips=12)) == 12
+    assert len(scoring.pack(cands)) == 8
+
+
+def test_gates_follow_the_median_but_stay_within_the_fixed_bounds():
+    low = [cand(i * 25.0, i * 25.0 + 20, standalone=0.6, hook=0.45) for i in range(8)]
+    g = scoring.gates(low)
+    assert (g.standalone, g.hook) == (0.6, 0.45)
+    high = [cand(i * 25.0, i * 25.0 + 20, standalone=0.95, hook=0.9) for i in range(8)]
+    assert scoring.gates(high) == scoring.FIXED_GATES
+    very_low = [cand(i * 25.0, i * 25.0 + 20, standalone=0.2, hook=0.1) for i in range(8)]
+    g = scoring.gates(very_low)
+    assert (g.standalone, g.hook) == (scoring.NEAR_MIN_STANDALONE, scoring.NEAR_MIN_HOOK)
+
+
+def test_gates_need_enough_candidates_to_adapt():
+    few = [cand(i * 25.0, i * 25.0 + 20, standalone=0.6, hook=0.45) for i in range(3)]
+    assert scoring.gates(few) == scoring.FIXED_GATES
+
+
+def test_pack_with_relative_gates_keeps_a_low_scoring_video_full():
+    low = [cand(i * 25.0, i * 25.0 + 20, total=0.5 + i / 100, standalone=0.6, hook=0.45) for i in range(10)]
+    fixed = scoring.pack(low)
+    relative = scoring.pack(low, gates=scoring.gates(low))
+    assert len(fixed) == scoring.MIN_CLIPS and all("weak_pick" in c.flags for c in fixed)
+    assert len(relative) == scoring.MAX_CLIPS and not any("weak_pick" in c.flags for c in relative)

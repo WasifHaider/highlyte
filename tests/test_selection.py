@@ -158,3 +158,39 @@ def test_skipped_note_merges_ranges():
     ])
     assert note == "Skipped 12:30–18:40, 25:00–31:00 (error, rate limit). Some moments may be missing."
     assert selection.skipped_note([]) is None
+
+
+def test_rank_and_pack_shortens_an_over_long_pick():
+    from tests.llm_fakes import FakeChat
+
+    # u1..u3 spans about 70 s, over the 60 s limit: it is cut back to the end
+    # of u2 (about 45 s) and flagged, not dropped.
+    rejects: list[str] = []
+    out = selection.rank_and_pack(transcript(), [], FakeChat([json.dumps([pick("u1", "u3")])]), rejects=rejects)
+    ranked, candidates, kept = out
+    assert rejects == []
+    assert len(candidates) == 1
+    c = candidates[0]
+    assert c.flags == ["shortened"]
+    assert c.duration <= 60.0 and c.words[-1].t == "baat."
+
+
+def test_rank_and_pack_reports_why_picks_were_dropped():
+    from tests.llm_fakes import FakeChat
+
+    # An 8 s sentence starting on a filler word: stripping "toh" leaves less
+    # than the 8 s minimum, so the cutter rejects it.
+    words = thought(0.0, n=20, text="baat")
+    words[0].t = "toh"
+    segs = [segments.Segment(id="seg_0001", start=0.0, end=words[-1].end, speaker="A", language="hi-Latn-EN",
+                             raw="", hinglish="", words=words, confidence=0.9)]
+    rejects: list[str] = []
+    ranked, candidates, kept = selection.rank_and_pack(segs, [], FakeChat([json.dumps([pick("u1", "u1")])]),
+                                                       rejects=rejects)
+    assert candidates == [] and rejects == ["snap: filler_start"]
+
+
+def test_rank_and_pack_returns_none_without_utterances():
+    from tests.llm_fakes import FakeChat
+
+    assert selection.rank_and_pack([], [], FakeChat([])) is None

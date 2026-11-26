@@ -2,6 +2,20 @@
   <div class="export-pill">
     <span class="selection-label">{{ label }}</span>
     <div class="divider"></div>
+    <div class="shapes" role="group" aria-label="Also export as">
+      <span class="shapes-label">Also as</span>
+      <button
+        v-for="a in ASPECTS"
+        :key="a.value"
+        type="button"
+        class="shape-chip"
+        :class="{ on: jobStore.exportShapes.includes(a.value) }"
+        :aria-pressed="jobStore.exportShapes.includes(a.value)"
+        :title="`Also render each selected clip as ${a.label}`"
+        @click="jobStore.toggleExportShape(a.value)"
+      >{{ a.value }}</button>
+    </div>
+    <div class="divider"></div>
     <a v-if="zipUrl" class="zip-link" :href="zipUrl">
       <span class="zip-full">Download zip</span>
       <span class="zip-short">Zip</span>
@@ -21,6 +35,7 @@
 import { computed } from 'vue'
 import { useJobStore } from '../stores/jobStore'
 import { rendersZipUrl } from '../services/highlyteApi'
+import { ASPECTS } from '../utils/clipStyle'
 
 const jobStore = useJobStore()
 
@@ -28,9 +43,11 @@ const label = computed(() => {
   const n = jobStore.selectedCount
   if (n === 0) return 'Select clips to export'
   const renders = jobStore.selectedRenders
+  const total = jobStore.expectedRenderCount
   const done = renders.filter(r => r.status === 'done').length
   const busy = renders.filter(r => ['queued', 'rendering'].includes(r.status)).length
-  if (busy) return `Rendering ${busy} of ${n} clips… (${done} done)`
+  const what = total === n ? 'clips' : 'videos'
+  if (busy) return `Rendering ${busy} of ${total} ${what}… (${done} done)`
   return `${n} of ${jobStore.clips.length} clips selected`
 })
 
@@ -38,7 +55,7 @@ const canExport = computed(() => jobStore.renderingEnabled && jobStore.selectedC
 
 const zipUrl = computed(() => {
   const renders = jobStore.selectedRenders
-  if (renders.length === 0 || renders.length !== jobStore.selectedCount) return null
+  if (renders.length === 0 || renders.length !== jobStore.expectedRenderCount) return null
   if (!renders.every(r => r.status === 'done')) return null
   return rendersZipUrl(renders.map(r => r.id))
 })
@@ -58,11 +75,19 @@ const zipUrl = computed(() => {
 .zip-link { font-size: 13.5px; font-weight: 600; color: var(--ink-soft); text-decoration: none; white-space: nowrap; }
 .zip-link:hover { color: var(--ink); }
 .zip-short { display: none; }
+.shapes { display: flex; align-items: center; gap: 6px; }
+.shapes-label { font-size: 12.5px; color: var(--ink-soft); white-space: nowrap; }
+.shape-chip {
+  height: 26px; padding: 0 9px; border-radius: 999px; border: 1px solid var(--border);
+  background: #fff; color: var(--ink-soft); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.shape-chip.on { background: var(--ink); border-color: var(--ink); color: #fff; }
 .export-btn { height: 32px; border-radius: 999px; padding: 0 16px; white-space: nowrap; }
 @media (max-width: 480px) {
   .export-pill { gap: 10px; padding: 10px 12px; }
   .zip-full { display: none; }
   .zip-short { display: inline; }
   .selection-label { overflow: hidden; text-overflow: ellipsis; }
+  .shapes-label { display: none; }
 }
 </style>

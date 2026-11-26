@@ -80,20 +80,20 @@ def test_build_chat_without_key(monkeypatch):
     assert groq_llm.build_chat() is None
 
 
-def test_build_chat_returns_the_same_shared_client(monkeypatch):
+def test_build_chat_shares_one_client_per_key_and_model(monkeypatch):
     monkeypatch.setenv("GROQ_KEY", "test-key")
     monkeypatch.setattr(groq_llm, "_chats", {})
     first = groq_llm.build_chat()
     second = groq_llm.build_chat()
     assert first is not None
-    assert first is second
+    assert all(a is b for a, b in zip(first.chats, second.chats))
 
 
 def test_complete_logs_token_usage(capsys):
     usage = SimpleNamespace(prompt_tokens=12, completion_tokens=3)
     chat, _, _ = make([FakeRaw('[]', usage=usage)])
     chat.complete("x", max_tokens=100)
-    assert "[groq] prompt_tokens=12 completion_tokens=3" in capsys.readouterr().out
+    assert "[groq] openai/gpt-oss-20b prompt_tokens=12 completion_tokens=3" in capsys.readouterr().out
 
 
 def test_complete_without_usage_does_not_log(capsys):
@@ -104,3 +104,95 @@ def test_complete_without_usage_does_not_log(capsys):
 
 def test_estimate_tokens():
     assert groq_llm.estimate_tokens("a" * 32) == 10
+
+
+# --- fallback across models and keys ----------------------------------------
+
+
+class _Stub:
+    def __init__(self, label, replies):
+        self.label, self.model, self.provider = label, label, "Groq"
+        self.replies, self.calls = list(replies), 0
+
+    def complete(self, prompt, *, max_tokens):
+        self.calls += 1
+        reply = self.replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return groq_llm.ChatResult(reply, "stop")
+
+
+def test_overloaded_503_is_retried():
+    err = RuntimeError("Error code: 503 - Groq is over capacity")
+    chat, _, sleeps = make([err, FakeRaw("ok")])
+    assert chat.complete("x", max_tokens=10).content == "ok"
+    assert sleeps == [groq_llm.DEFAULT_RETRY_S]
+
+
+def test_chat_sends_its_own_model():
+    fake = FakeOpenAI([FakeRaw("ok")])
+    groq_llm.GroqChat(fake, model=groq_llm.GROQ_BIG_MODEL).complete("x", max_tokens=10)
+    assert fake.calls[0]["model"] == groq_llm.GROQ_BIG_MODEL
+
+
+def test_fallback_uses_first_chat_that_answers():
+    a = _Stub("main / 120b", [RuntimeError("500")])
+    b = _Stub("main / 20b", ["ok"])
+    assert groq_llm.FallbackChat([a, b]).complete("x", max_tokens=10).content == "ok"
+
+
+def test_fallback_skips_a_chat_out_for_the_day():
+    a = _Stub("main / 120b", [groq_llm.DailyLimit("about 5 minutes")])
+    b = _Stub("main / 20b", ["one", "two"])
+    chat = groq_llm.FallbackChat([a, b])
+    assert chat.complete("x", max_tokens=10).content == "one"
+    assert chat.complete("y", max_tokens=10).content == "two"
+    assert a.calls == 1  # not asked again after its daily limit
+
+
+def test_fallback_all_out_for_the_day_raises_daily_limit():
+    a = _Stub("main / 120b", [groq_llm.DailyLimit(None)])
+    b = _Stub("backup / 120b", [groq_llm.DailyLimit("about 3 minutes")])
+    with pytest.raises(groq_llm.DailyLimit) as e:
+        groq_llm.FallbackChat([a, b]).complete("x", max_tokens=10)
+    assert (e.value.provider, e.value.wait) == ("Groq", "about 3 minutes")
+
+
+def test_fallback_raises_last_error_when_all_fail():
+    a = _Stub("main / 120b", [RuntimeError("first")])
+    b = _Stub("main / 20b", [RuntimeError("second")])
+    with pytest.raises(RuntimeError, match="second"):
+        groq_llm.FallbackChat([a, b]).complete("x", max_tokens=10)
+
+
+def test_build_chat_tries_both_models_on_main_then_backup(monkeypatch):
+    monkeypatch.setenv("GROQ_KEY", "main")
+    monkeypatch.setenv("GROQ_BACKUP_KEY", "backup")
+    monkeypatch.setattr(groq_llm, "_chats", {})
+    chat = groq_llm.build_chat()
+    assert [c.label for c in chat.chats] == [
+        f"main key / {groq_llm.GROQ_BIG_MODEL}", f"main key / {groq_llm.GROQ_MODEL}",
+        f"backup key / {groq_llm.GROQ_BIG_MODEL}", f"backup key / {groq_llm.GROQ_MODEL}",
+    ]
+
+
+def test_backup_same_as_main_adds_nothing(monkeypatch):
+    monkeypatch.setenv("GROQ_KEY", "same")
+    monkeypatch.setenv("GROQ_BACKUP_KEY", "same")
+    monkeypatch.setattr(groq_llm, "_chats", {})
+    assert len(groq_llm.build_chat().chats) == len(groq_llm.GROQ_MODELS)
+
+
+def test_backup_key_alone_is_enough(monkeypatch):
+    monkeypatch.setenv("GROQ_KEY", "")
+    monkeypatch.setenv("GROQ_BACKUP_KEY", "backup")
+    monkeypatch.setattr(groq_llm, "_chats", {})
+    assert groq_llm.build_chat() is not None
+
+
+def test_chat_for_model_has_no_fallback(monkeypatch):
+    monkeypatch.setenv("GROQ_KEY", "main")
+    monkeypatch.setattr(groq_llm, "_chats", {})
+    chat = groq_llm.chat_for_model("gpt-oss-120b")
+    assert isinstance(chat, groq_llm.GroqChat) and chat.model == groq_llm.GROQ_BIG_MODEL
+    assert groq_llm.chat_for_model("groq").model == groq_llm.GROQ_MODEL

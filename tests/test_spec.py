@@ -4,7 +4,7 @@ import os
 import pytest
 from pydantic import ValidationError
 
-from backend.spec import ClipSpec, ClipStyle, default_style, style_hash
+from backend.spec import BrandKit, ClipSpec, ClipStyle, brand_kit_from, default_style, render_hash, style_hash
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "..", "renderer", "src", "__fixtures__", "clip-spec.json")
 
@@ -124,3 +124,39 @@ def test_render_hash_changes_with_bounds():
     style, words = ClipStyle(layout="fit"), [Word(text="a", start=0, end=1)]
     assert render_hash(style, words) == render_hash(style, words, None)
     assert render_hash(style, words, (1.0, 9.0)) != render_hash(style, words, (1.5, 9.0))
+
+
+def test_old_style_fingerprints_survive_the_new_fields():
+    # Fingerprints of styles stored before font/progressBar existed, so
+    # their finished exports are still reused.
+    a = ClipStyle(layout="fit")
+    legacy = ClipStyle.model_validate({"layout": "fit", "captionPreset": "karaoke", "showHook": True,
+                                       "hookTitle": None, "accent": "#FFD400", "captionPosition": "lower"})
+    assert style_hash(legacy) == style_hash(a)
+    import hashlib, json
+    old_payload = json.dumps({k: v for k, v in a.model_dump().items() if k not in ("font", "progressBar", "aspect", "zoom", "tighten")},
+                             sort_keys=True, separators=(",", ":"))
+    assert style_hash(a) == hashlib.sha256(old_payload.encode()).hexdigest()[:16]
+
+
+def test_new_style_fields_change_the_fingerprint():
+    base = ClipStyle(layout="fit")
+    assert style_hash(ClipStyle(layout="fit", font="anton")) != style_hash(base)
+    assert render_hash(ClipStyle(layout="fit", progressBar="top"), []) != render_hash(base, [])
+    assert style_hash(ClipStyle(layout="fit", aspect="1:1")) != style_hash(base)
+    assert style_hash(ClipStyle(layout="fit", zoom="dynamic")) != style_hash(base)
+
+
+def test_default_style_starts_from_the_brand_kit():
+    spec = ClipSpec.model_validate(json.load(open(FIXTURE, encoding="utf-8")))
+    style = default_style(spec, BrandKit(accent="#00AAFF", font="bebas", progressBar="bottom"))
+    assert (style.accent, style.font, style.progressBar) == ("#00AAFF", "bebas", "bottom")
+    plain = default_style(spec)
+    assert (plain.accent, plain.font, plain.progressBar) == ("#FFD400", "montserrat", "off")
+
+
+def test_brand_kit_from_ignores_missing_or_invalid_kits():
+    assert brand_kit_from(None) is None
+    assert brand_kit_from("nope") is None
+    assert brand_kit_from({"font": "gone-font"}) is None
+    assert brand_kit_from({"accent": "#123456"}) == BrandKit(accent="#123456")

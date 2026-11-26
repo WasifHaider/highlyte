@@ -28,6 +28,23 @@ def test_format_window_separates_units_with_blank_line():
     assert ranker.format_window(units, [0, 1]) == "u1: kya hua?\nu2: kuch nahi\n\nu3: chalo"
 
 
+def test_format_window_with_clock_shows_start_times():
+    units = [ThoughtUnit([utt(1, 5, 7, "kya hua?")]), ThoughtUnit([utt(2, 125.6, 130, "chalo")])]
+    assert ranker.format_window(units, [0, 1], clock=True) == "u1 [0:05]: kya hua?\n\nu2 [2:05]: chalo"
+
+
+def test_rank_uses_the_given_template_and_clock():
+    chat = FakeChat(["[]"])
+    ranker.rank(chat, units_of(1), template="CUSTOM {n}\n{transcript}", clock=True)
+    assert chat.prompts[0] == f"CUSTOM {ranker.PICKS_PER_WINDOW}\nu1 [0:00]: baat chal rahi hai"
+
+
+def test_rank_defaults_to_the_production_prompt_without_clock():
+    chat = FakeChat(["[]"])
+    ranker.rank(chat, units_of(1))
+    assert chat.prompts[0] == ranker.PROMPT.format(transcript="u1: baat chal rahi hai", n=ranker.PICKS_PER_WINDOW)
+
+
 def test_windows_split_with_overlap(monkeypatch):
     monkeypatch.setattr(ranker, "WINDOW_TOKENS", 30)   # ~96 chars: about 3 units per window
     units = units_of(10)
@@ -53,14 +70,26 @@ def test_parse_picks_drops_bad_items():
     units = units_of(3)
     items = [
         pick("u9", "u2"),                       # unknown id
-        pick("u1", "u1", starts_mid=True),      # mid-thought
-        pick("u2", "u2", ends_mid=True),
         {"s": "u1", "e": "u1", "hook": 0.5, "payoff": 0.5},  # missing standalone
         pick("u3", "u1", standalone=1.7),       # reversed, clamped
         "junk",
     ]
     picks = ranker.parse_picks("Sure! " + json.dumps(items), units, [0, 1, 2])
     assert [(p.first_unit, p.last_unit, p.standalone) for p in picks] == [(0, 2, 1.0)]
+
+
+def test_parse_picks_widens_mid_thought_picks_by_one_unit():
+    units = units_of(4)
+    items = [pick("u2", "u2", starts_mid=True), pick("u2", "u3", ends_mid=True),
+             pick("u2", "u2", starts_mid=True, ends_mid=True)]
+    picks = ranker.parse_picks(json.dumps(items), units, [0, 1, 2, 3])
+    assert [(p.first_unit, p.last_unit) for p in picks] == [(0, 1), (1, 3), (0, 2)]
+
+
+def test_parse_picks_drops_a_mid_thought_pick_with_nothing_to_widen_into():
+    units = units_of(2)
+    items = [pick("u1", "u1", starts_mid=True), pick("u2", "u2", ends_mid=True)]
+    assert ranker.parse_picks(json.dumps(items), units, [0, 1]) == []
 
 
 def test_parse_picks_ignores_ids_outside_the_window():
