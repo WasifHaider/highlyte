@@ -1,10 +1,17 @@
 """Shared Groq chat client for clip selection. One place paces calls under
-the free tier's per-minute token limit and turns rate-limit errors into
-messages a person can act on."""
+the free tier's per-minute token limit, turns rate-limit errors into
+messages a person can act on, and falls back from one model or key to the
+next.
+
+Groq limits each organization (account) and each model separately, so
+every free key gives two daily buckets, `gpt-oss-120b` and `gpt-oss-20b`.
+A member can save a main key and a backup key from a second Groq account;
+selection tries main/120b, main/20b, backup/120b, backup/20b, moving on
+when one hits its daily limit or fails. Two keys from the same account
+share one limit and add nothing."""
 from __future__ import annotations
 
 import math
-import os
 import re
 import threading
 import time
@@ -15,12 +22,18 @@ from . import groq_context
 
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 GROQ_MODEL = "openai/gpt-oss-20b"
-# Groq free tier for gpt-oss-20b (checked 2026-09-26): 8k tokens/minute,
-# 200k tokens/day.
+GROQ_BIG_MODEL = "openai/gpt-oss-120b"
+# Tried in this order on each key.
+GROQ_MODELS = (GROQ_BIG_MODEL, GROQ_MODEL)
+# Groq free tier, both models (checked 2026-11-26): 8k tokens/minute,
+# 200k tokens/day, 1k requests/day.
 TOKENS_PER_MINUTE = 8000
+# Transcript tokens per ranker call: what fits under that limit with the
+# prompt and answer (ranker.WINDOW_TOKENS is this).
+GROQ_WINDOW_TOKENS = 4500
 # Roman Hinglish tokenizes worse than plain English.
 CHARS_PER_TOKEN = 3.2
-# How often a per-minute 429 is waited out and retried.
+# How often a per-minute 429 (or a 503) is waited out and retried.
 RATE_LIMIT_RETRIES = 2
 DEFAULT_RETRY_S = 10.0
 MAX_RETRY_WAIT_S = 65.0
@@ -41,9 +54,10 @@ class BadAnswer(Exception):
 
 
 class DailyLimit(Exception):
-    def __init__(self, wait: str | None) -> None:
-        super().__init__(f"Groq daily limit reached; try again in {wait or 'a while'}")
+    def __init__(self, wait: str | None, provider: str = "Groq") -> None:
+        super().__init__(f"{provider} daily limit reached; try again in {wait or 'a while'}")
         self.wait = wait
+        self.provider = provider
 
 
 @dataclass
@@ -90,15 +104,24 @@ def is_daily_limit(exc: Exception) -> bool:
     return is_rate_limit(exc) and ("per day" in text or "(tpd)" in text or "(rpd)" in text)
 
 
+def is_overloaded(exc: Exception) -> bool:
+    """A 503 (capacity) usually clears within seconds."""
+    text = str(exc).lower()
+    return "503" in text or "over capacity" in text or "overloaded" in text
+
+
 def is_auth_failure(exc: Exception) -> bool:
     text = str(exc).lower()
     return type(exc).__name__ == "AuthenticationError" or "401" in text or "invalid api key" in text
 
 
 class GroqChat:
+    """One model behind one key."""
+
     def __init__(
         self, client: Any, *, sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic, tokens_per_minute: int = TOKENS_PER_MINUTE,
+        model: str = GROQ_MODEL, label: str | None = None,
     ) -> None:
         self._client = client
         self._sleep = sleep
@@ -106,6 +129,10 @@ class GroqChat:
         self._tpm = tokens_per_minute
         self._remaining = tokens_per_minute
         self._reset_at = 0.0
+        self.model = model
+        self.provider = "Groq"
+        # For logs: "main key / openai/gpt-oss-120b".
+        self.label = label or model
         # Guards pacing state plus the call itself: two jobs racing here
         # could otherwise both see a full minute's budget and both spend it.
         self._lock = threading.Lock()
@@ -117,18 +144,18 @@ class GroqChat:
                 self._wait_for(need)
                 try:
                     raw = self._client.chat.completions.with_raw_response.create(
-                        model=GROQ_MODEL,
+                        model=self.model,
                         messages=[{"role": "user", "content": prompt}],
                         max_tokens=max_tokens,
                         # Sent via extra_body because the pinned openai client
-                        # predates the field. Without it gpt-oss-20b spends the
+                        # predates the field. Without it gpt-oss spends the
                         # whole budget on hidden reasoning.
                         extra_body={"reasoning_effort": "low"},
                     )
                 except Exception as e:
                     if is_daily_limit(e):
-                        raise DailyLimit(wait_label(e)) from e
-                    if not is_rate_limit(e) or attempt == RATE_LIMIT_RETRIES:
+                        raise DailyLimit(wait_label(e), self.provider) from e
+                    if not (is_rate_limit(e) or is_overloaded(e)) or attempt == RATE_LIMIT_RETRIES:
                         raise
                     self._sleep(min(retry_after(e) or DEFAULT_RETRY_S, MAX_RETRY_WAIT_S))
                     self._remaining = self._tpm
@@ -137,7 +164,7 @@ class GroqChat:
                 resp = raw.parse()
                 usage = getattr(resp, "usage", None)
                 if usage:
-                    print(f"[groq] prompt_tokens={getattr(usage, 'prompt_tokens', None)} "
+                    print(f"[groq] {self.label} prompt_tokens={getattr(usage, 'prompt_tokens', None)} "
                           f"completion_tokens={getattr(usage, 'completion_tokens', None)}")
                 choice = resp.choices[0]
                 return ChatResult(choice.message.content or "", getattr(choice, "finish_reason", None))
@@ -162,27 +189,97 @@ class GroqChat:
         self._reset_at = self._clock() + (wait if wait is not None else DEFAULT_WINDOW_S)
 
 
-_chats: dict[str, GroqChat] = {}
+class FallbackChat:
+    """Tries each chat in order. A chat that hits its daily limit is skipped
+    for the rest of this object's life (one job); any other failure moves
+    this call on to the next chat. Raises only when every chat failed: a
+    DailyLimit if all of them were out for the day, else the last error."""
+
+    def __init__(self, chats: list[GroqChat]) -> None:
+        self.chats = list(chats)
+        self._out_for_day: set[int] = set()
+        self._lock = threading.Lock()
+
+    @property
+    def model(self) -> str:
+        return self.chats[0].model
+
+    def complete(self, prompt: str, *, max_tokens: int) -> ChatResult:
+        last: Exception | None = None
+        waits: list[str] = []
+        for i, chat in enumerate(self.chats):
+            with self._lock:
+                if i in self._out_for_day:
+                    continue
+            try:
+                return chat.complete(prompt, max_tokens=max_tokens)
+            except DailyLimit as e:
+                with self._lock:
+                    self._out_for_day.add(i)
+                if e.wait:
+                    waits.append(e.wait)
+                last = e
+                print(f"[llm] {chat.label}: daily limit, trying the next one")
+            except Exception as e:  # noqa: BLE001
+                last = e
+                print(f"[llm] {chat.label} failed ({type(e).__name__}), trying the next one")
+        with self._lock:
+            all_out = len(self._out_for_day) == len(self.chats)
+        if all_out:
+            providers = " and ".join(dict.fromkeys(c.provider for c in self.chats))
+            raise DailyLimit(waits[-1] if waits else None, providers) from last
+        assert last is not None
+        raise last
+
+
+_chats: dict[tuple[str, str], GroqChat] = {}
 _chat_lock = threading.Lock()
 
 
-def build_chat() -> GroqChat | None:
-    """One GroqChat per Groq key, shared by every job using that key so
-    they pace calls against the same per-minute budget (spec section 1).
-    Each member can bring their own key (`groq_context`), so the cache is
-    keyed by key rather than a single process-wide singleton."""
-    key = groq_context.get_groq_key()
-    if not key:
-        return None
-    chat = _chats.get(key)
+def _shared(key: str, model: str, label: str | None = None) -> GroqChat:
+    """One GroqChat per (key, model), shared by every job using that key so
+    they pace calls against the same per-minute budget (spec section 1)."""
+    cache_key = (key, model)
+    chat = _chats.get(cache_key)
     if chat is None:
         with _chat_lock:
-            chat = _chats.get(key)
+            chat = _chats.get(cache_key)
             if chat is None:
                 from openai import OpenAI
 
                 # max_retries=0: GroqChat handles 429s itself, and retrying
                 # a daily limit only burns requests.
-                chat = GroqChat(OpenAI(api_key=key, base_url=GROQ_BASE_URL, max_retries=0))
-                _chats[key] = chat
+                chat = GroqChat(OpenAI(api_key=key, base_url=GROQ_BASE_URL, max_retries=0),
+                                model=model, label=label)
+                _chats[cache_key] = chat
     return chat
+
+
+# Short names the selection comparison script accepts for --models.
+MODEL_NAMES = {"groq": GROQ_MODEL, "gpt-oss-20b": GROQ_MODEL, "gpt-oss-120b": GROQ_BIG_MODEL}
+
+
+def chat_for_model(name: str) -> GroqChat | None:
+    """One model on the main key, no fallback, for the selection comparison
+    script. `name` is a key of MODEL_NAMES."""
+    key = groq_context.get_groq_key()
+    return _shared(key, MODEL_NAMES[name]) if key else None
+
+
+def keys() -> list[tuple[str, str]]:
+    """(label, key) for the caller's main and backup Groq keys, set ones only."""
+    out = []
+    for label, key in (("main key", groq_context.get_groq_key()),
+                       ("backup key", groq_context.get_groq_backup_key())):
+        if key and key not in (k for _, k in out):
+            out.append((label, key))
+    return out
+
+
+def build_chat() -> GroqChat | FallbackChat | None:
+    """The chat clip selection uses: every model on the main key, then every
+    model on the backup key (`groq_context`)."""
+    chats = [_shared(key, model, f"{label} / {model}") for label, key in keys() for model in GROQ_MODELS]
+    if not chats:
+        return None
+    return FallbackChat(chats)

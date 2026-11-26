@@ -47,6 +47,7 @@ class Member:
     team_name: str
     role: str  # admin | member
     groq_key: str | None = None
+    groq_backup_key: str | None = None
     brand_kit: BrandKit | None = None
 
     def to_me(self) -> dict[str, Any]:
@@ -55,6 +56,7 @@ class Member:
             "team": {"id": self.team_id, "name": self.team_name},
             "role": self.role,
             "groqKey": self.groq_key,
+            "groqBackupKey": self.groq_backup_key,
             # Always a full kit, so the Settings form has values to show.
             "brandKit": (self.brand_kit or BrandKit()).model_dump(),
         }
@@ -89,6 +91,15 @@ class GroqKeyRequest(BaseModel):
     @field_validator("groqKey")
     @classmethod
     def _groq_key(cls, value: str) -> str:
+        return value.strip()
+
+
+class GroqBackupKeyRequest(BaseModel):
+    groqBackupKey: str = Field(max_length=200)
+
+    @field_validator("groqBackupKey")
+    @classmethod
+    def _groq_backup_key(cls, value: str) -> str:
         return value.strip()
 
 
@@ -131,6 +142,8 @@ def _load_member(user: auth.AuthUser) -> Member | None:
         team_name=(row.get("teams") or {}).get("name") or "",
         role=row["role"],
         groq_key=row.get("groq_key") or None,
+        # None until the groq_backup_key column exists (migration 20261126120000_member_groq_backup_key.sql).
+        groq_backup_key=row.get("groq_backup_key") or None,
         # None until the brand_kit column exists (migration 20261123120000_member_brand_kit.sql).
         brand_kit=brand_kit_from(row.get("brand_kit")),
     )
@@ -296,6 +309,13 @@ def set_my_groq_key(body: GroqKeyRequest, member: Member = Depends(current_membe
     db.set_member_groq_key(member.user_id, body.groqKey or None)
     _forget_member(member.user_id)  # next call reloads the fresh key, not the 60s cache
     return {"groqKey": body.groqKey or None}
+
+
+@router.put("/api/me/groq-backup-key")
+def set_my_groq_backup_key(body: GroqBackupKeyRequest, member: Member = Depends(current_member)) -> dict[str, Any]:
+    db.set_member_groq_backup_key(member.user_id, body.groqBackupKey or None)
+    _forget_member(member.user_id)  # next call reloads the fresh key, not the 60s cache
+    return {"groqBackupKey": body.groqBackupKey or None}
 
 
 @router.put("/api/me/brand-kit")

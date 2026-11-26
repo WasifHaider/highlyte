@@ -15,6 +15,14 @@ found.
 
 Gold file: {"<job id>": [[start_s, end_s], ...], ...}
 
+--models runs every variant on each Groq model (main key, no fallback):
+"groq" or "gpt-oss-20b" (the default), "gpt-oss-120b". Runs on a model
+other than 20b are saved as "<model>@<variant>-<n>.json" and reported as
+"<variant> @ <model>".
+
+    python -m backend.eval.compare_selection --jobs 48ec2e8a39e7 --runs 2 \\
+        --models groq,gpt-oss-120b --gold eval-runs/gold.json
+
 Uses GROQ_KEY from the environment (.env). Each run of a long video costs
 several Groq calls against that key's daily limit.
 """
@@ -109,7 +117,7 @@ def _kept(c: scoring.Candidate) -> Kept:
     )
 
 
-def run_once(segments, loudness, chat, variant: str, run: int) -> Run:
+def run_once(segments, loudness, chat, variant: str, run: int, label: str | None = None) -> Run:
     rejects: list[str] = []
     v = VARIANTS[variant]
     out = rank_and_pack(segments, loudness, chat, template=v.template, clock=v.clock, rerank=v.rerank, rejects=rejects)
@@ -117,11 +125,12 @@ def run_once(segments, loudness, chat, variant: str, run: int) -> Run:
     counts: dict[str, int] = {}
     for r in rejects:
         counts[r] = counts.get(r, 0) + 1
+    label = label or variant
     if out is None:
-        return Run(variant, run, [], 0, 0, [], counts, len(answers), chat.est_tokens, list(answers))
+        return Run(label, run, [], 0, 0, [], counts, len(answers), chat.est_tokens, list(answers))
     ranked, candidates, kept = out
     skipped = [f"{duration_label(s.start)}-{duration_label(s.end)} {s.reason}" for s in ranked.skipped]
-    return Run(variant, run, [_kept(c) for c in kept], len(candidates), len(ranked.picks), skipped,
+    return Run(label, run, [_kept(c) for c in kept], len(candidates), len(ranked.picks), skipped,
                counts, len(answers), chat.est_tokens, list(answers))
 
 
@@ -185,6 +194,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--runs", type=int, default=1)
     ap.add_argument("--gold", help="gold moments JSON file")
     ap.add_argument("--out", default="eval-runs")
+    ap.add_argument("--models", default="groq", help=f"comma-separated, from: {', '.join(groq_llm.MODEL_NAMES)}")
     ap.add_argument("--replay", action="store_true", help="reuse saved answers instead of calling Groq")
     args = ap.parse_args(argv)
 
@@ -193,12 +203,18 @@ def main(argv: list[str] | None = None) -> int:
     if unknown:
         ap.error(f"unknown variant(s): {', '.join(unknown)}")
     gold_all = json.load(open(args.gold, encoding="utf-8")) if args.gold else {}
+    models = [m.strip() for m in args.models.split(",") if m.strip()]
+    unknown = [m for m in models if m not in groq_llm.MODEL_NAMES]
+    if unknown:
+        ap.error(f"unknown model(s): {', '.join(unknown)}")
 
-    chat = None
+    chats: dict[str, Any] = {}
     if not args.replay:
-        chat = groq_llm.build_chat()
-        if chat is None:
-            ap.error("GROQ_KEY is not set")
+        for model in models:
+            chat = groq_llm.chat_for_model(model)
+            if chat is None:
+                ap.error("GROQ_KEY is not set")
+            chats[model] = chat
 
     sections = []
     for job_id in [j.strip() for j in args.jobs.split(",") if j.strip()]:
@@ -214,21 +230,30 @@ def main(argv: list[str] | None = None) -> int:
         os.makedirs(job_dir, exist_ok=True)
 
         runs: list[Run] = []
-        for variant in variants:
-            for i in range(1, args.runs + 1):
-                path = os.path.join(job_dir, f"{variant}-{i}.json")
-                if args.replay:
-                    if not os.path.exists(path):
-                        print(f"{job_id}: no saved {variant} run {i}, skipped", file=sys.stderr)
-                        continue
-                    answers = json.load(open(path, encoding="utf-8"))["answers"]
-                    run = run_once(segments, loudness, ReplayChat(answers), variant, i)
-                    run.answers = answers
-                else:
-                    print(f"{job_id}: {variant} run {i}...", file=sys.stderr)
-                    run = run_once(segments, loudness, RecordingChat(chat), variant, i)
-                    _save(path, run)
-                runs.append(run)
+        for model in models:
+            # 20b runs keep the names they had before --models existed.
+            plain = groq_llm.MODEL_NAMES[model] == groq_llm.GROQ_MODEL
+            for variant in variants:
+                stem = variant if plain else f"{model}@{variant}"
+                label = variant if plain else f"{variant} @ {model}"
+                for i in range(1, args.runs + 1):
+                    path = os.path.join(job_dir, f"{stem}-{i}.json")
+                    if args.replay:
+                        if not os.path.exists(path):
+                            print(f"{job_id}: no saved {label} run {i}, skipped", file=sys.stderr)
+                            continue
+                        answers = json.load(open(path, encoding="utf-8"))["answers"]
+                        run = run_once(segments, loudness, ReplayChat(answers), variant, i, label)
+                        run.answers = answers
+                    else:
+                        print(f"{job_id}: {label} run {i}...", file=sys.stderr)
+                        try:
+                            run = run_once(segments, loudness, RecordingChat(chats[model]), variant, i, label)
+                        except groq_llm.SelectionFailed as e:
+                            print(f"{job_id}: {label} run {i} failed: {e}", file=sys.stderr)
+                            continue
+                        _save(path, run)
+                    runs.append(run)
         sections.append(report(job_id, title, runs, gold_all.get(job_id)))
 
     text = "\n".join(sections)

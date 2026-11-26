@@ -169,3 +169,38 @@ def test_transcribe_chunks_without_groq_uses_local():
     local = Fake("whisper", [[asr.AsrWord("b", 0, 1, 1.0)]])
     _, source = asr.transcribe_chunks([Chunk("a.wav", 0)], None, local, prompt=None)
     assert source == "whisper"
+
+
+def test_groq_keys_moves_to_backup_on_rate_limit_and_stays_there():
+    main = Fake("groq", [RuntimeError("429 rate limit (ASD)")])
+    backup = Fake("groq", [[asr.AsrWord("a", 0, 1, 1.0)], [asr.AsrWord("b", 0, 1, 1.0)]])
+    keys = asr.GroqKeysAsr([main, backup])
+    assert keys.transcribe("c0.wav", prompt=None)[0].text == "a"
+    assert keys.transcribe("c1.wav", prompt=None)[0].text == "b"
+    assert len(main.calls) == 1
+
+
+def test_groq_keys_other_errors_do_not_switch_keys():
+    main = Fake("groq", [RuntimeError("server error")])
+    backup = Fake("groq", [])
+    with pytest.raises(RuntimeError, match="server error"):
+        asr.GroqKeysAsr([main, backup]).transcribe("c.wav", prompt=None)
+    assert backup.calls == []
+
+
+def test_groq_keys_last_key_rate_limit_is_raised():
+    main = Fake("groq", [RuntimeError("429 rate limit")])
+    backup = Fake("groq", [RuntimeError("429 rate limit, retry in 2s")])
+    with pytest.raises(RuntimeError, match="retry in 2s"):
+        asr.GroqKeysAsr([main, backup]).transcribe("c.wav", prompt=None)
+
+
+def test_transcript_providers_use_both_keys(monkeypatch):
+    from backend.pipeline import transcript
+    monkeypatch.setenv("GROQ_KEY", "main")
+    monkeypatch.setenv("GROQ_BACKUP_KEY", "backup")
+    primary, _ = transcript._providers("hinglish")
+    assert isinstance(primary, asr.GroqKeysAsr) and [p.key for p in primary.providers] == ["main", "backup"]
+    monkeypatch.setenv("GROQ_BACKUP_KEY", "")
+    primary, _ = transcript._providers("hinglish")
+    assert isinstance(primary, asr.GroqAsr) and primary.key == "main"

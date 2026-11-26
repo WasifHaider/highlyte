@@ -29,6 +29,29 @@
     </div>
 
     <div class="section">
+      <h2 class="section-title">Backup Groq key</h2>
+      <p class="muted sub-note">
+        Optional. A key from a second Groq account, used when your main key hits its daily limit.
+        Groq's limits are per account, so another key from the same account doesn't help.
+      </p>
+      <form class="add-user" @submit.prevent="saveBackup">
+        <label class="field">
+          <span class="field-label">Backup Groq API key</span>
+          <input v-model.trim="backupKey" type="password" class="input" placeholder="gsk_…" autocomplete="off" />
+        </label>
+        <button type="submit" class="btn btn-primary" :disabled="backupSaving">
+          <BusyLabel :busy="backupSaving" idle="Save" busy-text="Saving…" />
+        </button>
+      </form>
+      <Transition name="fade">
+        <div v-if="backupError" class="danger-note" role="alert">{{ backupError }}</div>
+      </Transition>
+      <Transition name="fade">
+        <div v-if="backupSaved" class="state-msg" role="status">Saved.</div>
+      </Transition>
+    </div>
+
+    <div class="section">
       <h2 class="section-title">My brand kit</h2>
       <p class="muted sub-note">
         Your new clips start with these. You can still change any clip in its editor.
@@ -93,6 +116,27 @@ async function save() {
   }
 }
 
+const backupKey = ref(auth.me?.groqBackupKey || '')
+const backupSaving = ref(false)
+const backupError = ref('')
+const backupSaved = ref(false)
+let backupSavedTimer = null
+
+async function saveBackup() {
+  backupError.value = ''
+  backupSaving.value = true
+  try {
+    await auth.setGroqBackupKey(backupKey.value)
+    backupSaved.value = true
+    clearTimeout(backupSavedTimer)
+    backupSavedTimer = setTimeout(() => { backupSaved.value = false }, SAVED_MESSAGE_MS)
+  } catch (e) {
+    backupError.value = apiErrorMessage(e, "Couldn't save your backup Groq key.")
+  } finally {
+    backupSaving.value = false
+  }
+}
+
 const kit = reactive({ ...DEFAULT_BRAND_KIT, ...(auth.me?.brandKit || {}) })
 const kitSaving = ref(false)
 const kitError = ref('')
@@ -116,6 +160,7 @@ async function saveKit() {
 
 onUnmounted(() => {
   clearTimeout(savedTimer)
+  clearTimeout(backupSavedTimer)
   clearTimeout(kitSavedTimer)
 })
 </script>

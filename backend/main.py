@@ -205,12 +205,12 @@ def _job_from_row(row: dict[str, Any]) -> Job:
     )
 
 
-def _start_thread(target, *args, groq_key: str | None = None) -> None:
+def _start_thread(target, *args, groq_key: str | None = None, groq_backup_key: str | None = None) -> None:
     # A plain Thread doesn't inherit the request thread's groq_context, so
     # the worker sets it itself as its first line, before anything in
     # `target` can call groq_llm.build_chat().
     def run() -> None:
-        groq_context.set_groq_key(groq_key)
+        groq_context.set_groq_keys(groq_key, groq_backup_key)
         target(*args)
 
     threading.Thread(target=run, daemon=True).start()
@@ -537,7 +537,7 @@ def generate(req: GenerateRequest, member: Member = Depends(current_member)) -> 
     job = Job(id=job_id, url=req.url, team_id=member.team_id, created_by=member.user_id,
               language_requested=req.language, brand_kit=member.brand_kit)
     JOBS[job_id] = job
-    _start_thread(_run_pipeline, job, groq_key=member.groq_key)
+    _start_thread(_run_pipeline, job, groq_key=member.groq_key, groq_backup_key=member.groq_backup_key)
     return {"job_id": job_id}
 
 
@@ -605,7 +605,7 @@ def complete_upload(upload_id: str, body: CompleteUploadBody,
     job = Job(id=job_id, url=f"{uploads.PREFIX}{upload_id}", team_id=member.team_id,
               created_by=member.user_id, language_requested=body.language, brand_kit=member.brand_kit)
     JOBS[job_id] = job
-    _start_thread(_run_pipeline, job, groq_key=member.groq_key)
+    _start_thread(_run_pipeline, job, groq_key=member.groq_key, groq_backup_key=member.groq_backup_key)
     return {"job_id": job_id}
 
 
@@ -678,7 +678,7 @@ def retry_selection(job_id: str, member: Member = Depends(current_member)) -> di
             job.status, job.error = "selection_failed", previous_error
             _persist_job(job)
         raise HTTPException(409, "This video's transcript wasn't saved. Submit the video again.")
-    _start_thread(_run_selection_retry, job, stored, groq_key=member.groq_key)
+    _start_thread(_run_selection_retry, job, stored, groq_key=member.groq_key, groq_backup_key=member.groq_backup_key)
     return {"job_id": job_id}
 
 
@@ -822,7 +822,7 @@ def retry_failed(job_id: str, member: Member = Depends(current_member)) -> dict[
                   language_requested=language if language in ("hinglish", "english") else "hinglish",
                   brand_kit=member.brand_kit)
     JOBS[new_id] = new_job
-    _start_thread(_run_pipeline, new_job, groq_key=member.groq_key)
+    _start_thread(_run_pipeline, new_job, groq_key=member.groq_key, groq_backup_key=member.groq_backup_key)
     try:
         _purge_job(job_id, keep_upload=True)  # the new job reads the same upload
     except Exception as e:  # noqa: BLE001
@@ -1082,7 +1082,7 @@ def _start_clip_action(clip_id: str, kind: str, member: Member) -> dict[str, Any
             if pick_alternate(job.alternates, current, others) is None:
                 raise HTTPException(409, "No other moments left to swap in.")
         else:
-            groq_context.set_groq_key(member.groq_key)
+            groq_context.set_groq_keys(member.groq_key, member.groq_backup_key)
             if groq_llm.build_chat() is None:
                 raise HTTPException(409, "Regenerate needs a Groq key. Add yours under Settings.")
         record["pendingAction"] = kind
@@ -1092,7 +1092,7 @@ def _start_clip_action(clip_id: str, kind: str, member: Member) -> dict[str, Any
     except Exception:
         record["pendingAction"] = None
         raise
-    _start_thread(_run_clip_action, job, clip_id, kind, groq_key=member.groq_key)
+    _start_thread(_run_clip_action, job, clip_id, kind, groq_key=member.groq_key, groq_backup_key=member.groq_backup_key)
     return {"clipId": clip_id, "pendingAction": kind}
 
 

@@ -71,9 +71,15 @@ class NoSpeechError(RuntimeError):
 
 
 def _providers(language: str) -> tuple[asr.AsrProvider | None, asr.AsrProvider]:
-    key = groq_context.get_groq_key()
     model = asr.GROQ_HINGLISH_MODEL if language == "hinglish" else asr.GROQ_ENGLISH_MODEL
-    return (asr.GroqAsr(key, model) if key else None), asr.LocalWhisperAsr("small")
+    keys = [k for k in dict.fromkeys((groq_context.get_groq_key(), groq_context.get_groq_backup_key())) if k]
+    if not keys:
+        primary = None
+    elif len(keys) == 1:
+        primary = asr.GroqAsr(keys[0], model)
+    else:
+        primary = asr.GroqKeysAsr([asr.GroqAsr(k, model) for k in keys])
+    return primary, asr.LocalWhisperAsr("small")
 
 
 def transcribe(
